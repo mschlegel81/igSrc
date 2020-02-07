@@ -258,6 +258,101 @@ PROCEDURE halftone_impl(CONST parameters:T_parameterValue; CONST context:P_abstr
     context^.image.halftone(parameters.f1*context^.image.diagonal*0.01,parameters.i0);
   end;
 
+PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
+  TYPE T_rectData=record
+         x0,y0,x1,y1:longint;
+         variance:double;
+         mean:T_rgbFloatColor;
+       end;
+  VAR xRes,yRes:longint;
+      rectangle:T_rectData;
+      rectangles:array of T_rectData;
+      splitRatio:double;
+
+  PROCEDURE scanRectangle(VAR r:T_rectData);
+    VAR x,y:longint;
+        c,s,ss:T_rgbFloatColor;
+    begin
+      s :=BLACK;
+      ss:=BLACK;
+      for y:=r.y0 to r.y1-1 do
+      for x:=r.x0 to r.x1-1 do begin
+        c:=context^.image[x,y];
+        s +=c;
+        ss+=c*c;
+      end;
+      s *=1/((r.y1-r.y0)*(r.x1-r.x0));
+      ss*=1/((r.y1-r.y0)*(r.x1-r.x0));
+      ss-=s*s;
+      r.mean:=s;
+      r.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue])*(r.y1-r.y0)*(r.x1-r.x0);
+    end;
+
+  PROCEDURE splitRectangle;
+    VAR a0,a1,
+        b0,b1:T_rectData;
+        splitIdx:longint=0;
+        i:longint;
+    begin
+      splitIdx:=0;
+      for i:=1 to length(rectangles)-1 do if rectangles[i].variance>rectangles[splitIdx].variance then splitIdx:=i;
+      with rectangles[splitIdx] do begin
+        a0.x0:=x0; a0.x1:=x1; a0.y0:=y0; a0.y1:=y1;
+        a1.x0:=x0; a1.x1:=x1; a1.y0:=y0; a1.y1:=y1;
+        b0.x0:=x0; b0.x1:=x1; b0.y0:=y0; b0.y1:=y1;
+        b1.x0:=x0; b1.x1:=x1; b1.y0:=y0; b1.y1:=y1;
+        if x1-x0>=y1-y0 then begin
+          //split along x-axis
+          a0.x1:=round(x0+   splitRatio *(x1-x0));
+          a1.x0:=a0.x1;
+          b0.x1:=round(x0+(1-splitRatio)*(x1-x0));
+          b1.x0:=b0.x1;
+        end else begin
+          //split along y-axis
+          a0.y1:=round(y0+   splitRatio *(y1-y0));
+          a1.y0:=a0.y1;
+          b0.y1:=round(y0+(1-splitRatio)*(y1-y0));
+          b1.y0:=b0.y1;
+        end;
+      end;
+      scanRectangle(a0);
+      scanRectangle(a1);
+      if (b0.x1<>a0.x1) or (b0.y1<>a0.y1) then begin
+        scanRectangle(b0);
+        scanRectangle(b1);
+        if b0.variance+b1.variance<a0.variance+a1.variance then begin
+          a0:=b0;
+          a1:=b1;
+        end;
+      end;
+      i:=length(rectangles);
+      setLength(rectangles,i+1);
+      rectangles[splitIdx]:=a0;
+      rectangles[i       ]:=a1;
+    end;
+
+  PROCEDURE drawRectangle(CONST r:T_rectData);
+    VAR x,y:longint;
+    begin
+      with r do for y:=y0 to y1-1 do for x:=x0 to x1-1 do context^.image.pixel[x,y]:=mean;
+    end;
+
+  begin
+    xRes:=context^.image.dimensions.width;
+    yRes:=context^.image.dimensions.height;
+    splitRatio:=parameters.f1;
+    setLength(rectangles,1);
+    with rectangles[0] do begin
+      x0:=0;
+      y0:=0;
+      x1:=xRes;
+      y1:=yRes;
+    end;
+    while (length(rectangles)<parameters.i0) and not(context^.cancellationRequested) do splitRectangle;
+    for rectangle in rectangles do drawRectangle(rectangle);
+    setLength(rectangles,0);
+  end;
+
 INITIALIZATION
 registerSimpleOperation(imc_misc,
   newParameterDescription('sketch',pt_4floats)^
@@ -301,6 +396,12 @@ registerSimpleOperation(imc_misc,
     .addChildParameterDescription(spa_i0,'style',pt_integer,0,7)^
     .addChildParameterDescription(spa_f1,'scale',pt_float,0),
   @halftone_impl);
+registerSimpleOperation(imc_misc,
+  newParameterDescription('rectangleSplit',pt_1I1F)^
+    .setDefaultValue('500,0.5')^
+    .addChildParameterDescription(spa_i0,'count',pt_integer,2,200000)^
+    .addChildParameterDescription(spa_f1,'splitRatio',pt_float,0,1),
+  @rectagleSplit_impl);
 
 end.
 
