@@ -127,6 +127,8 @@ PROCEDURE T_generateImageWorkflow.beforeAll;
     enterCriticalSection(contextCS);
     enterCriticalSection(relatedEditor^.contextCS);
     try
+      messageQueue^.Post('----------------------------------',false);
+      messageQueue^.Post('Starting preview calculation',false);
       image.resize(relatedEditor^.config.initialResolution,res_dataResize);
       if (editingStep>0) and (editingStep-1<relatedEditor^.stepCount) and (relatedEditor^.step[editingStep-1]^.outputImage<>nil) then begin
         image.copyFromPixMap(relatedEditor^.step[editingStep-1]^.outputImage^);
@@ -176,8 +178,7 @@ CONSTRUCTOR T_generateImageWorkflow.createOneStepWorkflow(
     current:=imageGenerationAlgorithms[0];
   end;
 
-FUNCTION T_generateImageWorkflow.startEditing(CONST stepIndex: longint
-  ): boolean;
+FUNCTION T_generateImageWorkflow.startEditing(CONST stepIndex: longint): boolean;
   begin
     if not(relatedEditor^.step[stepIndex]^.isValid) or
        (relatedEditor^.step[stepIndex]^.operation=nil) or
@@ -369,6 +370,7 @@ PROCEDURE T_editorWorkflow.beforeAll;
       if currentExecution.currentStepIndex>0
       then image.copyFromPixMap(steps[currentExecution.currentStepIndex-1]^.outputImage^)
       else config.prepareImageForWorkflow(image);
+      messageQueue^.Post('----------------------------------',false);
       if currentExecution.currentStepIndex=0
       then messageQueue^.Post('Starting workflow',false)
       else messageQueue^.Post('Resuming workflow',false,currentExecution.currentStepIndex);
@@ -532,8 +534,8 @@ PROCEDURE T_editorWorkflow.swapStepDown(CONST index: longint);
         tmp           :=steps[index  ];
         steps[index  ]:=steps[index+1];
         steps[index+1]:=tmp;
-        isValid; //query "isValid" to trigger validation
-        stepChanged(index);
+        if isValid then stepChanged(index)
+                   else stepChanged(0);
       finally
         leaveCriticalSection(contextCS);
       end;
@@ -550,8 +552,8 @@ PROCEDURE T_editorWorkflow.removeStep(CONST index: longint);
         dispose(steps[index],destroy);
         for i:=index to length(steps)-2 do steps[i]:=steps[i+1];
         setLength(steps,length(steps)-1);
-        isValid; //query "isValid" to trigger validation
-        stepChanged(index);
+        if isValid then stepChanged(index)
+                   else stepChanged(0);
       finally
         leaveCriticalSection(contextCS);
       end;

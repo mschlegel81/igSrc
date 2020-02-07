@@ -77,6 +77,8 @@ TYPE
       PROPERTY f1:double read floatValue[1];
       PROPERTY f2:double read floatValue[2];
       PROPERTY f3:double read floatValue[3];
+      FUNCTION getNumericParameter(CONST index:byte):double;
+      PROCEDURE setNumericParameter(CONST index:byte; CONST value:double);
       FUNCTION color:T_rgbFloatColor;
       FUNCTION strEq(CONST other:T_parameterValue):boolean;
       FUNCTION interpolate(CONST other:T_parameterValue; CONST step:double):T_parameterValue;
@@ -574,6 +576,36 @@ FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode)
   end;
 
 FUNCTION T_parameterValue.fileName: string; begin result:=fileNameValue; end;
+
+FUNCTION T_parameterValue.getNumericParameter(CONST index:byte):double;
+  begin
+    case index of
+      0: if associatedParmeterDescription^.typ in I0_RELEVANT_PARAMETER_TYPES then result:=intValue  [0] else
+         if associatedParmeterDescription^.typ in F0_RELEVANT_PARAMETER_TYPES then result:=floatValue[0] else result:=0;
+      1: if associatedParmeterDescription^.typ in I1_RELEVANT_PARAMETER_TYPES then result:=intValue  [1] else
+         if associatedParmeterDescription^.typ in F1_RELEVANT_PARAMETER_TYPES then result:=floatValue[1] else result:=0;
+      2: if associatedParmeterDescription^.typ in I2_RELEVANT_PARAMETER_TYPES then result:=intValue  [2] else
+         if associatedParmeterDescription^.typ in F2_RELEVANT_PARAMETER_TYPES then result:=floatValue[2] else result:=0;
+      3: if associatedParmeterDescription^.typ in I3_RELEVANT_PARAMETER_TYPES then result:=intValue  [3] else
+         if associatedParmeterDescription^.typ in F3_RELEVANT_PARAMETER_TYPES then result:=floatValue[3] else result:=0;
+    else result:=0;
+    end;
+  end;
+
+PROCEDURE T_parameterValue.setNumericParameter(CONST index:byte; CONST value:double);
+  begin
+    case index of
+      0: if associatedParmeterDescription^.typ in I0_RELEVANT_PARAMETER_TYPES then intValue  [0]:=round(value) else
+         if associatedParmeterDescription^.typ in F0_RELEVANT_PARAMETER_TYPES then floatValue[0]:=      value;
+      1: if associatedParmeterDescription^.typ in I1_RELEVANT_PARAMETER_TYPES then intValue  [1]:=round(value) else
+         if associatedParmeterDescription^.typ in F1_RELEVANT_PARAMETER_TYPES then floatValue[1]:=      value;
+      2: if associatedParmeterDescription^.typ in I2_RELEVANT_PARAMETER_TYPES then intValue  [2]:=round(value) else
+         if associatedParmeterDescription^.typ in F2_RELEVANT_PARAMETER_TYPES then floatValue[2]:=      value;
+      3: if associatedParmeterDescription^.typ in I3_RELEVANT_PARAMETER_TYPES then intValue  [3]:=round(value) else
+         if associatedParmeterDescription^.typ in F3_RELEVANT_PARAMETER_TYPES then floatValue[3]:=      value;
+    end;
+  end;
+
 FUNCTION T_parameterValue.color: T_rgbFloatColor;
   begin
     result:=rgbColor(floatValue[0],floatValue[1],floatValue[2]);
