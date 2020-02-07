@@ -212,8 +212,7 @@ PROCEDURE T_imageWorkflowConfiguration.setInitialImage(
     if onStep0Changed<>nil then onStep0Changed();
   end;
 
-PROCEDURE T_imageWorkflowConfiguration.setInitialImage(
-  CONST fileName: string);
+PROCEDURE T_imageWorkflowConfiguration.setInitialImage(CONST fileName: string);
   begin
     if fileName=initialImageFilename then exit;
     clearImage;
@@ -247,6 +246,7 @@ PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(
           reloadInitialImage;
           cachedInitialImageWasScaled:=limitImageSize(cachedInitialImage^);
         end;
+        image.copyFromPixMap(cachedInitialImage^);
       end;
     end else begin
       image.resize(fInitialResolution,res_dataResize);
