@@ -747,9 +747,18 @@ registerSimpleOperation(imc_statistic,newParameterDescription('compress saturati
 registerSimpleOperation(imc_statistic,newParameterDescription('mono',        pt_integer)^.setDefaultValue('10')^.addChildParameterDescription(spa_i0,'Color count',pt_integer,1,255),@mono_impl);
 registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_integer)^.setDefaultValue('16')^.addChildParameterDescription(spa_i0,'Color count',pt_integer,2,255),@quantize_impl);
 registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_3integers)^.setDefaultValue('16,0,0')
-                                                                                        ^.addChildParameterDescription(spa_i0,'Color count',pt_integer,2,256)
-                                                                                        ^.addChildParameterDescription(spa_i1,'Color mode',pt_integer,0,5)
-                                                                                        ^.addChildParameterDescription(spa_i2,'Dither mode',pt_integer,0,3),@quantizeCustom_impl);
+                                                        ^.addChildParameterDescription(spa_i0,'Color count',pt_integer,2,256)
+                                                        ^.addEnumChildDescription(spa_i1,'Color mode','Standard adaptive colors',
+                                                                                                      'Fixed table 1',
+                                                                                                      'Fixed table 2',
+                                                                                                      'Monochrome adaptive',
+                                                                                                      'Median cut adaptive',
+                                                                                                      'k-means adaptive')
+                                                        ^.addEnumChildDescription(spa_i2,'Dither mode','none',
+                                                                                                       'Floyd-Steinberg',
+                                                                                                       'Line-Based',
+                                                                                                       'Koch-Curve'),
+                                                        @quantizeCustom_impl);
 
 end.
 
