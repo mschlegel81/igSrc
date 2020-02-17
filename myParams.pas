@@ -116,6 +116,17 @@ TYPE
                        CONST typ_: T_parameterType;
                        CONST minValue_: double= -infinity;
                        CONST maxValue_: double=  infinity):P_parameterDescription;
+    FUNCTION addEnumChildDescription(
+                       CONST association_:T_subParameterAssociation;
+                       CONST name_,value0,value1: string;
+                       CONST value2:string='';
+                       CONST value3:string='';
+                       CONST value4:string='';
+                       CONST value5:string='';
+                       CONST value6:string='';
+                       CONST value7:string='';
+                       CONST value8:string='';
+                       CONST value9:string=''):P_parameterDescription;
     FUNCTION subCount:longint;
     FUNCTION getSubDescription(CONST index:longint):P_parameterDescription;
     FUNCTION getSubParameter(CONST index:longint; CONST parentParameter:T_parameterValue):T_parameterValue;
@@ -207,6 +218,41 @@ FUNCTION T_parameterDescription.addChildParameterDescription(
     with children[length(children)-1] do begin
       new(description,
         create(name_,typ_,minValue_,maxValue_));
+      association:=association_;
+    end;
+    result:=@self;
+  end;
+
+FUNCTION T_parameterDescription.addEnumChildDescription(
+                   CONST association_:T_subParameterAssociation;
+                   CONST name_,value0,value1: string;
+                   CONST value2:string='';
+                   CONST value3:string='';
+                   CONST value4:string='';
+                   CONST value5:string='';
+                   CONST value6:string='';
+                   CONST value7:string='';
+                   CONST value8:string='';
+                   CONST value9:string=''):P_parameterDescription;
+  VAR subEnumValues:T_arrayOfString;
+  begin
+    assert(association_ in [spa_i0..spa_i3]);
+    setLength(subEnumValues,2);
+    subEnumValues[0]:=value0;
+    subEnumValues[1]:=value1;
+    if value2<>'' then append(subEnumValues,value2);
+    if value3<>'' then append(subEnumValues,value3);
+    if value4<>'' then append(subEnumValues,value4);
+    if value5<>'' then append(subEnumValues,value5);
+    if value6<>'' then append(subEnumValues,value6);
+    if value7<>'' then append(subEnumValues,value7);
+    if value8<>'' then append(subEnumValues,value8);
+    if value9<>'' then append(subEnumValues,value9);
+    setLength(children,length(children)+1);
+    with children[length(children)-1] do begin
+      new(description,
+        create(name_,pt_enum,0,length(subEnumValues)-1));
+      description^.setEnumValues(subEnumValues);
       association:=association_;
     end;
     result:=@self;

@@ -265,7 +265,7 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
          mean:T_rgbFloatColor;
        end;
   VAR xRes,yRes:longint;
-      rectangle:T_rectData;
+      Rectangle:T_rectData;
       rectangles:array of T_rectData;
       splitRatio:double;
 
@@ -349,7 +349,7 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
       y1:=yRes;
     end;
     while (length(rectangles)<parameters.i0) and not(context^.cancellationRequested) do splitRectangle;
-    for rectangle in rectangles do drawRectangle(rectangle);
+    for Rectangle in rectangles do drawRectangle(Rectangle);
     setLength(rectangles,0);
   end;
 
@@ -393,7 +393,15 @@ registerSimpleOperation(imc_misc,
 registerSimpleOperation(imc_misc,
   newParameterDescription('halftone',pt_1I1F)^
     .setDefaultValue('0,0.2')^
-    .addChildParameterDescription(spa_i0,'style',pt_integer,0,7)^
+    .addEnumChildDescription(spa_i0,'style',
+    'quadratic grid on black',
+    'quadratic grid on white',
+    'quadratic shifted grid on black',
+    'quadratic shifted grid on white',
+    'hexagonal grid on black',
+    'hexagonal grid on white',
+    'hexagonal shifted grid on black',
+    'hexagonal shifted grid on white')^
     .addChildParameterDescription(spa_f1,'scale',pt_float,0),
   @halftone_impl);
 registerSimpleOperation(imc_misc,
