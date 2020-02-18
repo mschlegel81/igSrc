@@ -267,86 +267,143 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
   VAR xRes,yRes:longint;
       Rectangle:T_rectData;
       rectangles:array of T_rectData;
-      splitRatio:double;
 
   PROCEDURE scanRectangle(VAR r:T_rectData);
     VAR x,y:longint;
+        k:longint=0;
         c,s,ss:T_rgbFloatColor;
     begin
       s :=BLACK;
       ss:=BLACK;
-      for y:=r.y0 to r.y1-1 do
-      for x:=r.x0 to r.x1-1 do begin
+      for y:=max(0,r.y0) to min(r.y1,context^.image.dimensions.height)-1 do
+      for x:=max(0,r.x0) to min(r.x1,context^.image.dimensions.width )-1 do begin
         c:=context^.image[x,y];
+        k +=1;
         s +=c;
         ss+=c*c;
       end;
-      s *=1/((r.y1-r.y0)*(r.x1-r.x0));
-      ss*=1/((r.y1-r.y0)*(r.x1-r.x0));
-      ss-=s*s;
-      r.mean:=s;
-      r.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue])*(r.y1-r.y0)*(r.x1-r.x0);
+      ss-=s*s*(1/k);
+      r.mean:=s*(1/k);
+      if k=0
+      then r.variance:=-1
+      else r.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
     end;
 
   PROCEDURE splitRectangle;
-    VAR a0,a1,
-        b0,b1:T_rectData;
+    VAR a0,a1,b0,b1:T_rectData;
         splitIdx:longint=0;
         i:longint;
     begin
       splitIdx:=0;
       for i:=1 to length(rectangles)-1 do if rectangles[i].variance>rectangles[splitIdx].variance then splitIdx:=i;
-      with rectangles[splitIdx] do begin
-        a0.x0:=x0; a0.x1:=x1; a0.y0:=y0; a0.y1:=y1;
-        a1.x0:=x0; a1.x1:=x1; a1.y0:=y0; a1.y1:=y1;
-        b0.x0:=x0; b0.x1:=x1; b0.y0:=y0; b0.y1:=y1;
-        b1.x0:=x0; b1.x1:=x1; b1.y0:=y0; b1.y1:=y1;
-        if x1-x0>=y1-y0 then begin
-          //split along x-axis
-          a0.x1:=round(x0+   splitRatio *(x1-x0));
-          a1.x0:=a0.x1;
-          b0.x1:=round(x0+(1-splitRatio)*(x1-x0));
-          b1.x0:=b0.x1;
-        end else begin
-          //split along y-axis
-          a0.y1:=round(y0+   splitRatio *(y1-y0));
-          a1.y0:=a0.y1;
-          b0.y1:=round(y0+(1-splitRatio)*(y1-y0));
-          b1.y0:=b0.y1;
+      a0:=rectangles[splitIdx];
+      a1:=rectangles[splitIdx];
+      b0:=rectangles[splitIdx];
+      b1:=rectangles[splitIdx];
+      case byte(parameters.i1) of
+        1: with rectangles[splitIdx] do begin
+          if x1-x0>=y1-y0 then begin
+            a0.x1:=round(x0+0.6180339887498949*(x1-x0)); a1.x0:=a0.x1;
+            b0.x1:=round(x0+0.3819660112501051*(x1-x0)); b1.x0:=b0.x1;
+          end else begin
+            a0.y1:=round(y0+0.6180339887498949*(y1-y0)); a1.y0:=a0.y1;
+            b0.y1:=round(y0+0.3819660112501051*(y1-y0)); b1.y0:=b0.y1;
+          end;
+          scanRectangle(a0);
+          scanRectangle(a1);
+          if (b0.x1<>a0.x1) or (b0.y1<>a0.y1) then begin
+            scanRectangle(b0);
+            scanRectangle(b1);
+            if b0.variance+b1.variance<a0.variance+a1.variance then begin
+              a0:=b0;
+              a1:=b1;
+            end;
+          end;
+          i:=length(rectangles);
+          setLength(rectangles,i+1);
+          rectangles[splitIdx]:=a0;
+          rectangles[i       ]:=a1;
+        end;
+        2: with rectangles[splitIdx] do begin
+          a0.x1:=round(x0+0.5*(x1-x0)); a1.x0:=a0.x1; b0.x1:=a0.x1; b1.x0:=a1.x0;
+          a0.y1:=round(y0+0.5*(y1-y0)); a1.y1:=a0.y1; b0.y0:=a0.y1; b1.y0:=a0.y1;
+          scanRectangle(a0);
+          scanRectangle(a1);
+          scanRectangle(b0);
+          scanRectangle(b1);
+          i:=length(rectangles);
+          setLength(rectangles,i+3);
+          rectangles[splitIdx]:=a0;
+          rectangles[i       ]:=a1;
+          rectangles[i+1     ]:=b0;
+          rectangles[i+2     ]:=b1;
+        end;
+        else with rectangles[splitIdx] do begin
+          if x1-x0>=y1-y0 then begin
+            a0.x1:=round(x0+0.5*(x1-x0)); a1.x0:=a0.x1;
+          end else begin
+            a0.y1:=round(y0+0.5*(y1-y0)); a1.y0:=a0.y1;
+          end;
+          scanRectangle(a0);
+          scanRectangle(a1);
+          i:=length(rectangles);
+          setLength(rectangles,i+1);
+          rectangles[splitIdx]:=a0;
+          rectangles[i       ]:=a1;
         end;
       end;
-      scanRectangle(a0);
-      scanRectangle(a1);
-      if (b0.x1<>a0.x1) or (b0.y1<>a0.y1) then begin
-        scanRectangle(b0);
-        scanRectangle(b1);
-        if b0.variance+b1.variance<a0.variance+a1.variance then begin
-          a0:=b0;
-          a1:=b1;
-        end;
-      end;
-      i:=length(rectangles);
-      setLength(rectangles,i+1);
-      rectangles[splitIdx]:=a0;
-      rectangles[i       ]:=a1;
     end;
 
+  VAR topEdgeLight   :double=1.1785113019775793 ;
+      bottomEdgeLight:double=0.23570226039551595;
+      leftEdgeLight  :double=0.47140452079103179;
+      rightEdgeLight :double=0.94280904158206336;
+      borderWitdh    :double=20;
+
   PROCEDURE drawRectangle(CONST r:T_rectData);
+    FUNCTION colorAt(CONST cx,cy:double):T_rgbFloatColor; inline;
+      VAR b   :byte=0;
+          d   :double=infinity;
+          dn  :double;
+      begin
+        dn:=(cx-r.x0); if (dn<borderWitdh)            then begin b:=1; d:=dn; end;
+        dn:=(r.x1-cx); if (dn<borderWitdh) and (dn<d) then begin b:=2; d:=dn; end;
+        dn:=(cy-r.y0); if (dn<borderWitdh) and (dn<d) then begin b:=3; d:=dn; end;
+        dn:=(r.y1-cy); if (dn<borderWitdh) and (dn<d) then begin b:=4; d:=dn; end;
+        case b of
+          1: result:=r.mean*leftEdgeLight;
+          2: result:=r.mean*rightEdgeLight;
+          3: result:=r.mean*topEdgeLight;
+          4: result:=r.mean*bottomEdgeLight;
+        else result:=r.mean;
+        end;
+      end;
+
     VAR x,y:longint;
+        sum:T_rgbFloatColor;
+        ix,iy:longint;
     begin
-      with r do for y:=y0 to y1-1 do for x:=x0 to x1-1 do context^.image.pixel[x,y]:=mean;
+      with r do for y:=max(0,y0) to min(y1,context^.image.dimensions.height)-1 do
+                for x:=max(0,x0) to min(x1,context^.image.dimensions.width )-1 do begin
+        sum:=BLACK;
+        for ix:=0 to 4 do for iy:=0 to 4 do sum+=colorAt(x+(ix+0.5)/5,y+(iy+0.5)/5);
+        context^.image.pixel[x,y]:=sum*0.04;
+      end;
     end;
 
   begin
+    borderWitdh:=parameters.f2/1000*context^.image.diagonal;
+    topEdgeLight   :=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*  2/3 );
+    bottomEdgeLight:=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*(-2/3));
+    leftEdgeLight  :=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*(-1/3));
+    rightEdgeLight :=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*( 1/3));
     xRes:=context^.image.dimensions.width;
     yRes:=context^.image.dimensions.height;
-    splitRatio:=parameters.f1;
     setLength(rectangles,1);
     with rectangles[0] do begin
-      x0:=0;
-      y0:=0;
-      x1:=xRes;
-      y1:=yRes;
+      x1:=max(xRes,yRes);
+      y0:=(yRes-x1) div 2; y1:=x1+y0;
+      x0:=(xRes-x1) div 2; x1   +=x0;
     end;
     while (length(rectangles)<parameters.i0) and not(context^.cancellationRequested) do splitRectangle;
     for Rectangle in rectangles do drawRectangle(Rectangle);
@@ -405,10 +462,13 @@ registerSimpleOperation(imc_misc,
     .addChildParameterDescription(spa_f1,'scale',pt_float,0),
   @halftone_impl);
 registerSimpleOperation(imc_misc,
-  newParameterDescription('rectangleSplit',pt_1I1F)^
-    .setDefaultValue('500,0.5')^
+  newParameterDescription('rectangleSplit',pt_2I2F)^
+    .setDefaultValue('500,0,2,45')^
     .addChildParameterDescription(spa_i0,'count',pt_integer,2,200000)^
-    .addChildParameterDescription(spa_f1,'splitRatio',pt_float,0,1),
+    .addEnumChildDescription(spa_i1,'split style',
+     'half split','golden section split','quadrats split')^
+    .addChildParameterDescription(spa_f2,'border width',pt_float,0)^
+    .addChildParameterDescription(spa_f3,'border angle',pt_float,0,90),
   @rectagleSplit_impl);
 
 end.
