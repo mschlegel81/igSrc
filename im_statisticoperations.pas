@@ -555,9 +555,12 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           end;
           if popCount=0
           then begin
-            spread:=DEFAULT_COLOR_TABLE[nextDefaultColor];
-            inc(nextDefaultColor);
-            result:=true;
+            if nextDefaultColor<length(DEFAULT_COLOR_TABLE)
+            then begin
+              spread:=DEFAULT_COLOR_TABLE[nextDefaultColor];
+              inc(nextDefaultColor);
+              result:=true;
+            end else spread:=BLACK;
           end else spread*=(1/popCount);
         end;
       end;
