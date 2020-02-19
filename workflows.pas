@@ -10,6 +10,7 @@ TYPE
   P_simpleWorkflow=^T_simpleWorkflow;
   T_simpleWorkflow=object(T_abstractWorkflow)
     protected
+      startedAt:double;
       steps: array of P_workflowStep;
       PROCEDURE headlessWorkflowExecution; virtual;
       PROCEDURE afterStep(CONST stepIndex:longint; CONST elapsed:double); virtual;
@@ -282,8 +283,8 @@ PROCEDURE T_simpleWorkflow.afterAll;
       if currentExecution.workflowState in [ts_pending,ts_evaluating] then currentExecution.workflowState:=ts_ready;
       if currentExecution.workflowState in [ts_stopRequested        ] then currentExecution.workflowState:=ts_cancelled;
       case currentExecution.workflowState of
-        ts_ready: messageQueue^.Post('Workflow done',false);
-        ts_cancelled: messageQueue^.Post('Workflow cancelled',false,currentExecution.currentStepIndex);
+        ts_ready: messageQueue^.Post('Workflow done '+myTimeToStr(now-startedAt),false);
+        ts_cancelled: messageQueue^.Post('Workflow cancelled '+myTimeToStr(now-startedAt),false,currentExecution.currentStepIndex);
       end;
     finally
       leaveCriticalSection(contextCS);
@@ -345,6 +346,7 @@ PROCEDURE T_simpleWorkflow.beforeAll;
   begin
     enterCriticalSection(contextCS);
     try
+      startedAt:=now;
       currentExecution.workflowState:=ts_evaluating;
       currentExecution.currentStepIndex:=0;
       config.prepareImageForWorkflow(image);
@@ -359,6 +361,7 @@ PROCEDURE T_editorWorkflow.beforeAll;
   begin
     enterCriticalSection(contextCS);
     try
+      startedAt:=now;
       currentExecution.workflowState:=ts_evaluating;
       currentExecution.currentStepIndex:=0;
       if previewQuality<>config.intermediateResultsPreviewQuality
