@@ -135,124 +135,6 @@ PROCEDURE encircleNeon_impl(CONST parameters:T_parameterValue; CONST context:P_a
   begin
     encircle(context^.image,parameters.i0,BLACK,parameters.f1,parameters.f2,context);
   end;
-
-PROCEDURE bySpheres(VAR image:T_rawImage; CONST count:longint; CONST style:byte; CONST relativeCircleSize0,relativeCircleSize1:double; CONST context:P_abstractWorkflow);
-  VAR copy:T_rawImage;
-
-  FUNCTION avgColor(VAR source:T_rawImage; CONST cx,cy,radius:double):T_rgbFloatColor;
-    VAR sampleCount:longint=0;
-        sqrRad:double;
-        x,y:longint;
-    begin
-      sqrRad:=sqr(radius);
-      result:=BLACK;
-      for y:=max(0,round(cy-radius)) to min(image.dimensions.height-1,round(cy+radius)) do
-      for x:=max(0,round(cx-radius)) to min(image.dimensions.width-1,round(cx+radius)) do
-      if sqr(x-cx)+sqr(y-cy)<=sqrRad then
-      begin
-        result:=result+source[x,y];
-        inc(sampleCount);
-      end;
-      if sampleCount>0 then result:=result*(1/sampleCount);
-    end;
-
-  FUNCTION getColorForPixel(CONST ix,iy:longint; CONST cx,cy,radius:double; CONST baseColor,previousColor:T_rgbFloatColor):T_rgbFloatColor;
-    FUNCTION illumination(x,y,r2:double):single;
-      VAR ambient:single;
-      begin
-        ambient:=x*0.30151134457776363-
-        y         *0.30151134457776363+
-        sqrt(1-r2)*0.90453403373329089;
-        result:=ambient*0.75+0.25;
-      end;
-
-    VAR x,y,r2:double;
-        cover:single;
-    begin
-      x:=(ix-cx)/radius;
-      y:=(iy-cy)/radius;
-      r2:=sqr(x)+sqr(y);
-      if r2<1 then begin
-        result:=baseColor*illumination(x,y,r2);
-      end else begin
-        r2:=sqrt(r2);
-        cover:=(1-(r2-1)*radius);
-        if cover<0
-        then result:=previousColor
-        else result:=baseColor    *illumination(x/r2,y/r2,1)*cover+
-                     previousColor*                  (1-cover);
-      end;
-    end;
-
-  PROCEDURE drawRandomSphere(CONST radius,avgWeight:double);
-    FUNCTION getImprovement(CONST cx,cy:double):double;
-      VAR x,y:longint;
-          prevError,newError:double;
-          avg:T_rgbFloatColor;
-      begin
-        avg:=avgColor(copy,cx,cy,radius);
-        result:=0;
-        for y:=max(0,round(cy-radius)) to min(image.dimensions.height-1,round(cy+radius)) do
-        for x:=max(0,round(cx-radius)) to min(image.dimensions.width -1,round(cx+radius)) do begin
-          prevError:=colDiff(copy[x,y],image.pixel[x,y]);
-          newError :=colDiff(copy[x,y],getColorForPixel(x,y,cx,cy,radius,avg*avgWeight+copy[x,y]*(1-avgWeight),image.pixel[x,y]));
-          result+=prevError-newError;
-        end;
-      end;
-
-    VAR x,y:longint;
-        best_cx,best_cy,best_imp:double;
-        cx,cy,imp:double;
-        avg:T_rgbFloatColor;
-        i:longint;
-    begin
-      best_imp:=-infinity;
-      for i:=0 to round(min(20,30000/sqr(radius))) do begin
-        cx:=random*(image.dimensions.width +radius)-0.5*radius;
-        cy:=random*(image.dimensions.height+radius)-0.5*radius;
-        imp:=getImprovement(cx,cy);
-        if (imp>best_imp) then begin
-          best_imp:=imp;
-          best_cx :=cx;
-          best_cy :=cy;
-        end;
-      end;
-      cx:=best_cx;
-      cy:=best_cy;
-      avg:=avgColor(copy,cx,cy,radius);
-      for y:=max(0,round(cy-radius)) to min(image.dimensions.height-1,round(cy+radius)) do
-      for x:=max(0,round(cx-radius)) to min(image.dimensions.width -1,round(cx+radius)) do
-        image.pixel[x,y]:=getColorForPixel(x,y,cx,cy,radius,avg*avgWeight+copy[x,y]*(1-avgWeight),image.pixel[x,y]);
-    end;
-
-  VAR radius,avgWeight,ra,rb:double;
-      i:longint;
-  begin
-    copy.create(image);
-    rb:=relativeCircleSize1/(relativeCircleSize0-relativeCircleSize1);
-    ra:=rb*relativeCircleSize0*image.diagonal;
-    if      style=0 then avgWeight:=1
-    else if style=1 then avgWeight:=0;
-    image.clearWithColor(BLACK);
-    for i:=0 to count-1 do begin
-      if context^.cancellationRequested then break;
-      //radius:=exp((1-i/(count-1))*ln(relativeCircleSize0)+
-      //               i/(count-1) *ln(relativeCircleSize1))*diagonal;
-      radius:=ra/(rb+i/(count-1));
-      case style of
-        2: avgWeight:=  i/(count-1);
-        3: avgWeight:=1-i/(count-1);
-      end;
-      drawRandomSphere(radius,avgWeight);
-    end;
-    copy.destroy;
-  end;
-
-PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin
-    bySpheres(context^.image,parameters.i0,parameters.i1,parameters.f2,parameters.f3,context);
-  end;
-
 PROCEDURE halftone_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
     context^.image.halftone(parameters.f1*context^.image.diagonal*0.01,parameters.i0);
@@ -439,14 +321,6 @@ registerSimpleOperation(imc_misc,
     .addChildParameterDescription(spa_f1,'opacity' ,pt_float,0,1)^
     .addChildParameterDescription(spa_f2,'circle size' ,pt_float,0),
   @encircleNeon_impl);
-registerSimpleOperation(imc_misc,
-  newParameterDescription('spheres',pt_2I2F,0)^
-    .setDefaultValue('2000,3,0.2,0.001')^
-    .addChildParameterDescription(spa_i0,'sphere count',pt_integer,1,100000)^
-    .addChildParameterDescription(spa_i1,'sphere style',pt_integer,0,3)^
-    .addChildParameterDescription(spa_f2,'max size' ,pt_float,0,1)^
-    .addChildParameterDescription(spa_f3,'min size' ,pt_float,0,1),
-  @spheres_impl);
 registerSimpleOperation(imc_misc,
   newParameterDescription('halftone',pt_1I1F)^
     .setDefaultValue('0,0.2')^

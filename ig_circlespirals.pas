@@ -23,32 +23,32 @@ TYPE
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE execute(CONST context:P_abstractWorkflow); virtual;
   end;
-
-IMPLEMENTATION
-USES darts,math;
 TYPE T_circle=record
        center:T_Complex;
        radius:double;
        color:T_rgbFloatColor;
      end;
      T_circles=array of T_circle;
-
+     T_sphereTodoMode=(stm_disjointCircles   ,stm_disjointSpheres,
+                       stm_overlappingCircles,stm_overlappingSpheres);
      P_spheresTodo=^T_spheresTodo;
      T_spheresTodo=object(T_parallelTask)
        chunkIndex:longint;
        circlesInRange:T_circles;
-       drawSpheres:boolean;
+       mode:T_sphereTodoMode;
 
        CONSTRUCTOR create(CONST allCircles:T_circles;
-                          CONST spheres:boolean;
+                          CONST todoMode:T_sphereTodoMode;
                           CONST chunkIndex_:longint;
                           CONST target_:P_rawImage);
        DESTRUCTOR destroy; virtual;
        PROCEDURE execute; virtual;
      end;
 
+IMPLEMENTATION
+USES darts,math;
 CONSTRUCTOR T_spheresTodo.create(CONST allCircles: T_circles;
-                                 CONST spheres:boolean;
+                                 CONST todoMode:T_sphereTodoMode;
                                  CONST chunkIndex_: longint;
                                  CONST target_: P_rawImage);
   VAR x0:longint=0;
@@ -57,7 +57,7 @@ CONSTRUCTOR T_spheresTodo.create(CONST allCircles: T_circles;
       c,tmp:T_circle;
   begin
     chunkIndex :=chunkIndex_;
-    drawSpheres:=spheres;
+    mode:=todoMode;
     for i:=0 to chunkIndex-1 do begin
       inc(x0,CHUNK_BLOCK_SIZE);
       if x0>=target_^.dimensions.width then begin
@@ -71,14 +71,20 @@ CONSTRUCTOR T_spheresTodo.create(CONST allCircles: T_circles;
                               (c.center.im+c.radius>y0-1) and (c.center.im-c.radius<=y0+CHUNK_BLOCK_SIZE+1) then begin
       if i>=length(circlesInRange) then setLength(circlesInRange,i*2);
       circlesInRange[i]:=c;
-      j:=i;
-      while (j>0) and (circlesInRange[j-1].radius>circlesInRange[j].radius) do begin
-        tmp                :=circlesInRange[j];
-        circlesInRange[j  ]:=circlesInRange[j-1];
-        circlesInRange[j-1]:=tmp;
-        dec(j);
+      if mode in [stm_overlappingCircles,stm_overlappingSpheres] then begin
+        j:=i;
+        while (j>0) and (circlesInRange[j].radius<circlesInRange[j-1].radius) do begin
+          tmp                :=circlesInRange[j];
+          circlesInRange[j  ]:=circlesInRange[j-1];
+          circlesInRange[j-1]:=tmp;
+          dec(j);
+        end;
       end;
       inc(i);
+    end;
+    if i=0 then begin
+      circlesInRange[0]:=allCircles[0];
+      i:=1;
     end;
     setLength(circlesInRange,i);
   end;
@@ -107,19 +113,43 @@ FUNCTION getColorForPixel(CONST ix,iy:double; CONST circle:T_circle; OUT hit:boo
   end;
 
 PROCEDURE T_spheresTodo.execute;
-  FUNCTION getColorAt(CONST x,y:double):T_rgbFloatColor;
-    VAR c:T_circle;
+  VAR prevHit:array[0..CHUNK_BLOCK_SIZE-1,
+                    0..CHUNK_BLOCK_SIZE-1] of longint;
+
+  FUNCTION getColorAt(CONST i,j:longint; CONST x,y:double):T_rgbFloatColor; inline;
+    VAR k:longint;
         col:T_rgbFloatColor;
         hit:boolean;
     begin
       result:=BLACK;
-      if drawSpheres then for c in circlesInRange do begin
-        col:=getColorForPixel(x,y,c,hit);
-        if hit then exit(col);
-      end else for c in circlesInRange do begin
-        if system.sqr(x-c.center.re)+
-           system.sqr(y-c.center.im)<
-           system.sqr(  c.radius) then exit(c.color);
+      if mode in [stm_overlappingSpheres,stm_disjointSpheres] then begin
+        if mode in [stm_disjointCircles,stm_disjointSpheres] then begin
+          k:=prevHit[i,j];
+          col:=getColorForPixel(x,y,circlesInRange[k],hit);
+          if hit then exit(col);
+        end;
+        for k:=0 to length(circlesInRange)-1 do begin
+          col:=getColorForPixel(x,y,circlesInRange[k],hit);
+          if hit then begin
+            prevHit[i,j]:=k;
+            exit(col);
+          end;
+        end;
+      end else begin
+        if mode in [stm_disjointCircles,stm_disjointSpheres] then begin
+          k:=prevHit[i,j];
+          if system.sqr(x-circlesInRange[k].center.re)+
+             system.sqr(y-circlesInRange[k].center.im)<
+             system.sqr(  circlesInRange[k].radius) then exit(circlesInRange[k].color);
+        end;
+        for k:=0 to length(circlesInRange)-1 do begin
+          if system.sqr(x-circlesInRange[k].center.re)+
+             system.sqr(y-circlesInRange[k].center.im)<
+             system.sqr(  circlesInRange[k].radius) then begin
+            prevHit[i,j]:=k;
+            exit(circlesInRange[k].color);
+          end;
+        end;
       end;
     end;
 
@@ -128,8 +158,11 @@ PROCEDURE T_spheresTodo.execute;
   begin
     chunk.create;
     chunk.initForChunk(containedIn^.image.dimensions.width,containedIn^.image.dimensions.height,chunkIndex);
-
-    for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do rest:=getColorAt(chunk.getPicX(i),chunk.getPicY(j));
+    for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do begin
+      prevHit[i,j]:=0;
+      with chunk.col[i,j] do rest:=getColorAt(i,j,chunk.getPicX(i),chunk.getPicY(j));
+    end;
+    if not(containedIn^.previewQuality) then
     while chunk.markAlias(0.5) and not(containedIn^.cancellationRequested) do
     for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do if odd(antialiasingMask) then begin
       if antialiasingMask=1 then begin
@@ -145,11 +178,10 @@ PROCEDURE T_spheresTodo.execute;
         k0:=2*k0;
         k1:=2*k1;
       end;
-      for k:=k0 to k1-1 do rest:=rest+getColorAt(
+      for k:=k0 to k1-1 do rest:=rest+getColorAt(i,j,
         chunk.getPicX(i)+darts_delta[k,0],
         chunk.getPicY(j)+darts_delta[k,1]);
     end;
-
     containedIn^.image.copyFromChunk(chunk);
     chunk.destroy;
   end;
@@ -404,28 +436,22 @@ PROCEDURE T_circleSpiralAlgorithm.execute(CONST context:P_abstractWorkflow);
       end;
     end;
 
+  CONST TODO_STYLE:array[false..true] of T_sphereTodoMode=(stm_disjointCircles,stm_disjointSpheres);
   VAR i:longint;
       todo:P_spheresTodo;
   begin with context^ do begin
     scaler.rescale(image.dimensions.width,image.dimensions.height);
     initialize(circlesOfImage);
     initCircles;
-    image.clearWithColor(BLACK);
-    if previewQuality then begin
-      if odd(colorStyle)
-      then quickDrawSpheres
-      else quickDrawCircles;
-    end else begin
-      clearQueue;
-      scaler.rescale(image.dimensions.width,image.dimensions.height);
-      scalerChanagedSinceCalculation:=false;
-      image.markChunksAsPending;
-      for i:=0 to image.chunksInMap-1 do begin
-        new(todo,create(circlesOfImage,odd(colorStyle),i,@image));
-        enqueue(todo);
-      end;
-      waitForFinishOfParallelTasks;
+    clearQueue;
+    scaler.rescale(image.dimensions.width,image.dimensions.height);
+    scalerChanagedSinceCalculation:=false;
+    image.markChunksAsPending;
+    for i:=0 to image.chunksInMap-1 do begin
+      new(todo,create(circlesOfImage,TODO_STYLE[odd(colorStyle)],i,@image));
+      enqueue(todo);
     end;
+    waitForFinishOfParallelTasks;
   end; end;
 
 FUNCTION newCircleSpiralAlgorithm:P_generalImageGenrationAlgorithm;
