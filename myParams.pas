@@ -37,7 +37,7 @@ TYPE
         F1_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_2floats..pt_floatOr2Floats,pt_1I1F..pt_1I3F];
         F2_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_3floats..pt_4floats,pt_1I2F..pt_1I3F,pt_2I2F];
         F3_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_4floats,pt_1I3F,pt_2I2F];
-
+        REAL_VALUES_PARAMETER_TYPES:set of T_parameterType=[pt_float,pt_2floats,pt_3floats,pt_color,pt_4floats,pt_floatOr2Floats];
 TYPE
   T_subParameterAssociation=(spa_filename,spa_i0,spa_i1,spa_i2,spa_i3,spa_f0,spa_f1,spa_f2,spa_f3);
 

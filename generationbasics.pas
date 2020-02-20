@@ -69,6 +69,7 @@ TYPE
       DESTRUCTOR destroy;
       FUNCTION get:P_structuredMessage;
       PROCEDURE Post(CONST message:string; CONST isError:boolean=true; CONST relatesToStep:longint=-1);
+      PROCEDURE clear;
   end;
 VAR messageStringLengthLimit:longint=100;
 IMPLEMENTATION
@@ -88,7 +89,7 @@ CONSTRUCTOR T_structuredMessageQueue.create;
     last:=nil;
   end;
 
-DESTRUCTOR T_structuredMessageQueue.destroy;
+PROCEDURE T_structuredMessageQueue.clear;
   VAR m:P_structuredMessage;
   begin
     enterCriticalSection(queueCs);
@@ -100,8 +101,13 @@ DESTRUCTOR T_structuredMessageQueue.destroy;
       end;
     finally
       leaveCriticalSection(queueCs);
-      doneCriticalSection(queueCs);
     end;
+  end;
+
+DESTRUCTOR T_structuredMessageQueue.destroy;
+  begin
+    clear;
+    doneCriticalSection(queueCs);
   end;
 
 FUNCTION T_structuredMessageQueue.get: P_structuredMessage;

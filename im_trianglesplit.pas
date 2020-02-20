@@ -314,14 +314,14 @@ PROCEDURE triangleSplit(CONST parameters:T_parameterValue; CONST context:P_abstr
     end;
 
   VAR BorderWidth:double;
-  PROCEDURE shiftEdge(CONST a,b:T_Complex; OUT a_,b_:T_Complex);
+  PROCEDURE shiftEdge(CONST a,b:T_Complex; OUT A_,B_:T_Complex);
     VAR d:T_Complex;
     begin
       d.re:=a.im-b.im;
       d.im:=b.re-a.re;
       d*=BorderWidth/abs(d);
-      a_:=a+d;
-      b_:=b+d;
+      A_:=a+d;
+      B_:=b+d;
     end;
 
   VAR borderUpFraction,borderAcrossFraction:double;

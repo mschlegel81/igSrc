@@ -35,6 +35,7 @@ TYPE
     FUNCTION getColorAt(CONST ix,iy:longint; CONST xy:T_Complex):T_rgbFloatColor; virtual;
     PROCEDURE prepareRawMap(VAR target: T_rawImage; CONST my:longint); virtual;
     PROCEDURE execute(CONST context:P_abstractWorkflow); virtual;
+    FUNCTION  parameterIsGenetic(CONST index:byte):boolean; virtual;
   end;
 
   P_functionPerPixelViaRawDataJuliaAlgorithm=^T_functionPerPixelViaRawDataJuliaAlgorithm;
@@ -46,6 +47,8 @@ TYPE
     FUNCTION numberOfParameters:longint; virtual;
     PROCEDURE setParameter(CONST index:byte; CONST value:T_parameterValue); virtual;
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
+    FUNCTION parameterIsGenetic(CONST index:byte):boolean; virtual;
+    PROCEDURE genetics_randomize; virtual;
   end;
 
 FUNCTION toSphere(CONST x:T_Complex):T_rgbFloatColor; inline;
@@ -416,6 +419,18 @@ FUNCTION T_functionPerPixelViaRawDataJuliaAlgorithm.getParameter(CONST index: by
       0: result.createFromValue(parameterDescription(inherited numberOfParameters  ),julianess);
       1: result.createFromValue(parameterDescription(inherited numberOfParameters+1),juliaParam.re,juliaParam.im);
     end;
+  end;
+
+FUNCTION T_functionPerPixelViaRawDataJuliaAlgorithm.parameterIsGenetic(CONST index: byte): boolean;
+  begin
+    result:=index>=inherited numberOfParameters;
+  end;
+
+PROCEDURE T_functionPerPixelViaRawDataJuliaAlgorithm.genetics_randomize;
+  begin
+    julianess:=-0.5+2*random;
+    juliaParam.re:=-1+2*random;
+    juliaParam.im:=-1+2*random;
   end;
 
 TYPE
@@ -1298,6 +1313,12 @@ PROCEDURE T_functionPerPixelViaRawDataAlgorithm.execute(CONST context: P_abstrac
       inherited execute(context);
     end;
   end; end;
+
+FUNCTION T_functionPerPixelViaRawDataAlgorithm.parameterIsGenetic(CONST index: byte): boolean;
+  begin
+    result:=false;
+  end;
+
 //------------------------------------------------------------------------------------------------------------------
 TYPE P_newton3Algorithm =^T_newton3Algorithm ;
      T_newton3Algorithm=object(T_functionPerPixelViaRawDataAlgorithm) FUNCTION getRawDataAt(CONST xy:T_Complex):T_rgbFloatColor; virtual; end;
@@ -1661,6 +1682,7 @@ FUNCTION T_mandelbrot.parameterResetStyles:T_arrayOfString;
   begin
     result:='Mandelbrot Set';
     append(result,'Julia Set');
+    //TODO: Add random reset style
   end;
 
 PROCEDURE T_mandelbrot.resetParameters(CONST style:longint);

@@ -57,6 +57,7 @@ TYPE
       PROCEDURE removeStep(CONST index:longint);
   end;
 
+  P_generateImageWorkflow=^T_generateImageWorkflow;
   T_generateImageWorkflow=object(T_abstractWorkflow)
     private
       relatedEditor:P_editorWorkflow;
@@ -71,7 +72,7 @@ TYPE
     public
       CONSTRUCTOR createOneStepWorkflow(CONST messageQueue_:P_structuredMessageQueue; CONST relatedEditor_:P_editorWorkflow);
       PROPERTY algorithmIndex:longint read getAlgorithmIndex write setAlgorithmIndex;
-      PROPERTY algoritm:P_algorithmMeta read current;
+      PROPERTY algorithm:P_algorithmMeta read current;
       FUNCTION startEditing(CONST stepIndex:longint):boolean;
       PROCEDURE startEditingForNewStep;
       PROCEDURE confirmEditing;
@@ -94,7 +95,6 @@ USES imageManipulation,
      im_statisticOperations,
      im_filter,
      im_misc,
-     im_triangleSplit,
      ig_gradient,
      ig_perlin,
      ig_simples,
@@ -106,6 +106,7 @@ USES imageManipulation,
      ig_funcTrees,
      ig_expoClouds,
      ig_factorTables,
+     im_triangleSplit,
      ig_circlespirals,
      myStringUtil;
 

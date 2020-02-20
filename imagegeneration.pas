@@ -38,6 +38,13 @@ TYPE
       FUNCTION dependsOnImageBefore:boolean; virtual;
       FUNCTION toString(nameMode:T_parameterNameMode):string; virtual;
       FUNCTION alterParameter(CONST newParameterString:string):boolean; virtual;
+      //Genetics:
+      FUNCTION  parameterIsGenetic  (CONST index:byte):boolean; virtual;
+      PROCEDURE genetics_cross      (CONST parent1,parent2:P_generalImageGenrationAlgorithm; CONST distortion:double);
+      PROCEDURE genetics_interpolate(CONST parent1,parent2:P_generalImageGenrationAlgorithm; CONST step:double);
+      PROCEDURE genetics_randomize; virtual;
+      PROCEDURE copyParameters          (CONST original:P_generalImageGenrationAlgorithm);
+      PROCEDURE copyNonGeneticParameters(CONST original:P_generalImageGenrationAlgorithm);
   end;
 
 CONST SCALER_PARAMETER_COUNT=4;
@@ -55,6 +62,7 @@ TYPE
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE panByPixels(VAR plotImage:TImage; CONST dx,dy:longint); virtual;
     PROCEDURE zoomOnPoint(VAR plotImage:TImage; CONST zoomFactor:double); virtual;
+    FUNCTION  parameterIsGenetic  (CONST index:byte):boolean; virtual;
   end;
 
   P_functionPerPixelAlgorithm=^T_functionPerPixelAlgorithm;
@@ -100,6 +108,7 @@ TYPE
     PROCEDURE execute(CONST context:P_abstractWorkflow); virtual;
     PROCEDURE prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint); virtual; abstract;
     FUNCTION dependsOnImageBefore:boolean; virtual;
+    FUNCTION parameterIsGenetic  (CONST index:byte):boolean; virtual;
   end;
 
   P_workerThreadTodo=^T_workerThreadTodo;
@@ -145,6 +154,7 @@ TYPE
       PROPERTY hasScaler:boolean read scaler;
       PROPERTY hasLight :boolean read light;
       PROPERTY hasJuliaP:boolean read juliaP;
+      FUNCTION isUsableForGenetics:boolean;
       FUNCTION parse(CONST specification:ansistring):P_imageOperation; virtual;
       FUNCTION getSimpleParameterDescription: P_parameterDescription; virtual;
       PROPERTY index:longint read fIndex;
@@ -216,6 +226,17 @@ FUNCTION T_algorithmMeta.prototype: P_generalImageGenrationAlgorithm;
     leaveCriticalSection(cs);
   end;
 
+FUNCTION T_algorithmMeta.isUsableForGenetics: boolean;
+  VAR k,k0:longint;
+  begin
+    with prototype^ do begin
+      if length(parameterResetStyles)<=1 then exit(false);
+      if hasScaler then k0:=SCALER_PARAMETER_COUNT else k0:=0;
+      for k:=k0 to numberOfParameters-1 do if parameterIsGenetic(k) then exit(true);
+    end;
+    result:=false;
+  end;
+
 FUNCTION T_algorithmMeta.parse(CONST specification: ansistring): P_imageOperation;
   VAR newOp:P_generalImageGenrationAlgorithm;
   begin
@@ -245,32 +266,6 @@ FUNCTION T_algorithmMeta.getDefaultOperation: P_imageOperation;
     result^.meta:=@self;
     P_generalImageGenrationAlgorithm(result)^.resetParameters(0);
   end;
-
-//PROCEDURE T_algorithmMeta.prepareImage(CONST specification:ansistring; CONST context:P_abstractWorkflow);
-//  VAR workerInstance:P_generalImageGenrationAlgorithm;
-//  begin
-//    workerInstance:=constructorHelper();
-//    workerInstance^.name:=name;
-//    workerInstance^.canParseParametersFromString(specification,true);
-//    workerInstance^.prepareImage(context,true);
-//    workerInstance^.cleanup;
-//    dispose(workerInstance,destroy);
-//  end;
-//
-//PROCEDURE T_algorithmMeta.prepareImageAccordingToCurrentSpecification(CONST context:P_abstractWorkflow);
-//  begin
-//    prototype^.prepareImage(context,true);
-//  end;
-//
-//FUNCTION T_algorithmMeta.prepareImageInBackground(CONST image: P_rawImage; CONST forPreview: boolean): boolean;
-//  VAR context:T_abstractWorkflow;
-//  begin
-//    context.queue:=@defaultProgressQueue;
-//    context.waitForFinish:=false;
-//    context.forPreview:=forPreview;
-//    context.targetImage:=image;
-//    result:=prototype^.prepareImage(context);
-//  end;
 
 CONSTRUCTOR T_pixelThrowerTodo.create(CONST algorithm_: P_pixelThrowerAlgorithm; CONST index: longint; CONST target_: P_rawImage);
   begin
@@ -336,8 +331,7 @@ PROCEDURE T_pixelThrowerAlgorithm.setParameter(CONST index: byte;
     end;
   end;
 
-FUNCTION T_pixelThrowerAlgorithm.getParameter(CONST index: byte
-  ): T_parameterValue;
+FUNCTION T_pixelThrowerAlgorithm.getParameter(CONST index: byte): T_parameterValue;
   begin
     if index<inherited numberOfParameters then exit(inherited getParameter(index));
     case byte(index-inherited numberOfParameters) of
@@ -349,8 +343,13 @@ FUNCTION T_pixelThrowerAlgorithm.getParameter(CONST index: byte
     end;
   end;
 
-PROCEDURE T_pixelThrowerAlgorithm.execute(
-  CONST context: P_abstractWorkflow);
+FUNCTION T_pixelThrowerAlgorithm.parameterIsGenetic(CONST index: byte): boolean;
+  begin
+    result:=((index=inherited numberOfParameters) or
+             (index>inherited numberOfParameters+2)) and inherited parameterIsGenetic(index);
+  end;
+
+PROCEDURE T_pixelThrowerAlgorithm.execute(CONST context: P_abstractWorkflow);
   VAR x,y:longint;
       todo:P_pixelThrowerTodo;
       newAASamples:longint;
@@ -491,6 +490,55 @@ FUNCTION T_generalImageGenrationAlgorithm.toString(nameMode: T_parameterNameMode
 FUNCTION T_generalImageGenrationAlgorithm.alterParameter(CONST newParameterString: string): boolean;
   begin
     result:=false;
+  end;
+
+FUNCTION T_generalImageGenrationAlgorithm.parameterIsGenetic(CONST index: byte): boolean;
+  begin
+    result:=parameterDescription(index)^.getType in REAL_VALUES_PARAMETER_TYPES;
+  end;
+
+PROCEDURE T_generalImageGenrationAlgorithm.genetics_cross(CONST parent1, parent2: P_generalImageGenrationAlgorithm; CONST distortion: double);
+  VAR k:longint;
+      randomInstance:P_generalImageGenrationAlgorithm;
+  begin
+    assert(parent1^.meta=meta);
+    assert(parent2^.meta=meta);
+    randomInstance:=P_generalImageGenrationAlgorithm(P_imageOperationMeta(meta)^.getDefaultOperation);
+    randomInstance^.genetics_randomize;
+    for k:=0 to numberOfParameters-1 do if parameterIsGenetic(k) then begin
+      setParameter(k,parent1^.getParameter(k)     .interpolate(
+                     parent2^.getParameter(k),0.5).interpolate(randomInstance^.getParameter(k),distortion));
+    end;
+    dispose(randomInstance,destroy);
+  end;
+
+PROCEDURE T_generalImageGenrationAlgorithm.genetics_interpolate(CONST parent1, parent2: P_generalImageGenrationAlgorithm; CONST step: double);
+  VAR k:longint;
+  begin
+    assert(parent1^.meta=meta);
+    assert(parent2^.meta=meta);
+    for k:=0 to numberOfParameters-1 do
+    if parameterIsGenetic(k) then setParameter(k,parent1^.getParameter(k).interpolate(parent2^.getParameter(k),step))
+                             else setParameter(k,parent1^.getParameter(k));
+  end;
+
+PROCEDURE T_generalImageGenrationAlgorithm.genetics_randomize;
+  begin
+    resetParameters(1);
+  end;
+
+PROCEDURE T_generalImageGenrationAlgorithm.copyParameters(CONST original: P_generalImageGenrationAlgorithm);
+  VAR k:longint;
+  begin
+    assert(original^.meta=meta);
+    for k:=0 to numberOfParameters-1 do setParameter(k,original^.getParameter(k));
+  end;
+
+PROCEDURE T_generalImageGenrationAlgorithm.copyNonGeneticParameters(CONST original: P_generalImageGenrationAlgorithm);
+  VAR k:longint;
+  begin
+    assert(original^.meta=meta);
+    for k:=0 to numberOfParameters-1 do if not(parameterIsGenetic(k)) then setParameter(k,original^.getParameter(k));
   end;
 
 FUNCTION T_generalImageGenrationAlgorithm.canParseParametersFromString(
@@ -642,6 +690,11 @@ PROCEDURE T_scaledImageGenerationAlgorithm.zoomOnPoint(VAR plotImage:TImage;  CO
     rectB.Bottom:=round((plotImage.height-cy)*zoomFactor+cy);
     plotImage.Canvas.CopyRect(rectA, plotImage.Canvas, rectB);
     scalerChanagedSinceCalculation:=true;
+  end;
+
+FUNCTION T_scaledImageGenerationAlgorithm.parameterIsGenetic(CONST index: byte): boolean;
+  begin
+    result:=(index>=SCALER_PARAMETER_COUNT) and inherited parameterIsGenetic(index);
   end;
 
 CONSTRUCTOR T_functionPerPixelAlgorithm.create;
