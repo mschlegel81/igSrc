@@ -539,8 +539,7 @@ PROCEDURE T_generalImageGenrationAlgorithm.copyNonGeneticParameters(CONST origin
     for k:=0 to numberOfParameters-1 do if not(parameterIsGenetic(k)) then setParameter(k,original^.getParameter(k));
   end;
 
-FUNCTION T_generalImageGenrationAlgorithm.canParseParametersFromString(
-  CONST s: ansistring; CONST doParse: boolean): boolean;
+FUNCTION T_generalImageGenrationAlgorithm.canParseParametersFromString(CONST s: ansistring; CONST doParse: boolean): boolean;
   VAR parsedParameters:array of T_parameterValue;
       paramRest:ansistring;
       stringParts:T_arrayOfString;
