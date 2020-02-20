@@ -118,11 +118,17 @@ DESTRUCTOR T_trianglesTodo.destroy;
   end;
 
 PROCEDURE T_trianglesTodo.execute;
-  FUNCTION getColorAt(CONST x,y:double):T_rgbFloatColor;
-    VAR q:T_quad;
+  VAR prevHit:array[0..CHUNK_BLOCK_SIZE-1,0..CHUNK_BLOCK_SIZE-1] of longint;
+  FUNCTION getColorAt(CONST i,j:longint; CONST x,y:double):T_rgbFloatColor; inline;
+    VAR k:longint;
     begin
+      k:=prevHit[i,j];
+      if isInside(x,y,quadsInRange[k]) then exit(quadsInRange[k].color);
+      for k:=0 to length(quadsInRange)-1 do if isInside(x,y,quadsInRange[k]) then begin
+        prevHit[i,j]:=k;
+        exit(quadsInRange[k].color);
+      end;
       result:=BLACK;
-      for q in quadsInRange do if isInside(x,y,q) then exit(q.color);
     end;
 
   VAR chunk:T_colChunk;
@@ -130,8 +136,8 @@ PROCEDURE T_trianglesTodo.execute;
   begin
     chunk.create;
     chunk.initForChunk(containedIn^.image.dimensions.width,containedIn^.image.dimensions.height,chunkIndex);
-
-    for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do rest:=getColorAt(chunk.getPicX(i),chunk.getPicY(j));
+    for i:=0 to CHUNK_BLOCK_SIZE-1 do for j:=0 to CHUNK_BLOCK_SIZE-1 do prevHit[i,j]:=0;
+    for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do rest:=getColorAt(i,j,chunk.getPicX(i),chunk.getPicY(j));
     if not(containedIn^.previewQuality) then
     while chunk.markAlias(0.5) and not(containedIn^.cancellationRequested) do
     for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do if odd(antialiasingMask) then begin
@@ -148,11 +154,10 @@ PROCEDURE T_trianglesTodo.execute;
         k0:=2*k0;
         k1:=2*k1;
       end;
-      for k:=k0 to k1-1 do rest:=rest+getColorAt(
+      for k:=k0 to k1-1 do rest:=rest+getColorAt(i,j,
         chunk.getPicX(i)+darts_delta[k,0],
         chunk.getPicY(j)+darts_delta[k,1]);
     end;
-
     containedIn^.image.copyFromChunk(chunk);
     chunk.destroy;
   end;
