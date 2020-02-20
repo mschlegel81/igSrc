@@ -2,7 +2,7 @@ UNIT im_filter;
 INTERFACE
 
 IMPLEMENTATION
-USES imageManipulation,imageContexts,myParams,mypics,myColors,math,myGenerics,pixMaps;
+USES imageManipulation,imageContexts,myParams,mypics,myColors,math,pixMaps;
 PROCEDURE blur_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
     context^.image.blur(parameters.f0,parameters.f1);

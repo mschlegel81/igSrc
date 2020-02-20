@@ -54,6 +54,7 @@ PROCEDURE extractChannel_impl(CONST parameters:T_parameterValue; CONST context:P
     VAR sum:double=0;
        c:T_colorChannel;
     begin
+      initialize(result);
       for c in RGB_CHANNELS do sum+=pixel[c]*col[c];
       for c in RGB_CHANNELS do result[c]:=sum;
     end;

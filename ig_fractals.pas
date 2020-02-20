@@ -439,7 +439,7 @@ T_lyapunov=object(T_functionPerPixelViaRawDataAlgorithm)
   sequence:array of boolean;
   parX0:double;
   PROCEDURE parseSequence(CONST s:string);
-  FUNCTION sequenceAsString:string;
+  FUNCTION sequenceAsString:shortstring;
   CONSTRUCTOR create;
   PROCEDURE resetParameters(CONST style:longint); virtual;
   PROCEDURE cleanup; virtual;
@@ -464,12 +464,12 @@ PROCEDURE T_lyapunov.parseSequence(CONST s: string);
     end;
   end;
 
-FUNCTION T_lyapunov.sequenceAsString: string;
+FUNCTION T_lyapunov.sequenceAsString: shortstring;
   CONST c:array[false..true] of char=('A','B');
-  VAR b:boolean;
+  VAR  b:boolean;
   begin
     result:='';
-    for b in sequence do result:=result+c[b];
+    for b in sequence do result+=c[b];
   end;
 
 CONSTRUCTOR T_lyapunov.create;
@@ -517,7 +517,7 @@ FUNCTION T_lyapunov.getParameter(CONST index: byte): T_parameterValue;
     then result:=inherited getParameter(index)
     else case(index-inherited numberOfParameters) of
       0: result:=parValue(index,sequenceAsString);
-      1: result:=parValue(index,parX0);
+    else result:=parValue(index,parX0);
     end;
   end;
 

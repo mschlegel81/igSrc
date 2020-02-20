@@ -2,7 +2,7 @@ UNIT workflows;
 INTERFACE
 USES myGenerics,
      pixMaps,
-     myParams,mypics,sysutils,imageGeneration,ExtCtrls,mySys,FileUtil,Dialogs,
+     myParams,mypics,sysutils,imageGeneration,mySys,FileUtil,Dialogs,
      generationBasics,
      imageContexts,workflowSteps;
 

@@ -228,18 +228,6 @@ FUNCTION T_funcTree.getColorAt(CONST ix, iy: longint; CONST x: T_Complex): T_rgb
       end;
     end;
 
-  FUNCTION colMin(c1,c2:T_rgbFloatColor):T_rgbFloatColor;
-    VAR i:T_colorChannel;
-    begin
-      for i in RGB_CHANNELS do if c1[i]<c2[i] then result[i]:=c1[i] else result[i]:=c2[i];
-    end;
-
-  FUNCTION colMax(c1,c2:T_rgbFloatColor):T_rgbFloatColor;
-    VAR i:T_colorChannel;
-    begin
-      for i in RGB_CHANNELS do if c1[i]>c2[i] then result[i]:=c1[i] else result[i]:=c2[i];
-    end;
-
   CONST rot72 :T_Complex=(re:system.cos(2*pi/5); im:system.sin(2*pi/5));
         rot90 :T_Complex=(re:0; im:1);
         rot120:T_Complex=(re:system.cos(2*pi/3); im:system.sin(2*pi/3));
@@ -260,31 +248,31 @@ FUNCTION T_funcTree.getColorAt(CONST ix, iy: longint; CONST x: T_Complex): T_rgb
 
     case rotation of
        0: result:=colorAt(x);
-       1: result:=colMin(colorAt(x),colorAt(-1*x   )); //'rot2, origin, min',
-       2: result:=colMin(colorAt(x),colorAt(c-(x-c))); //'rot2, center, min',
+       1: result:=rgbMin(colorAt(x),colorAt(-1*x   )); //'rot2, origin, min',
+       2: result:=rgbMin(colorAt(x),colorAt(c-(x-c))); //'rot2, center, min',
        3: result:=      (colorAt(x)+colorAt(-1*x   ))*0.5;//'rot2, origin, avg',
        4: result:=      (colorAt(x)+colorAt(c-(x-c)))*0.5;//'rot2, center, avg',
-       5: result:=colMax(colorAt(x),colorAt(-1*x   ));//'rot2, origin, max',
-       6: result:=colMax(colorAt(x),colorAt(c-(x-c)));//'rot2, center, max',
-       7: result:=colMin(colorAt(x),colMin(colorAt(   x   *rot120),colorAt(   x   *rot240))); //'rot3, origin, min',
-       8: result:=colMin(colorAt(x),colMin(colorAt(c+(x-c)*rot120),colorAt(c+(x-c)*rot240)));//'rot3, center, min',
+       5: result:=rgbMax(colorAt(x),colorAt(-1*x   ));//'rot2, origin, max',
+       6: result:=rgbMax(colorAt(x),colorAt(c-(x-c)));//'rot2, center, max',
+       7: result:=rgbMin(colorAt(x),rgbMin(colorAt(   x   *rot120),colorAt(   x   *rot240))); //'rot3, origin, min',
+       8: result:=rgbMin(colorAt(x),rgbMin(colorAt(c+(x-c)*rot120),colorAt(c+(x-c)*rot240)));//'rot3, center, min',
        9: result:=      (colorAt(x)+       colorAt(   x   *rot120)+colorAt(   x   *rot240))*(1/3);
       10: result:=      (colorAt(x)+       colorAt(c+(x-c)*rot120)+colorAt(c+(x-c)*rot240))*(1/3);
-      11: result:=colMax(colorAt(x),colMax(colorAt(   x   *rot120),colorAt(   x   *rot240)));//'rot3, origin, max',
-      12: result:=colMax(colorAt(x),colMax(colorAt(c+(x-c)*rot120),colorAt(c+(x-c)*rot240)));//'rot3, center, max',
-      13: result:=colMin(colorAt(x),colMin(colorAt(   x   *rot90),colMin(colorAt(   x   *-1),colorAt(   x   *rot270))));
-      14: result:=colMin(colorAt(x),colMin(colorAt(c+(x-c)*rot90),colMin(colorAt(c+(x-c)*-1),colorAt(c+(x-c)*rot270))));
+      11: result:=rgbMax(colorAt(x),rgbMax(colorAt(   x   *rot120),colorAt(   x   *rot240)));//'rot3, origin, max',
+      12: result:=rgbMax(colorAt(x),rgbMax(colorAt(c+(x-c)*rot120),colorAt(c+(x-c)*rot240)));//'rot3, center, max',
+      13: result:=rgbMin(colorAt(x),rgbMin(colorAt(   x   *rot90),rgbMin(colorAt(   x   *-1),colorAt(   x   *rot270))));
+      14: result:=rgbMin(colorAt(x),rgbMin(colorAt(c+(x-c)*rot90),rgbMin(colorAt(c+(x-c)*-1),colorAt(c+(x-c)*rot270))));
       15: result:=      (colorAt(x)       +colorAt(   x   *rot90)       +colorAt(   x   *-1)+colorAt(   x   *rot270))*0.25;
       16: result:=      (colorAt(x)       +colorAt(c+(x-c)*rot90)       +colorAt(c+(x-c)*-1)+colorAt(c+(x-c)*rot270))*0.25;
-      17: result:=colMax(colorAt(x),colMax(colorAt(   x   *rot90),colMax(colorAt(   x   *-1),colorAt(   x   *rot270))));
-      18: result:=colMax(colorAt(x),colMax(colorAt(c+(x-c)*rot90),colMax(colorAt(c+(x-c)*-1),colorAt(c+(x-c)*rot270))));
+      17: result:=rgbMax(colorAt(x),rgbMax(colorAt(   x   *rot90),rgbMax(colorAt(   x   *-1),colorAt(   x   *rot270))));
+      18: result:=rgbMax(colorAt(x),rgbMax(colorAt(c+(x-c)*rot90),rgbMax(colorAt(c+(x-c)*-1),colorAt(c+(x-c)*rot270))));
 
-      19: result:=colMin(colorAt(x),colMin(colorAt(   x   *rot72),colMin(colorAt(   x   *rot144),colMin(colorAt(   x   *rot216),colorAt(   x   *rot288)))));
-      20: result:=colMin(colorAt(x),colMin(colorAt(c+(x-c)*rot72),colMin(colorAt(c+(x-c)*rot144),colMin(colorAt(c+(x-c)*rot216),colorAt(c+(x-c)*rot288)))));
+      19: result:=rgbMin(colorAt(x),rgbMin(colorAt(   x   *rot72),rgbMin(colorAt(   x   *rot144),rgbMin(colorAt(   x   *rot216),colorAt(   x   *rot288)))));
+      20: result:=rgbMin(colorAt(x),rgbMin(colorAt(c+(x-c)*rot72),rgbMin(colorAt(c+(x-c)*rot144),rgbMin(colorAt(c+(x-c)*rot216),colorAt(c+(x-c)*rot288)))));
       21: result:=      (colorAt(x)       +colorAt(   x   *rot72)       +colorAt(   x   *rot144)       +colorAt(   x   *rot216)+colorAt(   x   *rot288))*0.2;
       22: result:=      (colorAt(x)       +colorAt(c+(x-c)*rot72)       +colorAt(c+(x-c)*rot144)       +colorAt(c+(x-c)*rot216)+colorAt(c+(x-c)*rot288))*0.2;
-      23: result:=colMax(colorAt(x),colMax(colorAt(   x   *rot72),colMax(colorAt(   x   *rot144),colMax(colorAt(   x   *rot216),colorAt(   x   *rot288)))));
-      24: result:=colMax(colorAt(x),colMax(colorAt(c+(x-c)*rot72),colMax(colorAt(c+(x-c)*rot144),colMax(colorAt(c+(x-c)*rot216),colorAt(c+(x-c)*rot288)))));
+      23: result:=rgbMax(colorAt(x),rgbMax(colorAt(   x   *rot72),rgbMax(colorAt(   x   *rot144),rgbMax(colorAt(   x   *rot216),colorAt(   x   *rot288)))));
+      24: result:=rgbMax(colorAt(x),rgbMax(colorAt(c+(x-c)*rot72),rgbMax(colorAt(c+(x-c)*rot144),rgbMax(colorAt(c+(x-c)*rot216),colorAt(c+(x-c)*rot288)))));
     end;
   end;
 

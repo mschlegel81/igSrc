@@ -227,6 +227,7 @@ PROCEDURE T_ifs_v2.setParameter(CONST index: byte; CONST value: T_parameterValue
 FUNCTION T_ifs_v2.getParameter(CONST index: byte): T_parameterValue;
   VAR i,j:longint;
   begin
+    initialize(result);
     if index<inherited numberOfParameters then exit(inherited getParameter(index))
     else case byte(index-inherited numberOfParameters) of
       0: result:=parValue(index,par_depth);

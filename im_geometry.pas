@@ -13,7 +13,7 @@ end;
 VAR cropMeta:^T_cropMeta;
 FUNCTION canParseResolution(CONST s:string; OUT dim:T_imageDimensions):boolean;
 IMPLEMENTATION
-USES imageContexts,myParams,mypics,math;
+USES imageContexts,myParams,mypics;
 VAR pd_resize:P_parameterDescription=nil;
 
 FUNCTION canParseResolution(CONST s: string; OUT dim: T_imageDimensions): boolean;

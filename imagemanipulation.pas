@@ -1,7 +1,6 @@
 UNIT imageManipulation;
 INTERFACE
 USES myParams,
-     pixMaps,
      imageContexts;
 TYPE
 T_simpleOperationKind=(sok_inputDependent,

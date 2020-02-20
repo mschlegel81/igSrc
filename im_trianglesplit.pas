@@ -273,6 +273,7 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
     imgBB.y0:=0;
     imgBB.x1:=context^.image.dimensions.width;
     imgBB.y1:=context^.image.dimensions.height;
+    initialize(tri);
     initTriangles;
     while (length(tri)<count) and not(context^.cancellationRequested) do splitTriangles;
     setLength(result,length(tri));

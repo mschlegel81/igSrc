@@ -350,7 +350,7 @@ FUNCTION T_pixelThrowerAlgorithm.parameterIsGenetic(CONST index: byte): boolean;
   end;
 
 PROCEDURE T_pixelThrowerAlgorithm.execute(CONST context: P_abstractWorkflow);
-  VAR x,y:longint;
+  VAR x:longint;
       todo:P_pixelThrowerTodo;
       newAASamples:longint;
       useQualityMultiplier:double=1;
@@ -457,14 +457,7 @@ FUNCTION T_generalImageGenrationAlgorithm.parameterDescription(CONST index: byte
 
 FUNCTION T_generalImageGenrationAlgorithm.toFullString(): ansistring;
   VAR i:longint;
-      p:array of array[0..1] of T_parameterValue;
   begin
-    setLength(p,numberOfParameters);
-    for i:=0 to numberOfParameters-1 do p[i,1]:=getParameter(i);
-    resetParameters(0);
-    for i:=0 to numberOfParameters-1 do p[i,0]:=getParameter(i);
-    for i:=0 to numberOfParameters-1 do setParameter(i,p[i,1]);
-
     result:='';
     for i:=0 to numberOfParameters-1 do
     result+=getParameter(i).toString(tsm_forSerialization)+';';
@@ -473,18 +466,23 @@ FUNCTION T_generalImageGenrationAlgorithm.toFullString(): ansistring;
 
 FUNCTION T_generalImageGenrationAlgorithm.toString(nameMode: T_parameterNameMode): string;
   VAR i:longint;
+      def:P_generalImageGenrationAlgorithm;
       p:array of array[0..1] of T_parameterValue;
   begin
     setLength(p,numberOfParameters);
-    for i:=0 to numberOfParameters-1 do p[i,1]:=getParameter(i);
-    resetParameters(0);
-    for i:=0 to numberOfParameters-1 do p[i,0]:=getParameter(i);
-    for i:=0 to numberOfParameters-1 do setParameter(i,p[i,1]);
-
+    for i:=0 to numberOfParameters-1 do p[i,1]:=     getParameter(i);
+    def:=P_generalImageGenrationAlgorithm(meta^.getDefaultOperation);
+    for i:=0 to numberOfParameters-1 do p[i,0]:=def^.getParameter(i);
     result:='';
     for i:=0 to numberOfParameters-1 do if not(p[i,0].strEq(p[i,1])) then
-    result+=getParameter(i).toString(tsm_forSerialization)+';';
+      result+=getParameter(i).toString(tsm_forSerialization)+';';
     result:=meta^.getName+'['+copy(result,1,length(result)-1)+']';
+    for i:=0 to numberOfParameters-1 do begin
+      p[i,0].destroy;
+      p[i,1].destroy;
+    end;
+    dispose(def,destroy);
+    setLength(p,0);
   end;
 
 FUNCTION T_generalImageGenrationAlgorithm.alterParameter(CONST newParameterString: string): boolean;
