@@ -656,6 +656,7 @@ FUNCTION T_scaledImageGenerationAlgorithm.getParameter(CONST index: byte): T_par
 PROCEDURE T_scaledImageGenerationAlgorithm.panByPixels(VAR plotImage:TImage; CONST dx, dy: longint);
   VAR rectA,rectB:TRect;
   begin
+    scaler.rescale(plotImage.width,plotImage.height);
     scaler.moveCenter(-dx,-dy);
     scalerChanagedSinceCalculation:=true;
     rectA.top:=0;

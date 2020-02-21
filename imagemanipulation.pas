@@ -184,6 +184,10 @@ PROCEDURE loadImage_impl(CONST parameters:T_parameterValue; CONST context:P_abst
 
 PROCEDURE saveImage_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
+    if context^.previewQuality then begin
+      context^.messageQueue^.Post('No images are saved in preview mode',false,context^.currentStepIndex);
+      exit;
+    end;
     if parameters.description^.getType=pt_jpgNameWithSize
     then context^.image.saveJpgWithSizeLimit(parameters.fileName,parameters.i0)
     else context^.image.saveToFile(parameters.fileName);
@@ -195,9 +199,9 @@ PROCEDURE deleteFile_impl(CONST parameters:T_parameterValue; CONST context:P_abs
   end;
 
 CONSTRUCTOR T_deleteFileMeta.create;
-begin
-  inherited create(imc_misc,newParameterDescription('delete',pt_fileName)^.setDefaultValue('123.todo'),@deleteFile_impl,sok_inputIndependent);
-end;
+  begin
+    inherited create(imc_misc,newParameterDescription('delete',pt_fileName)^.setDefaultValue('123.todo'),@deleteFile_impl,sok_inputIndependent);
+  end;
 
 FUNCTION T_deleteFileMeta.getOperationToDeleteFile(CONST fileName: string): P_simpleImageOperation;
   VAR value:T_parameterValue;

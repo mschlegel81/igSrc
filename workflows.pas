@@ -379,6 +379,15 @@ PROCEDURE T_editorWorkflow.beforeAll;
       if currentExecution.currentStepIndex=0
       then messageQueue^.Post('Starting workflow',false)
       else messageQueue^.Post('Resuming workflow',false,currentExecution.currentStepIndex);
+
+      //clear stash and restore it from output images:
+      stash.clear;
+      for i:=0 to currentExecution.currentStepIndex-1 do if (steps[i]^.isValid) and (steps[i]^.outputImage<>nil) and (steps[i]^.operation^.writesStash<>'') then begin
+        {$ifdef debugMode}messageQueue^.Post('Restoring stash "'+steps[i]^.operation^.writesStash+'" from output',false,i); {$endif}
+        stash.stashImage(steps[i]^.operation^.writesStash,
+                         steps[i]^.outputImage^);
+      end;
+
     finally
       leaveCriticalSection(contextCS);
     end;
@@ -486,10 +495,6 @@ PROCEDURE T_editorWorkflow.stepChanged(CONST index: longint);
     enterCriticalSection(contextCS);
     try
       if (index>=0) and (index<length(steps)) then step[index]^.refreshSpecString;
-      //The simple approach: clear stash and restore it from output images:
-      stash.clear;
-      for i:=0 to index-1 do if (steps[i]^.isValid) and (steps[i]^.outputImage<>nil) and (steps[i]^.operation^.writesStash<>'') then
-        stash.stashImage(steps[i]^.operation^.writesStash,steps[i]^.outputImage^);
       for i:=index to length(steps)-1 do steps[i]^.clearOutputImage;
     finally
       leaveCriticalSection(contextCS);

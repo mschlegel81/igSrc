@@ -50,7 +50,7 @@ CONSTRUCTOR T_workflowStep.create(CONST spec: string);
 CONSTRUCTOR T_workflowStep.create(CONST op: P_imageOperation);
   begin
     operation_:=op;
-    specString:=op^.toString(tsm_forSerialization);
+    specString:=op^.toString(tsm_withNiceParameterName);
     valid     :=true;
     outputImage:=nil;
   end;
@@ -109,7 +109,7 @@ FUNCTION T_workflowStep.hasComplexParameterDescription: boolean;
 
 PROCEDURE T_workflowStep.refreshSpecString;
   begin
-    if operation_<>nil then specString:=operation_^.toString(tsm_forSerialization);
+    if operation_<>nil then specString:=operation_^.toString(tsm_withNiceParameterName);
   end;
 
 end.
