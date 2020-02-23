@@ -162,7 +162,7 @@ PROCEDURE T_trianglesTodo.execute;
     chunk.destroy;
   end;
 
-FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST count:longint):T_quadList;
+FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST count:longint; CONST style:byte):T_quadList;
   TYPE T_triangleInfo=record
          base:T_quad;
          variance:double;
@@ -193,34 +193,27 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
 
   VAR tri:array of T_triangleInfo;
   PROCEDURE initTriangles;
-    VAR x0,y0,x1,y1:double;
-        a,b,c,d:T_Complex;
+    CONST c=0.5;
+          s=0.8660254037844388;
+    VAR a:double;
+        p0,p1,p2:T_Complex;
     begin
-      x1:=max(imgBB.x1,imgBB.y1);
-      y0:=(imgBB.y1-round(x1)) div 2; y1:=x1+y0;
-      x0:=(imgBB.x1-round(x1)) div 2; x1   +=x0;
-      a.re:=x0; a.im:=y0;
-      b.re:=x1; b.im:=y0;
-      c.re:=x1; c.im:=y1;
-      d.re:=x0; d.im:=y1;
-
-      setLength(tri,2);
+      a:=max(context^.image.dimensions.width/2/s*1.5+context^.image.dimensions.height/2,context^.image.dimensions.height);
+      p0.re:=context^.image.dimensions.width /2;
+      p0.im:=context^.image.dimensions.height/2;
+      p1:=a*( s+II*c)+p0;
+      p2:=a*(-s+II*c)+p0;
+      p0-=a*II;
+      setLength(tri,1);
       with tri[0] do begin
-        base.p0:=a;
-        base.p1:=b;
-        base.p2:=c;
-        base.p3:=c;
+        base.p0:=p0;
+        base.p1:=p1;
+        base.p2:=p2;
+        base.p3:=p0;
         base.isTriangle:=true;
+        base.color:=BLACK;
+        variance:=1;
       end;
-      scanTriangle(tri[0]);
-      with tri[1] do begin
-        base.p0:=a;
-        base.p1:=c;
-        base.p2:=d;
-        base.p3:=d;
-        base.isTriangle:=true;
-      end;
-      scanTriangle(tri[1]);
     end;
 
   PROCEDURE splitTriangles;
@@ -231,12 +224,6 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
         a0,a1,b0,b1,c0,c1:T_triangleInfo;
     begin
       for i:=1 to length(tri)-1 do if tri[i].variance>tri[toSplit].variance then toSplit:=i;
-      a0:=tri[toSplit];
-      a1:=tri[toSplit];
-      b0:=tri[toSplit];
-      b1:=tri[toSplit];
-      c0:=tri[toSplit];
-      c1:=tri[toSplit];
       with tri[toSplit] do begin
         l:= sqrabs(base.p1-base.p0);
         l2:=sqrabs(base.p2-base.p1);
@@ -244,32 +231,81 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
         l2:=sqrabs(base.p0-base.p2);
         if l2>l then              edgeToSplit:=2;
       end;
-      case edgeToSplit of
-        0: begin
-          a0.base.p1:=a0.base.p0*0.5 +a0.base.p1*0.5 ; a1.base.p0:=a0.base.p1;
-          b0.base.p1:=b0.base.p0*0.33+b0.base.p1*0.67; b1.base.p0:=b0.base.p1;
-          c0.base.p1:=c0.base.p0*0.67+c0.base.p1*0.33; c1.base.p0:=c0.base.p1;
-        end;
+      a0:=tri[toSplit];
+      a1:=tri[toSplit];
+      b0:=tri[toSplit];
+      b1:=tri[toSplit];
+      c0:=tri[toSplit];
+      c1:=tri[toSplit];
+      case style of
         1: begin
-          a0.base.p2:=a0.base.p1*0.5 +a0.base.p2*0.5 ; a1.base.p1:=a0.base.p2; a0.base.p3:=a0.base.p2;
-          b0.base.p2:=b0.base.p1*0.5 +b0.base.p2*0.5 ; b1.base.p1:=b0.base.p2; b0.base.p3:=b0.base.p2;
-          c0.base.p2:=c0.base.p1*0.5 +c0.base.p2*0.5 ; c1.base.p1:=c0.base.p2; c0.base.p3:=c0.base.p2;
+          b1.base.p0:=(a0.base.p0+a0.base.p1)*0.5;
+          b1.base.p1:=(a0.base.p1+a0.base.p2)*0.5;
+          b1.base.p2:=(a0.base.p2+a0.base.p0)*0.5; b1.base.p0:=b1.base.p0;
+          a1.base.p1:=b1.base.p0;
+          a1.base.p2:=b1.base.p2;
+          b0.base.p0:=b1.base.p0;
+          b0.base.p2:=b1.base.p1;
+          a0.base.p0:=b1.base.p2;
+          a0.base.p1:=b1.base.p1;
+          scanTriangle(a0);
+          scanTriangle(a1);
+          scanTriangle(b0);
+          scanTriangle(b1);
+          i:=length(tri);
+          setLength(tri,i+3);
+          tri[toSplit]:=a0;
+          tri[i  ]:=a1;
+          tri[i+1]:=b0;
+          tri[i+2]:=b1;
         end;
         2: begin
-          a0.base.p2:=a0.base.p2*0.5 +a0.base.p0*0.5 ; a1.base.p0:=a0.base.p2; a0.base.p3:=a0.base.p2;
-          b0.base.p2:=b0.base.p2*0.5 +b0.base.p0*0.5 ; b1.base.p0:=b0.base.p2; b0.base.p3:=b0.base.p2;
-          c0.base.p2:=c0.base.p2*0.5 +c0.base.p0*0.5 ; c1.base.p0:=c0.base.p2; c0.base.p3:=c0.base.p2;
+          case edgeToSplit of
+            0: begin
+              a0.base.p1:=a0.base.p0*0.5 +a0.base.p1*0.5 ; a1.base.p0:=a0.base.p1;
+              b0.base.p1:=b0.base.p0*0.33+b0.base.p1*0.67; b1.base.p0:=b0.base.p1;
+              c0.base.p1:=c0.base.p0*0.67+c0.base.p1*0.33; c1.base.p0:=c0.base.p1;
+            end;
+            1: begin
+              a0.base.p2:=a0.base.p1*0.5 +a0.base.p2*0.5 ; a1.base.p1:=a0.base.p2; a0.base.p3:=a0.base.p2;
+              b0.base.p2:=b0.base.p1*0.33+b0.base.p2*0.67; b1.base.p1:=b0.base.p2; b0.base.p3:=b0.base.p2;
+              c0.base.p2:=c0.base.p1*0.67+c0.base.p2*0.33; c1.base.p1:=c0.base.p2; c0.base.p3:=c0.base.p2;
+            end;
+            2: begin
+              a0.base.p2:=a0.base.p2*0.5 +a0.base.p0*0.5 ; a1.base.p0:=a0.base.p2; a0.base.p3:=a0.base.p2;
+              b0.base.p2:=b0.base.p2*0.33+b0.base.p0*0.67; b1.base.p0:=b0.base.p2; b0.base.p3:=b0.base.p2;
+              c0.base.p2:=c0.base.p2*0.67+c0.base.p0*0.33; c1.base.p0:=c0.base.p2; c0.base.p3:=c0.base.p2;
+            end;
+          end;
+          scanTriangle(a0); scanTriangle(a1);
+          scanTriangle(b0); scanTriangle(b1);
+          scanTriangle(c0); scanTriangle(c1);
+          if b0.variance+b1.variance<a0.variance+a1.variance then begin a0:=b0; a1:=b1; end;
+          if c0.variance+c1.variance<a0.variance+a1.variance then begin a0:=c0; a1:=c1; end;
+          i:=length(tri);
+          setLength(tri,i+1);
+          tri[toSplit]:=a0;
+          tri[i      ]:=a1;
+        end
+        else begin
+          case edgeToSplit of
+            0: begin
+              a0.base.p1:=a0.base.p0*0.5 +a0.base.p1*0.5 ; a1.base.p0:=a0.base.p1;
+            end;
+            1: begin
+              a0.base.p2:=a0.base.p1*0.5 +a0.base.p2*0.5 ; a1.base.p1:=a0.base.p2;
+            end;
+            2: begin
+              a0.base.p2:=a0.base.p2*0.5 +a0.base.p0*0.5 ; a1.base.p0:=a0.base.p2;
+            end;
+          end;
+          scanTriangle(a0); scanTriangle(a1);
+          i:=length(tri);
+          setLength(tri,i+1);
+          tri[toSplit]:=a0;
+          tri[i      ]:=a1;
         end;
       end;
-      scanTriangle(a0); scanTriangle(a1);
-      scanTriangle(b0); scanTriangle(b1);
-      scanTriangle(c0); scanTriangle(c1);
-      if b0.variance+b1.variance<a0.variance+a1.variance then begin a0:=b0; a1:=b1; end;
-      if c0.variance+c1.variance<a0.variance+a1.variance then begin a0:=c0; a1:=c1; end;
-      i:=length(tri);
-      setLength(tri,i+1);
-      tri[toSplit]:=a0;
-      tri[i      ]:=a1;
     end;
 
   VAR i:longint;
@@ -380,10 +416,10 @@ PROCEDURE triangleSplit(CONST parameters:T_parameterValue; CONST context:P_abstr
       todo:P_trianglesTodo;
       i:longint;
   begin
-    BorderWidth:=parameters.f1/1000*context^.image.diagonal;
-    borderUpFraction    :=system.cos(parameters.f2*0.017453292519943295);
-    borderAcrossFraction:=system.sin(parameters.f2*0.017453292519943295);
-    rawTriangles:=findApproximatingTriangles(context,parameters.i0);
+    BorderWidth:=parameters.f2/1000*context^.image.diagonal;
+    borderUpFraction    :=system.cos(parameters.f3*0.017453292519943295);
+    borderAcrossFraction:=system.sin(parameters.f3*0.017453292519943295);
+    rawTriangles:=findApproximatingTriangles(context,parameters.i0,parameters.i1);
 
     setLength(allQuads,100);
     for i:=0 to length(rawTriangles)-1 do toRenderables(rawTriangles[i]);
@@ -428,7 +464,7 @@ PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstra
       todo:P_spheresTodo;
 
   begin
-    rawTriangles:=findApproximatingTriangles(context,parameters.i0);
+    rawTriangles:=findApproximatingTriangles(context,parameters.i0,0);
     setLength(circles,length(rawTriangles));
     for i:=0 to length(circles)-1 do begin
       circles[i]:=triangleToCircle(rawTriangles[i]);
@@ -455,11 +491,12 @@ PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstra
 
 INITIALIZATION
 registerSimpleOperation(imc_misc,
-  newParameterDescription('triangleSplit',pt_1I2F)^
-    .setDefaultValue('500,2,45')^
+  newParameterDescription('triangleSplit',pt_2I2F)^
+    .setDefaultValue('500,0,1,20')^
     .addChildParameterDescription(spa_i0,'count',pt_integer,2,200000)^
-    .addChildParameterDescription(spa_f1,'border width',pt_float,0)^
-    .addChildParameterDescription(spa_f2,'border angle',pt_float,0,90),
+    .addEnumChildDescription(spa_i1,'split','half-split','quarter-split','half adaptive')^
+    .addChildParameterDescription(spa_f2,'border width',pt_float,0)^
+    .addChildParameterDescription(spa_f3,'border angle',pt_float,0,90),
   @triangleSplit);
 registerSimpleOperation(imc_misc,
   newParameterDescription('spheres',pt_2integers,0)^
