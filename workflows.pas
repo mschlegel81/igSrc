@@ -108,7 +108,8 @@ USES imageManipulation,
      ig_factorTables,
      im_triangleSplit,
      ig_circlespirals,
-     myStringUtil;
+     myStringUtil,
+     LazFileUtils;
 
 CONSTRUCTOR T_standaloneWorkflow.create;
   VAR ownedMessageQueue:P_structuredMessageQueue;
@@ -452,17 +453,21 @@ PROCEDURE T_simpleWorkflow.saveToFile(CONST fileName: string);
     config.workflowFilename:=fileName;
   end;
 
-PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string;
-  CONST savingWithSizeLimit: longint);
-  VAR todoName:string;
+PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWithSizeLimit: longint);
+  VAR todoBase,
+      todoName:string;
       temporaryWorkflow:T_arrayOfString;
+      counter:longint=0;
   begin
     temporaryWorkflow:=config.getFirstTodoStep;
     append(temporaryWorkflow,workflowText);
     append(temporaryWorkflow,getSaveStatement(savingToFile,savingWithSizeLimit));
-    repeat
-      todoName:='T'+intToStr(random(maxLongint))+'.todo';
-    until not(fileExists(todoName));
+    todoBase:=ExtractFileNameWithoutExt(savingToFile);
+    todoName:=todoBase+'.todo';
+    while fileExists(todoName) do begin
+      inc(counter);
+      todoName:=todoBase+'_'+intToStr(counter)+'.todo';
+    end;
     messageQueue^.Post('Writing todo to file: '+todoName,false);
     writeFile(todoName,temporaryWorkflow);
   end;
@@ -484,6 +489,7 @@ PROCEDURE T_simpleWorkflow.appendSaveStep(CONST savingToFile: string;
 
 PROCEDURE T_simpleWorkflow.executeAsTodo;
   begin
+    SetCurrentDir(ExtractFileDir(config.workflowFilename));
     addStep(deleteOp.getOperationToDeleteFile(config.workflowFilename));
     executeWorkflowInBackground(false);
   end;

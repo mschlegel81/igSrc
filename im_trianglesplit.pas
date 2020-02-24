@@ -139,20 +139,16 @@ PROCEDURE T_trianglesTodo.execute;
     for i:=0 to CHUNK_BLOCK_SIZE-1 do for j:=0 to CHUNK_BLOCK_SIZE-1 do prevHit[i,j]:=0;
     for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do rest:=getColorAt(i,j,chunk.getPicX(i),chunk.getPicY(j));
     if not(containedIn^.previewQuality) then
-    while chunk.markAlias(0.5) and not(containedIn^.cancellationRequested) do
+    while chunk.markAlias(0.1) and not(containedIn^.cancellationRequested) do
     for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do if odd(antialiasingMask) then begin
       if antialiasingMask=1 then begin
-        k0:=1;
-        k1:=2;
-        antialiasingMask:=2;
-        k1:=2*k1;
+        k0:=1; k1:=2; antialiasingMask:=2; k1:=2*k1;
       end else begin
         k0:=antialiasingMask-1;
         k1:=k0+2;
         if k1>254 then k1:=254;
         antialiasingMask:=k1;
-        k0:=2*k0;
-        k1:=2*k1;
+        k0:=2*k0; k1:=2*k1;
       end;
       for k:=k0 to k1-1 do rest:=rest+getColorAt(i,j,
         chunk.getPicX(i)+darts_delta[k,0],
@@ -456,7 +452,7 @@ PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstra
       if hasNanOrInfiniteComponent(result.color) then result.radius:=0;
     end;
 
-  CONST TODO_MODE:array[0..1] of T_sphereTodoMode=(stm_overlappingCircles,stm_overlappingSpheres);
+  CONST TODO_MODE:array[0..3] of T_sphereTodoMode=(stm_overlappingCircles,stm_overlappingMatteSpheres,stm_overlappingShinySpheres,stm_overlappingMatteSpheres);
   VAR rawTriangles:T_quadList;
       circles:T_circles;
       i,j:longint;
@@ -464,7 +460,9 @@ PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstra
       todo:P_spheresTodo;
 
   begin
-    rawTriangles:=findApproximatingTriangles(context,parameters.i0,0);
+    rawTriangles:=findApproximatingTriangles(context,parameters.i0,2);
+    if parameters.i1=3 then //White matte spheres
+      for i:=0 to length(rawTriangles)-1 do rawTriangles[i].color:=WHITE;
     setLength(circles,length(rawTriangles));
     for i:=0 to length(circles)-1 do begin
       circles[i]:=triangleToCircle(rawTriangles[i]);
@@ -502,7 +500,7 @@ registerSimpleOperation(imc_misc,
   newParameterDescription('spheres',pt_2integers,0)^
     .setDefaultValue('2000,1')^
     .addChildParameterDescription(spa_i0,'sphere count',pt_integer,1,100000)^
-    .addEnumChildDescription(spa_i1,'style','circles','spheres'),
+    .addEnumChildDescription(spa_i1,'style','circles','matte spheres','shiny spheres','white spheres'),
   @spheres_impl);
 
 end.

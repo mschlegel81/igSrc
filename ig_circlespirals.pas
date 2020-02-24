@@ -29,8 +29,8 @@ TYPE T_circle=record
        color:T_rgbFloatColor;
      end;
      T_circles=array of T_circle;
-     T_sphereTodoMode=(stm_disjointCircles   ,stm_disjointSpheres,
-                       stm_overlappingCircles,stm_overlappingSpheres);
+     T_sphereTodoMode=(stm_disjointCircles   ,stm_disjointBorderedCircles   ,stm_disjointShinySpheres   ,stm_disjointMatteSpheres   ,
+                       stm_overlappingCircles,stm_overlappingBorderedCircles,stm_overlappingShinySpheres,stm_overlappingMatteSpheres);
      P_spheresTodo=^T_spheresTodo;
      T_spheresTodo=object(T_parallelTask)
        chunkIndex:longint;
@@ -71,7 +71,7 @@ CONSTRUCTOR T_spheresTodo.create(CONST allCircles: T_circles;
                               (c.center.im+c.radius>y0-1) and (c.center.im-c.radius<=y0+CHUNK_BLOCK_SIZE+1) then begin
       if i>=length(circlesInRange) then setLength(circlesInRange,i*2);
       circlesInRange[i]:=c;
-      if mode in [stm_overlappingCircles,stm_overlappingSpheres] then begin
+      if mode in [stm_overlappingCircles,stm_overlappingBorderedCircles,stm_overlappingMatteSpheres,stm_overlappingShinySpheres] then begin
         j:=i;
         while (j>0) and (circlesInRange[j].radius<circlesInRange[j-1].radius) do begin
           tmp                :=circlesInRange[j];
@@ -94,7 +94,7 @@ DESTRUCTOR T_spheresTodo.destroy;
     setLength(circlesInRange,0);
   end;
 
-FUNCTION getColorForPixel(CONST ix,iy:double; CONST circle:T_circle; OUT hit:boolean):T_rgbFloatColor;
+FUNCTION getColorForPixel(CONST ix,iy:double; CONST circle:T_circle; CONST shiny:boolean; OUT hit:boolean):T_rgbFloatColor;
   VAR x,y,r2:double;
   begin
     x:=(ix-circle.center.re)/circle.radius;
@@ -106,9 +106,14 @@ FUNCTION getColorForPixel(CONST ix,iy:double; CONST circle:T_circle; OUT hit:boo
       x:=max(0,x*0.30151134457776363-
       y         *0.30151134457776363+
       r2        *0.90453403373329089);
-      y:=x*x; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y;
-      x:=(x*0.8+0.2)*(1-y);
-      result:=circle.color*x+WHITE*y;
+      if shiny then begin
+        y:=x*x; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y;
+        x:=(x*0.8+0.2)*(1-y);
+        result:=circle.color*x+WHITE*y;
+      end else begin
+        x:=(x*0.8+0.2);
+        result:=circle.color*x;
+      end;
     end else result:=BLACK;
   end;
 
@@ -122,21 +127,22 @@ PROCEDURE T_spheresTodo.execute;
         hit:boolean;
     begin
       result:=BLACK;
-      if mode in [stm_overlappingSpheres,stm_disjointSpheres] then begin
-        if mode in [stm_disjointCircles,stm_disjointSpheres] then begin
+      if mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres,
+                  stm_overlappingMatteSpheres,stm_disjointMatteSpheres] then begin
+        if mode in [stm_disjointShinySpheres,stm_disjointMatteSpheres] then begin
           k:=prevHit[i,j];
-          col:=getColorForPixel(x,y,circlesInRange[k],hit);
+          col:=getColorForPixel(x,y,circlesInRange[k],mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres],hit);
           if hit then exit(col);
         end;
         for k:=0 to length(circlesInRange)-1 do begin
-          col:=getColorForPixel(x,y,circlesInRange[k],hit);
+          col:=getColorForPixel(x,y,circlesInRange[k],mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres],hit);
           if hit then begin
             prevHit[i,j]:=k;
             exit(col);
           end;
         end;
       end else begin
-        if mode in [stm_disjointCircles,stm_disjointSpheres] then begin
+        if mode in [stm_disjointCircles,stm_disjointBorderedCircles] then begin
           k:=prevHit[i,j];
           if system.sqr(x-circlesInRange[k].center.re)+
              system.sqr(y-circlesInRange[k].center.im)<
@@ -406,37 +412,7 @@ PROCEDURE T_circleSpiralAlgorithm.execute(CONST context:P_abstractWorkflow);
       if colorStyle in [2,3] then for i:=0 to fill-1 do circlesOfImage[i].color:=colorOfCircle(circlesOfImage[i]);
     end;
 
-  PROCEDURE quickDrawCircles;
-    VAR c:T_circle;
-        ix,iy:longint;
-    begin
-      for c in circlesOfImage do begin
-        for iy:=max(0          ,round(c.center.im-c.radius)) to
-                min(picHeight-1,round(c.center.im+c.radius)) do
-        for ix:=max(0          ,round(c.center.re-c.radius)) to
-                min(picWidth-1 ,round(c.center.re+c.radius)) do
-        if (system.sqr(ix-c.center.re)+system.sqr(iy-c.center.im))<system.sqr(c.radius) then context^.image[ix,iy]:=c.color;
-      end;
-    end;
-
-  PROCEDURE quickDrawSpheres;
-    VAR c:T_circle;
-        ix,iy:longint;
-        hit:boolean;
-        col:T_rgbColor;
-    begin
-      for c in circlesOfImage do begin
-        for iy:=max(0          ,round(c.center.im-c.radius)) to
-                min(picHeight-1,round(c.center.im+c.radius)) do
-        for ix:=max(0          ,round(c.center.re-c.radius)) to
-                min(picWidth-1 ,round(c.center.re+c.radius)) do begin
-          col:=getColorForPixel(ix,iy,c,hit);
-          if hit then context^.image[ix,iy]:=col;
-        end;
-      end;
-    end;
-
-  CONST TODO_STYLE:array[false..true] of T_sphereTodoMode=(stm_disjointCircles,stm_disjointSpheres);
+  CONST TODO_STYLE:array[false..true] of T_sphereTodoMode=(stm_disjointCircles,stm_disjointShinySpheres);
   VAR i:longint;
       todo:P_spheresTodo;
   begin with context^ do begin

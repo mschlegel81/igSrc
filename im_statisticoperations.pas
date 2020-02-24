@@ -303,9 +303,21 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
          spread:T_rgbFloatColor;
          maxSpread:single;
        end;
+       T_colorLists=array of T_colorList;
 
-  PROCEDURE medianCutColors;
-    //Variance based spreads
+  FUNCTION averageColor(CONST bucket:T_colorList):T_rgbFloatColor;
+    VAR s:T_sample;
+        count:longint=0;
+    begin
+      result:=BLACK;
+      for s in bucket.sample do begin
+        result+=s.color*s.count;
+        count +=        s.count;
+      end;
+      result*=1/count;
+    end;
+
+  FUNCTION medianCutBuckets:T_colorLists;
     PROCEDURE updateSpreads(VAR bucket:T_colorList);
       VAR r :double=0;
           g :double=0;
@@ -326,14 +338,14 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
             gG+=sqr(s.color[cc_green])*s.count;
             bb+=sqr(s.color[cc_blue ])*s.count;
           end;
-          spread:=rgbColor(sqrt(rr/count-sqr(r/count))*count,
-                           sqrt(gG/count-sqr(g/count))*count,
-                           sqrt(bb/count-sqr(b/count))*count);
-          maxSpread:=max(spread[cc_red],max(spread[cc_green],spread[cc_blue]));
+          spread:=rgbColor((rr-sqr(r)/count),
+                           (gG-sqr(g)/count),
+                           (bb-sqr(b)/count));
+          maxSpread:=spread[cc_red]+spread[cc_green]+spread[cc_blue];
         end;
       end;
 
-    PROCEDURE split(VAR list:T_colorList; CONST threefold:boolean; OUT halfList,thirdList:T_colorList);
+    PROCEDURE split(VAR list:T_colorList; OUT halfList:T_colorList);
       VAR channel:T_colorChannel;
       FUNCTION partition(CONST Left,Right:longint):longint;
         VAR pivot:byte;
@@ -366,25 +378,6 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         if list.spread[cc_blue]>list.spread[channel] then channel:=cc_blue;
         sort(0,length(list.sample)-1);
         for i:=0 to length(list.sample)-1 do popCount+=list.sample[i].count;
-        if threefold then begin
-          splitCount:=popCount div 3;
-          i0:=0; popCount:=0;
-          while (popCount<splitCount) do begin
-            popCount+=list.sample[i0].count; inc(i0);
-          end;
-
-          setLength(thirdList.sample,i0);
-          for i:=0 to i0-1 do thirdList.sample[i]:=list.sample[i];
-          updateSpreads(thirdList);
-
-          popCount:=0;
-          for i:=i0 to length(list.sample)-1 do begin
-            list.sample[i-i0]:=list.sample[i];
-            popCount+=list.sample[i].count;
-          end;
-          setLength(list.sample,length(list.sample)-i0);
-
-        end;
         splitCount:=popCount shr 1;
         popCount:=0; i0:=0;
         while (popCount<splitCount) do begin
@@ -399,17 +392,24 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         updateSpreads(list);
       end;
 
-    VAR buckets:array of T_colorList;
-    PROCEDURE splitOneList(CONST threefold:boolean);
+    VAR buckets:T_colorLists;
+    PROCEDURE splitOneList;
       VAR i:longint;
           toSplit:longint=0;
 
       begin
         for i:=1 to length(buckets)-1 do if buckets[i].maxSpread>buckets[toSplit].maxSpread then toSplit:=i;
         i:=length(buckets);
-        setLength(buckets,i+2);
-        split(buckets[toSplit],threefold,buckets[i],buckets[i+1]);
-        if not(threefold) then setLength(buckets,i+1);
+        setLength(buckets,i+1);
+        split(buckets[toSplit],buckets[i]);
+      end;
+
+    PROCEDURE splitAllLists;
+      VAR i,i0:longint;
+      begin
+        i0:=length(buckets);
+        setLength(buckets,i0+i0);
+        for i:=0 to i0-1 do split(buckets[i],buckets[i0+i]);
       end;
 
     FUNCTION firstBucket:T_colorList;
@@ -449,23 +449,19 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         updateSpreads(result);
       end;
 
-    FUNCTION averageColor(CONST bucket:T_colorList):T_rgbFloatColor;
-      VAR s:T_sample;
-          count:longint=0;
-      begin
-        result:=BLACK;
-        for s in bucket.sample do begin
-          result+=s.color*s.count;
-          count +=        s.count;
-        end;
-        result*=1/count;
-      end;
-
-    VAR k:longint;
     begin
       setLength(buckets,1);
       buckets[0]:=firstBucket;
-      while (length(buckets)<parameters.i0) and not context^.cancellationRequested do splitOneList(false);
+      while (length(buckets)*2<=parameters.i0) and not context^.cancellationRequested do splitAllLists;
+      while (length(buckets)  < parameters.i0) and not context^.cancellationRequested do splitOneList;
+      result:=buckets;
+    end;
+
+  PROCEDURE medianCutColors;
+    VAR k:longint;
+        buckets:T_colorLists;
+    begin
+      buckets:=medianCutBuckets;
       setLength(colorTable,length(buckets));
       for k:=0 to length(buckets)-1 do begin
         colorTable[k]:=averageColor(buckets[k]);
@@ -475,44 +471,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE kMeansColorTable;
-    FUNCTION firstBucket:T_colorList;
-      VAR raw:P_floatColor;
-          i,j:longint;
-          tmp:T_rgbColor;
-          arr:T_arrayOfLongint;
-      begin
-        raw:=context^.image.rawData;
-        setLength(arr,context^.image.pixelCount);
-        for i:=0 to context^.image.pixelCount-1 do begin
-          tmp:=raw[i];
-          arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
-        end;
-        sort(arr);
-        j:=0; i:=0;
-        setLength(result.sample,length(arr));
-        tmp[cc_red  ]:= arr[i]         and 255;
-        tmp[cc_green]:=(arr[i] shr  8) and 255;
-        tmp[cc_blue ]:= arr[i] shr 16;
-        result.sample[0].color:=tmp; inc(i);
-        result.sample[0].count:=1;
-        while i<length(arr) do begin
-          if arr[i]=arr[i-1] then inc(result.sample[j].count)
-          else begin
-            inc(j);
-            tmp[cc_red  ]:= arr[i]         and 255;
-            tmp[cc_green]:=(arr[i] shr  8) and 255;
-            tmp[cc_blue ]:= arr[i] shr 16;
-            result.sample[j].color:=tmp;
-            result.sample[j].count:=1;
-          end;
-          inc(i);
-        end;
-        setLength(arr,0);
-        setLength(result.sample,j+1);
-      end;
-
     VAR allSamples:T_colorList;
-        buckets:array of T_colorList;
+        buckets:T_colorLists;
         nextDefaultColor:longint;
     FUNCTION redistributeSamples:boolean;
       VAR i:longint;
@@ -565,14 +525,21 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         end;
       end;
 
-    VAR i:longint;
+    VAR i,j,k:longint;
     begin
-      allSamples:=firstBucket;
-      setLength(buckets,parameters.i0);
-      for i:=0 to length(buckets)-1 do buckets[i].spread:=DEFAULT_COLOR_TABLE[i];
-      nextDefaultColor:=length(buckets);
+      buckets:=medianCutBuckets;
+      k:=0;
+      for i:=0 to length(buckets)-1 do k+=length(buckets[i].sample);
+      setLength(allSamples.sample,k);
+      k:=0;
+      for i:=0 to length(buckets)-1 do for j:=0 to length(buckets[i].sample)-1 do begin
+        allSamples.sample[k]:=buckets[i].sample[j];
+        inc(k);
+      end;
+      for i:=0 to length(buckets)-1 do buckets[i].spread:=averageColor(buckets[i]);
+      nextDefaultColor:=0;
       i:=0;
-      while redistributeSamples and (i<50) do inc(i);
+      while redistributeSamples and (i<50) and not(context^.cancellationRequested) do inc(i);
       setLength(colorTable,parameters.i0);
       for i:=0 to length(colorTable)-1 do colorTable[i]:=buckets[i].spread;
     end;
@@ -621,7 +588,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     begin
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
-      for y:=0 to ym do for x:=0 to xm do begin
+      for y:=0 to ym do if not(context^.cancellationRequested) then for x:=0 to xm do begin
         oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=oldPixel-newPixel;
         if x<xm then context^.image.multIncPixel(x+1,y,1,error*(7/16));
         if y<ym then begin
@@ -653,6 +620,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
         end;
       end;
+      if context^.cancellationRequested then exit;
       for y:=0 to ym do case byte(y and 3) of
       0: for x:=0 to xm do begin
            oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.3333333333333333;
@@ -671,6 +639,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
            end;
          end;
       end;
+      if context^.cancellationRequested then exit;
       for y:=0 to ym do if (y and 3)=3 then for x:=0 to xm do context^.image[x,y]:=nearestColor(context^.image[x,y]);
     end;
 
@@ -715,7 +684,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       error:=BLACK;
       for k:=0 to sqr(n)-1 do begin
         d2xy(k,x,y);
-        if (x>=0) and (x<=xm) and (y>=0) and (y<=ym) then begin
+        if (x>=0) and (x<=xm) and (y>=0) and (y<=ym) and not(context^.cancellationRequested) then begin
           oldPixel:=context^.image[x,y]+error;
           newPixel:=nearestColor(oldPixel);
           context^.image[x,y]:=newPixel;
