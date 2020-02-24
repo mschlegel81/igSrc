@@ -410,6 +410,13 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         i0:=length(buckets);
         setLength(buckets,i0+i0);
         for i:=0 to i0-1 do split(buckets[i],buckets[i0+i]);
+        //Check if an empty bucket has been created
+        i0:=0;
+        for i:=0 to length(buckets)-1 do if length(buckets[i].sample)>0 then begin
+          if i0<>i then buckets[i0]:=buckets[i];
+          inc(i0);
+        end;
+        if i0<>length(buckets) then setLength(buckets,i0);
       end;
 
     FUNCTION firstBucket:T_colorList;
