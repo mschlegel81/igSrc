@@ -28,7 +28,7 @@ TYPE
                    pt_1I2F,
                    pt_1I3F,
                    pt_2I2F);
-  CONST I0_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_integer..pt_intOr2Ints,pt_1I1F..pt_1I3F];
+  CONST I0_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_enum..pt_intOr2Ints,pt_1I1F..pt_1I3F];
         I1_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_2integers..pt_intOr2Ints,pt_jpgNameWithSize,pt_2I2F];
         I2_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_3integers,pt_4integers];
         I3_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_4integers];
@@ -107,7 +107,6 @@ TYPE
                        CONST maxValue_: double=  infinity);
     DESTRUCTOR destroy;
     FUNCTION shortName:string;
-    FUNCTION describe:ansistring;
     FUNCTION setEnumValues(CONST txt:array of string):P_parameterDescription;
     FUNCTION addRGBChildParameters:P_parameterDescription;
     FUNCTION addHSVChildParameters:P_parameterDescription;
@@ -157,32 +156,6 @@ FUNCTION T_parameterDescription.shortName:string;
     result:=ansiReplaceStr(cleanString(name,IDENTIFIER_CHARS,' '),' ','');
   end;
 
-FUNCTION T_parameterDescription.describe:ansistring;
-  VAR i:longint;
-  begin
-    result:='name: "'+name+'"; parameters: ';
-    case typ of
-      pt_none: result:=result+'none';
-      pt_string: result:=result+' string';
-      pt_fileName: result:=result+'file name (allowed extensions: .jpg .png .bmp .vraw)';
-      pt_jpgNameWithSize: result:=result+'fileName.jpg@size (e.g. test.jpg@1M)';
-      pt_enum: begin result:=result+'enum';
-        result:=result+C_lineBreakChar+'Values:';
-        for i:=0 to length(enumValues)-1 do result:=result+C_lineBreakChar+enumValues[i];
-      end;
-      pt_integer: result:=result+'integer';
-      pt_2integers: result:=result+'x,y (two integers)';
-      pt_intOr2Ints: result:=result+'x[,y] (one or two integers)';
-      pt_4integers: result:=result+'x0,x1,y0,y1 (four integers)';
-      pt_color: result:=result+'color (as RGB, e.g. red: 1,0,0)';
-      pt_float: result:=result+'float';
-      pt_2floats: result:=result+'x,y (two floats)';
-      pt_floatOr2Floats: result:=result+'x,y (one or two floats)';
-      pt_3floats: result:=result+'x,y,z (three floats)';
-      pt_4floats: result:=result+'x0,x1,y0,y1 (four floats)';
-    end;
-  end;
-
 FUNCTION T_parameterDescription.setEnumValues(CONST txt:array of string):P_parameterDescription;
   VAR i:longint;
   begin
@@ -205,10 +178,7 @@ FUNCTION T_parameterDescription.addHSVChildParameters:P_parameterDescription;
             addChildParameterDescription(spa_f2,'V',pt_float);
   end;
 
-FUNCTION T_parameterDescription.addChildParameterDescription(
-  CONST association_:T_subParameterAssociation;
-  CONST name_: string; CONST typ_: T_parameterType; CONST minValue_: double;
-  CONST maxValue_: double): P_parameterDescription;
+FUNCTION T_parameterDescription.addChildParameterDescription(CONST association_:T_subParameterAssociation; CONST name_: string; CONST typ_: T_parameterType; CONST minValue_: double; CONST maxValue_: double): P_parameterDescription;
   begin
     case association_ of
       spa_filename:   if not(typ_ in [pt_string,pt_fileName]) then exit(nil);
@@ -320,14 +290,14 @@ FUNCTION T_parameterDescription.getDefaultParameterString:string;
 FUNCTION T_parameterDescription.areValuesInRange(CONST p:T_parameterValue):boolean;
   VAR i:longint;
   begin
-    result:=(not(typ in I0_RELEVANT_PARAMETER_TYPES) or (p.I0>=minValue) and (p.I0<=maxValue))
-        and (not(typ in I1_RELEVANT_PARAMETER_TYPES) or (p.I1>=minValue) and (p.I1<=maxValue))
-        and (not(typ in I2_RELEVANT_PARAMETER_TYPES) or (p.I2>=minValue) and (p.I2<=maxValue))
-        and (not(typ in I3_RELEVANT_PARAMETER_TYPES) or (p.I3>=minValue) and (p.I3<=maxValue))
-        and (not(typ in F0_RELEVANT_PARAMETER_TYPES) or (p.F0>=minValue) and (p.F0<=maxValue))
-        and (not(typ in F1_RELEVANT_PARAMETER_TYPES) or (p.F1>=minValue) and (p.F1<=maxValue))
-        and (not(typ in F2_RELEVANT_PARAMETER_TYPES) or (p.F2>=minValue) and (p.F2<=maxValue))
-        and (not(typ in F3_RELEVANT_PARAMETER_TYPES) or (p.F3>=minValue) and (p.F3<=maxValue));
+    result:=           (not(typ in I0_RELEVANT_PARAMETER_TYPES) or (p.I0>=minValue) and (p.I0<=maxValue));
+    result:=result and (not(typ in I1_RELEVANT_PARAMETER_TYPES) or (p.I1>=minValue) and (p.I1<=maxValue));
+    result:=result and (not(typ in I2_RELEVANT_PARAMETER_TYPES) or (p.I2>=minValue) and (p.I2<=maxValue));
+    result:=result and (not(typ in I3_RELEVANT_PARAMETER_TYPES) or (p.I3>=minValue) and (p.I3<=maxValue));
+    result:=result and (not(typ in F0_RELEVANT_PARAMETER_TYPES) or (p.F0>=minValue) and (p.F0<=maxValue));
+    result:=result and (not(typ in F1_RELEVANT_PARAMETER_TYPES) or (p.F1>=minValue) and (p.F1<=maxValue));
+    result:=result and (not(typ in F2_RELEVANT_PARAMETER_TYPES) or (p.F2>=minValue) and (p.F2<=maxValue));
+    result:=result and (not(typ in F3_RELEVANT_PARAMETER_TYPES) or (p.F3>=minValue) and (p.F3<=maxValue));;
     for i:=0 to length(children)-1 do result:=result and getSubDescription(i)^.areValuesInRange(getSubParameter(i,p));
   end;
 
@@ -500,17 +470,20 @@ FUNCTION T_parameterValue.canParse(CONST stringToParse: ansistring;
     result:=valid;
   end;
 
-CONSTRUCTOR T_parameterValue.createFromValue(
-  CONST parameterDescription: P_parameterDescription; CONST i0: longint;
-  CONST i1: longint; CONST i2: longint; CONST i3: longint);
+CONSTRUCTOR T_parameterValue.createFromValue(CONST parameterDescription: P_parameterDescription; CONST i0: longint; CONST i1: longint; CONST i2: longint; CONST i3: longint);
   begin
     setDefaults;
     associatedParmeterDescription:=parameterDescription;
+    valid:=true;
     intValue[0]:=i0;
     intValue[1]:=i1;
     intValue[2]:=i2;
     intValue[3]:=i3;
-    if parameterDescription^.typ=pt_enum then fileNameValue:=parameterDescription^.enumValues[i0];
+    if parameterDescription^.typ=pt_enum then begin
+      if (i0>=0) and (i0<length(parameterDescription^.enumValues))
+      then fileNameValue:=parameterDescription^.enumValues[i0]
+      else valid:=false;
+    end;
   end;
 
 CONSTRUCTOR T_parameterValue.createFromValue(
