@@ -110,6 +110,7 @@ TYPE
       PROCEDURE ensureStop;
       PROCEDURE postStop;
       FUNCTION  executing:boolean;
+      FUNCTION  isDone:boolean;
       FUNCTION  cancellationRequested:boolean;
       PROCEDURE cancelWithError(CONST errorMessage:string);
       PROCEDURE clear;
@@ -471,6 +472,13 @@ FUNCTION T_abstractWorkflow.executing: boolean;
   begin
     enterCriticalSection(contextCS);
     result:=currentExecution.workflowState in [ts_pending,ts_evaluating,ts_stopRequested];
+    leaveCriticalSection(contextCS);
+  end;
+
+FUNCTION T_abstractWorkflow.isDone:boolean;
+  begin
+    enterCriticalSection(contextCS);
+    result:=currentExecution.workflowState=ts_ready;
     leaveCriticalSection(contextCS);
   end;
 
