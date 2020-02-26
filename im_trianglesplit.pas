@@ -452,7 +452,7 @@ PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstra
       if hasNanOrInfiniteComponent(result.color) then result.radius:=0;
     end;
 
-  CONST TODO_MODE:array[0..3] of T_sphereTodoMode=(stm_overlappingCircles,stm_overlappingMatteSpheres,stm_overlappingShinySpheres,stm_overlappingMatteSpheres);
+  CONST TODO_MODE:array[0..4] of T_sphereTodoMode=(stm_overlappingCircles,stm_overlappingMatteSpheres,stm_overlappingShinySpheres,stm_overlappingMatteSpheres,stm_overlappingBorderedCircles);
   VAR rawTriangles:T_quadList;
       circles:T_circles;
       i,j:longint;
@@ -500,7 +500,7 @@ registerSimpleOperation(imc_misc,
   newParameterDescription('spheres',pt_2integers,0)^
     .setDefaultValue('2000,1')^
     .addChildParameterDescription(spa_i0,'sphere count',pt_integer,1,100000)^
-    .addEnumChildDescription(spa_i1,'style','circles','matte spheres','shiny spheres','white spheres'),
+    .addEnumChildDescription(spa_i1,'style','circles','matte spheres','shiny spheres','white spheres','embossed circles'),
   @spheres_impl);
 
 end.

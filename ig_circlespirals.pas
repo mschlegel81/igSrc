@@ -94,30 +94,48 @@ DESTRUCTOR T_spheresTodo.destroy;
     setLength(circlesInRange,0);
   end;
 
-FUNCTION getColorForPixel(CONST ix,iy:double; CONST circle:T_circle; CONST shiny:boolean; OUT hit:boolean):T_rgbFloatColor;
-  VAR x,y,r2:double;
-  begin
-    x:=(ix-circle.center.re)/circle.radius;
-    y:=(iy-circle.center.im)/circle.radius;
-    r2:=system.sqr(x)+system.sqr(y);
-    hit:=r2<1;
-    if hit then begin
-      r2:=sqrt(1-r2);
-      x:=max(0,x*0.30151134457776363-
-      y         *0.30151134457776363+
-      r2        *0.90453403373329089);
-      if shiny then begin
-        y:=x*x; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y;
-        x:=(x*0.8+0.2)*(1-y);
-        result:=circle.color*x+WHITE*y;
-      end else begin
-        x:=(x*0.8+0.2);
-        result:=circle.color*x;
-      end;
-    end else result:=BLACK;
-  end;
-
 PROCEDURE T_spheresTodo.execute;
+  FUNCTION getSphereColor(CONST ix,iy:double; CONST circle:T_circle; CONST shiny:boolean; OUT hit:boolean):T_rgbFloatColor;
+    VAR x,y,r2:double;
+    begin
+      x:=(ix-circle.center.re)/circle.radius;
+      y:=(iy-circle.center.im)/circle.radius;
+      r2:=system.sqr(x)+system.sqr(y);
+      hit:=r2<1;
+      if hit then begin
+        r2:=sqrt(1-r2);
+        x:=max(0,x*0.30151134457776363-
+        y         *0.30151134457776363+
+        r2        *0.90453403373329089);
+        if shiny then begin
+          y:=x*x; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y; y*=y;
+          x:=(x*0.8+0.2)*(1-y);
+          result:=circle.color*x+WHITE*y;
+        end else begin
+          x:=(x*0.8+0.2);
+          result:=circle.color*x;
+        end;
+      end else result:=BLACK;
+    end;
+
+  FUNCTION getEmbossedCircleColor(CONST ix,iy,diagonal:double; CONST circle:T_circle; OUT hit:boolean):T_rgbFloatColor;
+    VAR x,y,r2:double;
+    begin
+      x:=(ix-circle.center.re);
+      y:=(iy-circle.center.im);
+      r2:=system.sqr(x)+system.sqr(y);
+      hit:=r2<system.sqr(circle.radius);
+      if hit then begin
+        r2:=sqrt(r2);
+        //borderWitdh   = 1E-3*context^.image.diagonal;
+        //borderUp      = 0.9396926207859084
+        //borderAccross = 0.3420201433256687
+        if circle.radius-r2<1E-3*diagonal
+        then result:=circle.color*max(0,((x/r2-2*y/r2)*0.3420201433256687+0.9396926207859084))
+        else result:=circle.color;
+      end else result:=BLACK;
+    end;
+
   VAR prevHit:array[0..CHUNK_BLOCK_SIZE-1,
                     0..CHUNK_BLOCK_SIZE-1] of longint;
 
@@ -127,33 +145,49 @@ PROCEDURE T_spheresTodo.execute;
         hit:boolean;
     begin
       result:=BLACK;
-      if mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres,
-                  stm_overlappingMatteSpheres,stm_disjointMatteSpheres] then begin
-        if mode in [stm_disjointShinySpheres,stm_disjointMatteSpheres] then begin
-          k:=prevHit[i,j];
-          col:=getColorForPixel(x,y,circlesInRange[k],mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres],hit);
-          if hit then exit(col);
-        end;
-        for k:=0 to length(circlesInRange)-1 do begin
-          col:=getColorForPixel(x,y,circlesInRange[k],mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres],hit);
-          if hit then begin
-            prevHit[i,j]:=k;
-            exit(col);
+      case mode of
+        stm_overlappingShinySpheres,stm_disjointShinySpheres,stm_overlappingMatteSpheres,stm_disjointMatteSpheres:begin;
+          if mode in [stm_disjointShinySpheres,stm_disjointMatteSpheres] then begin
+            k:=prevHit[i,j];
+            col:=getSphereColor(x,y,circlesInRange[k],mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres],hit);
+            if hit then exit(col);
+          end;
+          for k:=0 to length(circlesInRange)-1 do begin
+            col:=getSphereColor(x,y,circlesInRange[k],mode in [stm_overlappingShinySpheres,stm_disjointShinySpheres],hit);
+            if hit then begin
+              prevHit[i,j]:=k;
+              exit(col);
+            end;
           end;
         end;
-      end else begin
-        if mode in [stm_disjointCircles,stm_disjointBorderedCircles] then begin
-          k:=prevHit[i,j];
-          if system.sqr(x-circlesInRange[k].center.re)+
-             system.sqr(y-circlesInRange[k].center.im)<
-             system.sqr(  circlesInRange[k].radius) then exit(circlesInRange[k].color);
+        stm_overlappingCircles,stm_disjointCircles: begin
+          if mode=stm_disjointCircles then begin
+            k:=prevHit[i,j];
+            if system.sqr(x-circlesInRange[k].center.re)+
+               system.sqr(y-circlesInRange[k].center.im)<
+               system.sqr(  circlesInRange[k].radius) then exit(circlesInRange[k].color);
+          end;
+          for k:=0 to length(circlesInRange)-1 do begin
+            if system.sqr(x-circlesInRange[k].center.re)+
+               system.sqr(y-circlesInRange[k].center.im)<
+               system.sqr(  circlesInRange[k].radius) then begin
+              prevHit[i,j]:=k;
+              exit(circlesInRange[k].color);
+            end;
+          end;
         end;
-        for k:=0 to length(circlesInRange)-1 do begin
-          if system.sqr(x-circlesInRange[k].center.re)+
-             system.sqr(y-circlesInRange[k].center.im)<
-             system.sqr(  circlesInRange[k].radius) then begin
-            prevHit[i,j]:=k;
-            exit(circlesInRange[k].color);
+        stm_overlappingBorderedCircles,stm_disjointBorderedCircles:begin
+          if mode=stm_disjointBorderedCircles then begin
+            k:=prevHit[i,j];
+            col:=getEmbossedCircleColor(x,y,containedIn^.image.diagonal,circlesInRange[k],hit);
+            if hit then exit(col);
+          end;
+          for k:=0 to length(circlesInRange)-1 do begin
+            col:=getEmbossedCircleColor(x,y,containedIn^.image.diagonal,circlesInRange[k],hit);
+            if hit then begin
+              prevHit[i,j]:=k;
+              exit(col);
+            end;
           end;
         end;
       end;
