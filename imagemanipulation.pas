@@ -7,7 +7,9 @@ T_simpleOperationKind=(sok_inputDependent,
                        sok_inputIndependent,
                        sok_combiningStash,
                        sok_restoringStash,
-                       sok_writingStash);
+                       sok_writingStash,
+                       sok_writingFile,
+                       sok_readingFile);
 F_simpleImageOperation=PROCEDURE(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
 P_simpleImageOperationMeta=^T_simpleImageOperationMeta;
 T_simpleImageOperationMeta=object(T_imageOperationMeta)
@@ -36,6 +38,8 @@ T_simpleImageOperation=object(T_imageOperation)
     DESTRUCTOR destroy; virtual;
     FUNCTION readsStash:string; virtual;
     FUNCTION writesStash:string; virtual;
+    FUNCTION readsFile:string; virtual;
+    FUNCTION writesFile:string; virtual;
     FUNCTION dependsOnImageBefore:boolean; virtual;
     FUNCTION toString(nameMode:T_parameterNameMode):string; virtual;
     FUNCTION alterParameter(CONST newParameterString:string):boolean; virtual;
@@ -49,12 +53,12 @@ end;
 
 FUNCTION registerSimpleOperation(CONST cat_:T_imageManipulationCategory; CONST sig:P_parameterDescription; CONST op:F_simpleImageOperation; CONST kind:T_simpleOperationKind=sok_inputDependent):P_simpleImageOperationMeta;
 FUNCTION canParseSizeLimit(CONST s:string; OUT size:longint):boolean;
-FUNCTION getSaveStatement(CONST savingToFile:string; CONST savingWithSizeLimit:longint):string;
+FUNCTION getSaveStatement(CONST savingToFile:string; CONST savingWithSizeLimit:longint):P_simpleImageOperation;
 VAR deleteOp:T_deleteFileMeta;
 IMPLEMENTATION
 USES generationBasics,sysutils;
-VAR pd_save                :P_parameterDescription=nil;
-    pd_save_with_size_limit:P_parameterDescription=nil;
+VAR pd_save                :P_simpleImageOperationMeta=nil;
+    pd_save_with_size_limit:P_simpleImageOperationMeta=nil;
 
 FUNCTION registerSimpleOperation(CONST cat_:T_imageManipulationCategory; CONST sig:P_parameterDescription; CONST op:F_simpleImageOperation; CONST kind:T_simpleOperationKind=sok_inputDependent):P_simpleImageOperationMeta;
   begin
@@ -65,24 +69,30 @@ FUNCTION registerSimpleOperation(CONST cat_:T_imageManipulationCategory; CONST s
 FUNCTION canParseSizeLimit(CONST s: string; OUT size: longint): boolean;
   VAR p:T_parameterValue;
   begin
-    p.createToParse(pd_save_with_size_limit,'dummy.jpg@'+s);
+    p.createToParse(pd_save_with_size_limit^.getSimpleParameterDescription,'dummy.jpg@'+s);
     size:=p.i0;
     result:=p.isValid;
   end;
 
-FUNCTION getSaveStatement(CONST savingToFile: string; CONST savingWithSizeLimit: longint): string;
-  VAR p:T_parameterValue;
+FUNCTION getSaveStatement(CONST savingToFile: string; CONST savingWithSizeLimit: longint): P_simpleImageOperation;
   begin
     if (uppercase(extractFileExt(savingToFile))=SIZE_LIMITABLE_EXTENSION) and (savingWithSizeLimit>0) then begin
-      p.createFromValue(pd_save_with_size_limit,savingToFile,savingWithSizeLimit);
-      result:=p.toString(tsm_withNiceParameterName);
+      result:=P_simpleImageOperation(pd_save_with_size_limit^.getDefaultOperation);
+      result^.parameters.fileName:=savingToFile;
+      result^.parameters.modifyI(0,savingWithSizeLimit);
     end else begin
-      p.createFromValue(pd_save,savingToFile);
-      result:=p.toString(tsm_withNiceParameterName);
+      result:=P_simpleImageOperation(pd_save^.getDefaultOperation);
+      result^.parameters.fileName:=savingToFile;
+    end;
+    if not(result^.parameters.isValid) then begin
+      dispose(result,destroy);
+      result:=nil;
+      assert(false,'save statement must be valid');
     end;
   end;
 
-CONSTRUCTOR T_simpleImageOperation.create(CONST meta_: P_simpleImageOperationMeta; CONST parameters_: T_parameterValue);
+CONSTRUCTOR T_simpleImageOperation.create(
+  CONST meta_: P_simpleImageOperationMeta; CONST parameters_: T_parameterValue);
   begin
     inherited create(meta_);
     parameters:=parameters_;
@@ -122,6 +132,20 @@ FUNCTION T_simpleImageOperation.writesStash: string;
     else result:='';
   end;
 
+FUNCTION T_simpleImageOperation.readsFile: string;
+  begin
+    if P_simpleImageOperationMeta(meta)^.kind=sok_readingFile
+    then result:=parameters.fileName
+    else result:='';
+  end;
+
+FUNCTION T_simpleImageOperation.writesFile: string;
+  begin
+    if P_simpleImageOperationMeta(meta)^.kind=sok_writingFile
+    then result:=parameters.fileName
+    else result:='';
+  end;
+
 FUNCTION T_simpleImageOperation.dependsOnImageBefore: boolean;
   begin
     result:=P_simpleImageOperationMeta(meta)^.kind in [sok_inputDependent,sok_combiningStash,sok_writingStash];
@@ -132,7 +156,8 @@ FUNCTION T_simpleImageOperation.toString(nameMode: T_parameterNameMode): string;
     result:=parameters.toString(nameMode);
   end;
 
-FUNCTION T_simpleImageOperation.alterParameter(CONST newParameterString: string): boolean;
+FUNCTION T_simpleImageOperation.alterParameter(CONST newParameterString: string
+  ): boolean;
   begin
     result:= parameters.canParse(newParameterString);
   end;
@@ -179,6 +204,7 @@ FUNCTION T_simpleImageOperationMeta.getDefaultOperation: P_imageOperation;
 
 PROCEDURE loadImage_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
+    //TODO: Handle file access errors
     context^.image.loadFromFile(parameters.fileName);
   end;
 
@@ -188,6 +214,7 @@ PROCEDURE saveImage_impl(CONST parameters:T_parameterValue; CONST context:P_abst
       context^.messageQueue^.Post('No images are saved in preview mode',false,context^.currentStepIndex);
       exit;
     end;
+    //TODO: Handle file access errors
     if parameters.description^.getType=pt_jpgNameWithSize
     then context^.image.saveJpgWithSizeLimit(parameters.fileName,parameters.i0)
     else context^.image.saveToFile(parameters.fileName);
@@ -216,15 +243,17 @@ INITIALIZATION
   registerSimpleOperation(imc_imageAccess,
                           newParameterDescription(C_loadStatementName,pt_fileName)^.setDefaultValue('filename.jpg'),
                           @loadImage_impl,
-                          sok_inputIndependent);
+                          sok_readingFile);
   pd_save:=
   registerSimpleOperation(imc_imageAccess,
                           newParameterDescription('save',pt_fileName)^.setDefaultValue('filename.jpg'),
-                          @saveImage_impl)^.getSimpleParameterDescription;
+                          @saveImage_impl,
+                          sok_writingFile);
   pd_save_with_size_limit:=
   registerSimpleOperation(imc_imageAccess,
                           newParameterDescription('save',pt_jpgNameWithSize)^.setDefaultValue('image.jpg@1M'),
-                          @saveImage_impl)^.getSimpleParameterDescription;
+                          @saveImage_impl,
+                          sok_writingFile);
   deleteOp.create;
 FINALIZATION
   deleteOp.destroy;

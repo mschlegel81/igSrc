@@ -47,6 +47,8 @@ TYPE
       DESTRUCTOR destroy; virtual;
       FUNCTION readsStash:string; virtual;
       FUNCTION writesStash:string; virtual;
+      FUNCTION readsFile:string; virtual;
+      FUNCTION writesFile:string; virtual;
       FUNCTION dependsOnImageBefore:boolean; virtual; abstract;
       FUNCTION toString(nameMode:T_parameterNameMode):string; virtual; abstract;
       FUNCTION alterParameter(CONST newParameterString:string):boolean; virtual; abstract;
@@ -202,6 +204,8 @@ CONSTRUCTOR T_imageOperation.create(CONST meta: P_imageOperationMeta); begin fMe
 FUNCTION T_imageOperation.getSimpleParameterValue: P_parameterValue; begin result:=nil; end;
 FUNCTION T_imageOperation.readsStash: string; begin result:=''; end;
 FUNCTION T_imageOperation.writesStash: string; begin result:=''; end;
+FUNCTION T_imageOperation.readsFile: string; begin result:=''; end;
+FUNCTION T_imageOperation.writesFile: string; begin result:=''; end;
 
 CONSTRUCTOR T_imageOperationMeta.create(CONST name_: string;
   CONST cat_: T_imageManipulationCategory);

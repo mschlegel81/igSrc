@@ -457,11 +457,14 @@ PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWi
   VAR todoBase,
       todoName:string;
       temporaryWorkflow:T_arrayOfString;
+      saveStep:P_simpleImageOperation;
       counter:longint=0;
   begin
     temporaryWorkflow:=config.getFirstTodoStep;
     append(temporaryWorkflow,workflowText);
-    append(temporaryWorkflow,getSaveStatement(savingToFile,savingWithSizeLimit));
+    saveStep:=getSaveStatement(savingToFile,savingWithSizeLimit);
+    append(temporaryWorkflow,saveStep^.toString(tsm_withNiceParameterName));
+    dispose(saveStep,destroy);
     todoBase:=ExtractFileNameWithoutExt(savingToFile);
     todoName:=todoBase+'.todo';
     while fileExists(todoName) do begin
@@ -489,7 +492,12 @@ PROCEDURE T_simpleWorkflow.appendSaveStep(CONST savingToFile: string;
 
 PROCEDURE T_simpleWorkflow.executeAsTodo;
   begin
+    if not(isValid) then exit;
     SetCurrentDir(ExtractFileDir(config.workflowFilename));
+    if step[stepCount-1]^.operation^.writesFile='' then begin
+      messageQueue^.Post('Invalid todo workflow. The last operation must be a save statement.');
+      exit;
+    end;
     addStep(deleteOp.getOperationToDeleteFile(config.workflowFilename));
     executeWorkflowInBackground(false);
   end;
@@ -605,6 +613,7 @@ FUNCTION T_simpleWorkflow.isValid: boolean;
   VAR s:P_workflowStep;
       i,j:longint;
       stashId:string;
+      fileName:string;
       writtenBeforeRead:boolean;
   begin
     //Every single step has to be valid
@@ -620,6 +629,18 @@ FUNCTION T_simpleWorkflow.isValid: boolean;
           messageQueue^.Post('Stash "'+stashId+'" is read before it is written',true,i);
           result:=false;
         end;
+      end;
+
+      fileName:=steps[i]^.operation^.readsFile;
+      if (fileName<>'') and not(fileExists(fileName)) then begin
+        messageQueue^.Post('File "'+fileName+'" does not exist so it cannot be loaded',true,i);
+        result:=false;
+      end;
+
+      fileName:=steps[i]^.operation^.writesFile;
+      if  (fileName<>'') and fileExists(fileName) then begin
+        messageQueue^.Post('File "'+fileName+'" already exists. The workflow will not be exeuted to prevent overwriting.',true,i);
+        result:=false;
       end;
     end;
   end;

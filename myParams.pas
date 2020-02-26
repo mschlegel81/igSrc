@@ -56,7 +56,9 @@ TYPE
       intValue:array[0..3] of longint;
       floatValue:array[0..3] of double;
       valid:boolean;
+      PROCEDURE setFileName(CONST newValue:string);
       PROCEDURE setDefaults;
+      PROCEDURE validate;
     public
       CONSTRUCTOR createCopy     (CONST other:P_parameterValue);
       CONSTRUCTOR createToParse  (CONST parameterDescription:P_parameterDescription; CONST stringToParse:ansistring; CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName);
@@ -66,10 +68,10 @@ TYPE
       CONSTRUCTOR createFromValue(CONST parameterDescription:P_parameterDescription; CONST txt:ansistring; CONST sizeLimit:longint=-1);
       DESTRUCTOR destroy;
       FUNCTION canParse(CONST stringToParse:ansistring; CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName):boolean;
-      FUNCTION isValid:boolean;
+      PROPERTY isValid:boolean read valid;
       FUNCTION toString(CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName):ansistring;
 
-      FUNCTION fileName:string;
+      PROPERTY fileName:string read fileNameValue write setFileName;
       PROPERTY i0:longint read intValue[0];
       PROPERTY i1:longint read intValue[1];
       PROPERTY i2:longint read intValue[2];
@@ -298,6 +300,10 @@ FUNCTION T_parameterDescription.areValuesInRange(CONST p:T_parameterValue):boole
     result:=result and (not(typ in F1_RELEVANT_PARAMETER_TYPES) or (p.F1>=minValue) and (p.F1<=maxValue));
     result:=result and (not(typ in F2_RELEVANT_PARAMETER_TYPES) or (p.F2>=minValue) and (p.F2<=maxValue));
     result:=result and (not(typ in F3_RELEVANT_PARAMETER_TYPES) or (p.F3>=minValue) and (p.F3<=maxValue));;
+    case typ of
+      pt_fileName       : result:=result and isFilename(p.fileNameValue,                IMAGE_TYPE_EXTENSIONS    );
+      pt_jpgNameWithSize: result:=result and isFilename(p.fileNameValue,T_arrayOfString(SIZE_LIMITABLE_EXTENSION));
+    end;
     for i:=0 to length(children)-1 do result:=result and getSubDescription(i)^.areValuesInRange(getSubParameter(i,p));
   end;
 
@@ -379,13 +385,12 @@ FUNCTION T_parameterValue.canParse(CONST stringToParse: ansistring;
       pt_fileName: begin
         if (copy(txt,1,1)=':') then txt:=copy(txt,2,length(txt)-1);
         fileNameValue:=txt;
-        valid:=isFilename(txt,IMAGE_TYPE_EXTENSIONS);
+        valid:=true;
       end;
       pt_jpgNameWithSize: begin
         part:=split(txt,'@');
         if length(part)<2 then valid:=false else begin
           fileNameValue:=part[0];
-          if not(isFilename(fileName,T_arrayOfString(SIZE_LIMITABLE_EXTENSION))) then begin valid:=false; exit(valid); end;
           if length(part)<>2 then begin valid:=false; exit(valid); end else txt:=part[1];
           if      endsWith(uppercase(txt),'K') then i:=1 shl 10
           else if endsWith(uppercase(txt),'M') then i:=1 shl 20
@@ -466,8 +471,13 @@ FUNCTION T_parameterValue.canParse(CONST stringToParse: ansistring;
         valid:=true;
       end;
     end;
-    valid:=valid and associatedParmeterDescription^.areValuesInRange(self);
+    if valid then validate;
     result:=valid;
+  end;
+
+PROCEDURE T_parameterValue.validate;
+  begin
+    valid:=associatedParmeterDescription^.areValuesInRange(self);
   end;
 
 CONSTRUCTOR T_parameterValue.createFromValue(CONST parameterDescription: P_parameterDescription; CONST i0: longint; CONST i1: longint; CONST i2: longint; CONST i3: longint);
@@ -520,11 +530,6 @@ CONSTRUCTOR T_parameterValue.createFromValue(CONST parameterDescription: P_param
 DESTRUCTOR T_parameterValue.destroy;
   begin
     fileNameValue:='';
-  end;
-
-FUNCTION T_parameterValue.isValid: boolean;
-  begin
-    result:=valid;
   end;
 
 FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode): ansistring;
@@ -598,9 +603,13 @@ FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode)
     end;
   end;
 
-FUNCTION T_parameterValue.fileName: string; begin result:=fileNameValue; end;
+PROCEDURE T_parameterValue.setFileName(CONST newValue: string);
+  begin
+    fileNameValue:=newValue;
+    validate;
+  end;
 
-FUNCTION T_parameterValue.getNumericParameter(CONST index:byte):double;
+FUNCTION T_parameterValue.getNumericParameter(CONST index: byte): double;
   begin
     case index of
       0: if associatedParmeterDescription^.typ in I0_RELEVANT_PARAMETER_TYPES then result:=intValue  [0] else
@@ -654,11 +663,13 @@ FUNCTION T_parameterValue.interpolate(CONST other: T_parameterValue;
 PROCEDURE T_parameterValue.modifyI(CONST index: longint; CONST value: longint);
   begin
     intValue[index]:=value;
+    validate;
   end;
 
 PROCEDURE T_parameterValue.modifyF(CONST index: longint; CONST value: double);
   begin
     floatValue[index]:=value;
+    validate;
   end;
 
 PROCEDURE T_parameterValue.copyFrom(CONST other: T_parameterValue; CONST forceParameterDescription: boolean=false);
