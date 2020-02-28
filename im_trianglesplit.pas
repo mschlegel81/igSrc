@@ -1,20 +1,62 @@
 UNIT im_triangleSplit;
 INTERFACE
-USES complex,myColors;
-TYPE T_quad=record
-       p0,p1,p2,p3:T_Complex;
-       color:T_rgbFloatColor;
-       isTriangle:boolean;
-     end;
-     T_quadList=array of T_quad;
-     T_boundingBox=record
-       x0,y0,x1,y1:longint;
-     end;
+USES complex,myColors,imageContexts;
+TYPE
+  T_quad=record
+    p0,p1,p2,p3:T_Complex;
+    color:T_rgbFloatColor;
+    isTriangle:boolean;
+  end;
+
+  T_quadList=array of T_quad;
+
+  T_boundingBox=record
+    x0,y0,x1,y1:longint;
+  end;
+
+  T_complexPair=array[0..1] of T_Complex;
+
+  T_tileBuilder=object
+    private
+      drawable        :T_quadList;
+      drawableCount   :longint;
+      imageBoundingBox:T_boundingBox;
+      flat            :boolean; //true depending on border width and angle
+      BorderWidth         ,
+      borderUpFraction    ,
+      borderAcrossFraction:double;
+      context:P_abstractWorkflow;
+
+      PROCEDURE addFlatTriangle(CONST a,b,c  :T_Complex; CONST color:T_rgbFloatColor);
+      PROCEDURE addFlatQuad    (CONST a,b,c,d:T_Complex; CONST color:T_rgbFloatColor);
+
+      FUNCTION shiftEdge(CONST a,b:T_Complex):T_complexPair;
+      FUNCTION colorOfSide(CONST a,b:T_Complex; CONST baseColor:T_rgbFloatColor):T_rgbFloatColor;
+    public
+      CONSTRUCTOR create(CONST workflow:P_abstractWorkflow; CONST relativeBorderWidth,borderAngleInDegrees:double);
+      DESTRUCTOR destroy;
+
+      PROCEDURE addTriangle(CONST q:T_quad);
+      PROCEDURE addTriangle(CONST a,b,c:T_Complex; CONST color:T_rgbFloatColor);
+      {The color is given by the image}
+      PROCEDURE addTriangle(CONST a,b,c:T_Complex);
+
+      PROCEDURE addQuad(CONST q:T_quad);
+      PROCEDURE addQuad(CONST a,b,c,d:T_Complex; CONST color:T_rgbFloatColor);
+      {The color is given by the image}
+      PROCEDURE addQuad(CONST a,b,c,d:T_Complex);
+
+      PROCEDURE addHexagon(CONST a,b,c,d,e,f:T_Complex; CONST color:T_rgbFloatColor);
+      {The color is given by the image}
+      PROCEDURE addHexagon(CONST a,b,c,d,e,f:T_Complex);
+
+      PROCEDURE startExecution;
+  end;
 
 IMPLEMENTATION
-USES imageManipulation,imageContexts,myParams,mypics,math,pixMaps,darts,ig_circlespirals;
+USES imageManipulation,myParams,mypics,math,pixMaps,darts,ig_circlespirals,sysutils;
 
-FUNCTION areaMeasure(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
+FUNCTION crossProduct(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
   begin
     result:=(b.re-a.re)*(y2-a.im)-
             (b.im-a.im)*(x2-a.re);
@@ -23,13 +65,13 @@ FUNCTION areaMeasure(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
 FUNCTION isInside(CONST x,y:double; CONST q:T_quad):boolean;
   begin
     if q.isTriangle
-    then result:=(areaMeasure(q.p0,q.p1,x,y)>=0) and
-                 (areaMeasure(q.p1,q.p2,x,y)>=0) and
-                 (areaMeasure(q.p2,q.p0,x,y)>=0)
-    else result:=(areaMeasure(q.p0,q.p1,x,y)>=0) and
-                 (areaMeasure(q.p1,q.p2,x,y)>=0) and
-                 (areaMeasure(q.p2,q.p3,x,y)>=0) and
-                 (areaMeasure(q.p3,q.p0,x,y)>=0);
+    then result:=(crossProduct(q.p0,q.p1,x,y)>=0) and
+                 (crossProduct(q.p1,q.p2,x,y)>=0) and
+                 (crossProduct(q.p2,q.p0,x,y)>=0)
+    else result:=(crossProduct(q.p0,q.p1,x,y)>=0) and
+                 (crossProduct(q.p1,q.p2,x,y)>=0) and
+                 (crossProduct(q.p2,q.p3,x,y)>=0) and
+                 (crossProduct(q.p3,q.p0,x,y)>=0);
   end;
 
 FUNCTION getBoundingBox(CONST q:T_quad):T_boundingBox;
@@ -83,6 +125,307 @@ T_trianglesTodo=object(T_parallelTask)
   DESTRUCTOR destroy; virtual;
   PROCEDURE execute; virtual;
 end;
+
+{Use this only for pixel coordinates. Otherwise the epsilon is too large.}
+FUNCTION almostEqual(CONST a,b:T_Complex):boolean; inline;
+  begin result:=(abs(a.re-b.re)<1E-3) and (abs(a.im-b.im)<1E-3); end;
+
+PROCEDURE T_tileBuilder.addFlatTriangle(CONST a, b, c: T_Complex; CONST color: T_rgbFloatColor);
+  begin
+    //Only add triangles if orientation fits and the area is larger than epsilon
+    if crossProduct(a,b,c.re,c.im)<1E-3 then exit;
+    addFlatQuad(a,b,c,a,color);
+    drawable[drawableCount-1].isTriangle:=true;
+  end;
+
+PROCEDURE T_tileBuilder.addFlatQuad(CONST a, b, c, d: T_Complex; CONST color: T_rgbFloatColor);
+  begin
+    //Only add triangles if orientation fits and the area is larger than epsilon
+    if crossProduct(a,b,c.re,c.im)+crossProduct(c,d,a.re,a.im)<1E-3 then exit;
+    if drawableCount>=length(drawable) then setLength(drawable,1+round(length(drawable)*1.1));
+    with drawable[drawableCount] do begin
+      p0:=a;
+      p1:=b;
+      p2:=c;
+      p3:=d;
+      isTriangle:=false;
+      //Check for degeneration to triangle
+      if      almostEqual(p3,p0) then begin p0:=p1; p1:=p2; p2:=p3; p3:=p0; isTriangle:=true; end
+      else if almostEqual(p0,p1) then begin         p1:=p2; p2:=p3; p3:=p0; isTriangle:=true; end
+      else if almostEqual(p1,p2) then begin                 p2:=p3; p3:=p0; isTriangle:=true; end
+      else if almostEqual(p2,p3) then begin                         p3:=p0; isTriangle:=true; end;
+    end;
+    drawable[drawableCount].color:=color;
+    inc(drawableCount);
+  end;
+
+CONSTRUCTOR T_tileBuilder.create(CONST workflow: P_abstractWorkflow; CONST relativeBorderWidth, borderAngleInDegrees: double);
+  begin
+    setLength(drawable,1);
+    drawableCount:=0;
+    context:=workflow;
+    BorderWidth:=relativeBorderWidth/1000*context^.image.diagonal;
+    borderUpFraction    :=system.cos(borderAngleInDegrees*0.017453292519943295);
+    borderAcrossFraction:=system.sin(borderAngleInDegrees*0.017453292519943295);
+    flat:=(BorderWidth<0.2) or (borderAcrossFraction<0.05);
+    imageBoundingBox.x0:=0;
+    imageBoundingBox.y0:=0;
+    imageBoundingBox.x1:=context^.image.dimensions.width;
+    imageBoundingBox.y1:=context^.image.dimensions.height;
+  end;
+
+DESTRUCTOR T_tileBuilder.destroy;
+  begin
+    setLength(drawable,0);
+  end;
+
+FUNCTION T_tileBuilder.shiftEdge(CONST a,b:T_Complex):T_complexPair;
+  VAR d:T_Complex;
+  begin
+    d.re:=a.im-b.im;
+    d.im:=b.re-a.re;
+    d*=BorderWidth/abs(d);
+    result[0]:=a+d;
+    result[1]:=b+d;
+  end;
+
+FUNCTION T_tileBuilder.colorOfSide(CONST a,b:T_Complex; CONST baseColor:T_rgbFloatColor):T_rgbFloatColor;
+  VAR d:T_Complex;
+  begin
+    d:=b-a;
+    d:=d*II/complex.abs(d);
+    result:=baseColor*max(0,borderAcrossFraction*d.re*1/3
+                           +borderAcrossFraction*d.im*2/3
+                           +borderUpFraction);
+  end;
+
+PROCEDURE T_tileBuilder.addTriangle(CONST q: T_quad);
+  begin
+    addTriangle(q.p0,q.p1,q.p2,q.color);
+  end;
+
+PROCEDURE T_tileBuilder.addQuad(CONST q: T_quad);
+  begin
+    addQuad(q.p0,q.p1,q.p2,q.p3);
+  end;
+
+FUNCTION edgeCut(CONST a,b,c,d:T_Complex):T_Complex;
+  VAR X,Y,Z:T_Complex;
+      u:double;
+  begin
+    X:=b-a;
+    Y:=d-c;
+    Z:=c-a;
+    u:=(Z.re*Y.im-Y.re*Z.im)/(X.re*Y.im-Y.re*X.im);
+    result:=a+X*u;
+  end;
+
+FUNCTION edgeCut(CONST edge1,edge2:T_complexPair):T_Complex;
+  begin
+    result:=edgeCut(edge1[0],edge1[1],edge2[0],edge2[1]);
+  end;
+
+PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex; CONST color: T_rgbFloatColor);
+  VAR ab_shifted,
+      bc_shifted,
+      ca_shifted:T_complexPair;
+      a_,b_,c_,X:T_Complex;
+  begin
+    if flat then begin
+      addFlatTriangle(a,b,c,color);
+      exit;
+    end;
+    ab_shifted:=shiftEdge(a,b);
+    bc_shifted:=shiftEdge(b,c);
+    ca_shifted:=shiftEdge(c,a);
+    a_:=edgeCut(ab_shifted,ca_shifted);
+    b_:=edgeCut(ab_shifted,bc_shifted);
+    c_:=edgeCut(ca_shifted,bc_shifted);
+    X:=edgeCut(a,a_,b,b_);
+    if sqrabs(X-a)<sqrabs(a_-a) then a_:=X;
+    if sqrabs(X-b)<sqrabs(b_-b) then b_:=X;
+    X:=edgeCut(b,b_,c,c_);
+    if sqrabs(X-b)<sqrabs(b_-b) then b_:=X;
+    if sqrabs(X-c)<sqrabs(c_-c) then c_:=X;
+    X:=edgeCut(c,c_,a,a_);
+    if sqrabs(X-c)<sqrabs(c_-c) then c_:=X;
+    if sqrabs(X-a)<sqrabs(a_-a) then a_:=X;
+    addFlatTriangle(a_,b_,c_,color);
+    addFlatQuad(a,b,b_,a_,colorOfSide(a,b,color));
+    addFlatQuad(b,c,c_,b_,colorOfSide(b,c,color));
+    addFlatQuad(c,a,a_,c_,colorOfSide(c,a,color));
+  end;
+
+PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex; CONST color: T_rgbFloatColor);
+  VAR ab_shifted,
+      bc_shifted,
+      cd_shifted,
+      da_shifted:T_complexPair;
+      a_,b_,c_,d_,X:T_Complex;
+  begin
+    if flat then begin
+      addFlatQuad(a,b,c,d,color);
+      exit;
+    end;
+    ab_shifted:=shiftEdge(a,b);
+    bc_shifted:=shiftEdge(b,c);
+    cd_shifted:=shiftEdge(c,d);
+    da_shifted:=shiftEdge(d,a);
+    a_:=edgeCut(ab_shifted,da_shifted);
+    b_:=edgeCut(ab_shifted,bc_shifted);
+    c_:=edgeCut(cd_shifted,bc_shifted);
+    d_:=edgeCut(cd_shifted,da_shifted);
+
+    X:=edgeCut(a,a_,b,b_);
+    if sqrabs(X-a)<sqrabs(a_-a) then a_:=X;
+    if sqrabs(X-b)<sqrabs(b_-b) then b_:=X;
+    X:=edgeCut(b,b_,c,c_);
+    if sqrabs(X-b)<sqrabs(b_-b) then b_:=X;
+    if sqrabs(X-c)<sqrabs(c_-c) then c_:=X;
+    X:=edgeCut(c,c_,d,d_);
+    if sqrabs(X-c)<sqrabs(c_-c) then c_:=X;
+    if sqrabs(X-d)<sqrabs(d_-d) then d_:=X;
+    X:=edgeCut(d,d_,a,a_);
+    if sqrabs(X-d)<sqrabs(d_-d) then d_:=X;
+    if sqrabs(X-a)<sqrabs(a_-a) then a_:=X;
+
+    addFlatQuad(a_,b_,c_,d_,color);
+    addFlatQuad(a,b,b_,a_,colorOfSide(a,b,color));
+    addFlatQuad(b,c,c_,b_,colorOfSide(c,d,color));
+    addFlatQuad(c,d,d_,c_,colorOfSide(c,d,color));
+    addFlatQuad(d,a,a_,d_,colorOfSide(d,a,color));
+  end;
+
+PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d,e,f: T_Complex; CONST color: T_rgbFloatColor);
+  VAR ab_shifted,
+      bc_shifted,
+      cd_shifted,
+      de_shifted,
+      ef_shifted,
+      fa_shifted:T_complexPair;
+      a_,b_,c_,d_,e_,f_,X:T_Complex;
+  begin
+    if flat then begin
+      addFlatQuad(a,b,c,d,color);
+      addFlatQuad(d,e,f,a,color);
+      exit;
+    end;
+    ab_shifted:=shiftEdge(a,b);
+    bc_shifted:=shiftEdge(b,c);
+    cd_shifted:=shiftEdge(c,d);
+    de_shifted:=shiftEdge(d,e);
+    ef_shifted:=shiftEdge(e,f);
+    fa_shifted:=shiftEdge(f,a);
+    a_:=edgeCut(fa_shifted,ab_shifted);
+    b_:=edgeCut(ab_shifted,bc_shifted);
+    c_:=edgeCut(bc_shifted,cd_shifted);
+    d_:=edgeCut(cd_shifted,de_shifted);
+    e_:=edgeCut(de_shifted,ef_shifted);
+    f_:=edgeCut(ef_shifted,fa_shifted);
+
+    X:=edgeCut(a,a_,b,b_);
+    if sqrabs(X-a)<sqrabs(a_-a) then a_:=X;
+    if sqrabs(X-b)<sqrabs(b_-b) then b_:=X;
+    X:=edgeCut(b,b_,c,c_);
+    if sqrabs(X-b)<sqrabs(b_-b) then b_:=X;
+    if sqrabs(X-c)<sqrabs(c_-c) then c_:=X;
+    X:=edgeCut(c,c_,d,d_);
+    if sqrabs(X-c)<sqrabs(c_-c) then c_:=X;
+    if sqrabs(X-d)<sqrabs(d_-d) then d_:=X;
+    X:=edgeCut(d,d_,e,e_);
+    if sqrabs(X-d)<sqrabs(d_-d) then d_:=X;
+    if sqrabs(X-e)<sqrabs(e_-e) then e_:=X;
+    X:=edgeCut(e,e_,f,f_);
+    if sqrabs(X-e)<sqrabs(e_-e) then e_:=X;
+    if sqrabs(X-f)<sqrabs(f_-f) then f_:=X;
+    X:=edgeCut(f,f_,a,a_);
+    if sqrabs(X-f)<sqrabs(f_-f) then f_:=X;
+    if sqrabs(X-a)<sqrabs(a_-a) then a_:=X;
+
+    addFlatQuad(a_,b_,c_,d_,color);
+    addFlatQuad(d_,e_,f_,a_,color);
+    addFlatQuad(a,b,b_,a_,colorOfSide(a,b,color));
+    addFlatQuad(b,c,c_,b_,colorOfSide(b,c,color));
+    addFlatQuad(c,d,d_,c_,colorOfSide(c,d,color));
+    addFlatQuad(d,e,e_,d_,colorOfSide(d,e,color));
+    addFlatQuad(e,f,f_,e_,colorOfSide(e,f,color));
+    addFlatQuad(f,a,a_,f_,colorOfSide(f,a,color));
+  end;
+
+TYPE T_triangleInfo=record
+  base:T_quad;
+  variance:double;
+end;
+
+FUNCTION scanTriangle(VAR triangleInfo:T_triangleInfo; CONST imgBB:T_boundingBox; VAR image:T_rawImage):longint;
+  VAR box:T_boundingBox;
+      x,y:longint;
+      k:longint=0;
+      c,s,ss:T_rgbFloatColor;
+  begin
+    box:=bbIntersect(imgBB,getBoundingBox(triangleInfo.base));
+    s :=BLACK;
+    ss:=BLACK;
+    for y:=box.y0 to box.y1-1 do
+    for x:=box.x0 to box.x1-1 do if isInside(x,y,triangleInfo.base) then begin
+      c:=image[x,y];
+      k +=1;
+      s +=c;
+      ss+=c*c;
+    end;
+    ss-=s*s*(1/k);
+    triangleInfo.base.color:=s*(1/k);
+    result:=k;
+    if k=0
+    then triangleInfo.variance:=-1
+    else triangleInfo.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
+  end;
+
+PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex);
+  VAR info:T_triangleInfo;
+  begin
+    with info.base do begin
+      p0:=a; p1:=b; p2:=c; p3:=a; isTriangle:=true;
+    end;
+    scanTriangle(info,imageBoundingBox,context^.image);
+    addTriangle(a,b,c,info.base.color);
+  end;
+
+PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex);
+  VAR info:T_triangleInfo;
+  begin
+    with info.base do begin
+      p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false;
+    end;
+    scanTriangle(info,imageBoundingBox,context^.image);
+    addQuad(a,b,c,d,info.base.color);
+  end;
+
+PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d,e,f: T_Complex);
+  VAR half1,half2:T_triangleInfo;
+      w1,w2:longint;
+  begin
+    with half1.base do begin p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false; end;
+    with half2.base do begin p0:=d; p1:=e; p2:=f; p3:=a; isTriangle:=false; end;
+    w1:=scanTriangle(half1,imageBoundingBox,context^.image);
+    w2:=scanTriangle(half2,imageBoundingBox,context^.image);
+    addHexagon(a,b,c,d,e,f,
+               (half1.base.color*w1 +
+                half2.base.color*w2)*(1/max(w1+w1,1)));
+  end;
+
+PROCEDURE T_tileBuilder.startExecution;
+  VAR todo:P_trianglesTodo;
+      i:longint;
+  begin
+    setLength(drawable,drawableCount);
+    context^.clearQueue;
+    context^.image.markChunksAsPending;
+    for i in context^.image.getPendingList do begin
+      new(todo,create(drawable,i,@(context^.image)));
+      context^.enqueue(todo);
+    end;
+  end;
 
 CONSTRUCTOR T_trianglesTodo.create(CONST allCircles: T_quadList; CONST chunkIndex_: longint; CONST target_: P_rawImage);
   VAR box:T_boundingBox;
@@ -159,34 +502,7 @@ PROCEDURE T_trianglesTodo.execute;
   end;
 
 FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST count:longint; CONST style:byte):T_quadList;
-  TYPE T_triangleInfo=record
-         base:T_quad;
-         variance:double;
-       end;
   VAR imgBB:T_boundingBox;
-  PROCEDURE scanTriangle(VAR triangleInfo:T_triangleInfo);
-    VAR box:T_boundingBox;
-        x,y:longint;
-        k:longint=0;
-        c,s,ss:T_rgbFloatColor;
-    begin
-      box:=bbIntersect(imgBB,getBoundingBox(triangleInfo.base));
-      s :=BLACK;
-      ss:=BLACK;
-      for y:=box.y0 to box.y1-1 do
-      for x:=box.x0 to box.x1-1 do if isInside(x,y,triangleInfo.base) then begin
-        c:=context^.image[x,y];
-        k +=1;
-        s +=c;
-        ss+=c*c;
-      end;
-      ss-=s*s*(1/k);
-      triangleInfo.base.color:=s*(1/k);
-      if k=0
-      then triangleInfo.variance:=-1
-      else triangleInfo.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
-    end;
-
   VAR tri:array of T_triangleInfo;
   PROCEDURE initTriangles;
     CONST c=0.5;
@@ -244,10 +560,10 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
           b0.base.p2:=b1.base.p1;
           a0.base.p0:=b1.base.p2;
           a0.base.p1:=b1.base.p1;
-          scanTriangle(a0);
-          scanTriangle(a1);
-          scanTriangle(b0);
-          scanTriangle(b1);
+          scanTriangle(a0,imgBB,context^.image);
+          scanTriangle(a1,imgBB,context^.image);
+          scanTriangle(b0,imgBB,context^.image);
+          scanTriangle(b1,imgBB,context^.image);
           i:=length(tri);
           setLength(tri,i+3);
           tri[toSplit]:=a0;
@@ -273,9 +589,9 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
               c0.base.p2:=c0.base.p2*0.67+c0.base.p0*0.33; c1.base.p0:=c0.base.p2; c0.base.p3:=c0.base.p2;
             end;
           end;
-          scanTriangle(a0); scanTriangle(a1);
-          scanTriangle(b0); scanTriangle(b1);
-          scanTriangle(c0); scanTriangle(c1);
+          scanTriangle(a0,imgBB,context^.image); scanTriangle(a1,imgBB,context^.image);
+          scanTriangle(b0,imgBB,context^.image); scanTriangle(b1,imgBB,context^.image);
+          scanTriangle(c0,imgBB,context^.image); scanTriangle(c1,imgBB,context^.image);
           if b0.variance+b1.variance<a0.variance+a1.variance then begin a0:=b0; a1:=b1; end;
           if c0.variance+c1.variance<a0.variance+a1.variance then begin a0:=c0; a1:=c1; end;
           i:=length(tri);
@@ -295,7 +611,7 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
               a0.base.p2:=a0.base.p2*0.5 +a0.base.p0*0.5 ; a1.base.p0:=a0.base.p2;
             end;
           end;
-          scanTriangle(a0); scanTriangle(a1);
+          scanTriangle(a0,imgBB,context^.image); scanTriangle(a1,imgBB,context^.image);
           i:=length(tri);
           setLength(tri,i+1);
           tri[toSplit]:=a0;
@@ -319,116 +635,17 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
   end;
 
 PROCEDURE triangleSplit(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  VAR allQuads:T_quadList;
-      quadCount:longint=0;
-
-  PROCEDURE addQuad(CONST a,b,c,d:T_Complex; CONST color:T_rgbFloatColor);
-    begin
-      if quadCount>=length(allQuads) then setLength(allQuads,round(1.1*length(allQuads)));
-      allQuads[quadCount].p0:=a;
-      allQuads[quadCount].p1:=b;
-      allQuads[quadCount].p2:=c;
-      allQuads[quadCount].p3:=d;
-      allQuads[quadCount].isTriangle:=false;
-      allQuads[quadCount].color:=color;
-      inc(quadCount);
-    end;
-
-  PROCEDURE addTriangle(CONST a,b,c:T_Complex; CONST color:T_rgbFloatColor);
-    begin
-      addQuad(a,b,c,c,color);
-      allQuads[quadCount-1].isTriangle:=true;
-    end;
-
-  FUNCTION edgeCut(CONST a,b,c,d:T_Complex):T_Complex;
-    VAR X,Y,Z:T_Complex;
-        u:double;
-    begin
-      X:=b-a;
-      Y:=d-c;
-      Z:=c-a;
-      u:=(Z.re*Y.im-Y.re*Z.im)/(X.re*Y.im-Y.re*X.im);
-      result:=a+X*u;
-    end;
-
-  VAR BorderWidth:double;
-  PROCEDURE shiftEdge(CONST a,b:T_Complex; OUT A_,B_:T_Complex);
-    VAR d:T_Complex;
-    begin
-      d.re:=a.im-b.im;
-      d.im:=b.re-a.re;
-      d*=BorderWidth/abs(d);
-      A_:=a+d;
-      B_:=b+d;
-    end;
-
-  VAR borderUpFraction,borderAcrossFraction:double;
-  PROCEDURE toRenderables(CONST q:T_quad);
-    VAR abs,BCs,CAs:array[0..1] of T_Complex;
-        A_,B_,C_:T_Complex;
-    FUNCTION colorOfSide(CONST side:byte):T_rgbFloatColor;
-      VAR d:T_Complex;
-      begin
-        case side of
-          0: d:=q.p1-q.p0;
-          1: d:=q.p2-q.p1;
-          2: d:=q.p0-q.p2;
-        else exit(q.color);
-        end;
-        d:=d*II/complex.abs(d);
-        result:=q.color*max(0,borderAcrossFraction*d.re*1/3
-                             +borderAcrossFraction*d.im*2/3
-                             +borderUpFraction);
-      end;
-
-    begin
-      if (BorderWidth<0.2) or (borderAcrossFraction<0.05) then begin
-        addTriangle(q.p0,q.p1,q.p2,q.color);
-        exit;
-      end;
-      shiftEdge(q.p0,q.p1,abs[0],abs[1]);
-      shiftEdge(q.p1,q.p2,BCs[0],BCs[1]);
-      shiftEdge(q.p2,q.p0,CAs[0],CAs[1]);
-      A_:=edgeCut(abs[0],abs[1],CAs[0],CAs[1]);
-      B_:=edgeCut(abs[0],abs[1],BCs[0],BCs[1]);
-      C_:=edgeCut(CAs[0],CAs[1],BCs[0],BCs[1]);
-      if (areaMeasure(q.p0,B_,C_.re,C_.im)>0) and
-         (areaMeasure(A_,B_,C_.re,C_.im)<areaMeasure(q.p0,q.p1,q.p2.re,q.p2.im)) then begin
-        //Slim borders: 4 quads + 1 triangle
-        addTriangle(A_,B_,C_,q.color);
-        addQuad(q.p0,q.p1,B_,A_,colorOfSide(0));
-        addQuad(q.p1,q.p2,C_,B_,colorOfSide(1));
-        addQuad(q.p2,q.p0,A_,C_,colorOfSide(2));
-      end else begin
-        //Broad borders: 3 triangles
-        A_:=edgeCut(q.p0,A_,q.p1,B_);
-        addTriangle(q.p0,q.p1,A_,colorOfSide(0));
-        addTriangle(q.p1,q.p2,A_,colorOfSide(1));
-        addTriangle(q.p2,q.p0,A_,colorOfSide(2));
-      end;
-    end;
-
   VAR rawTriangles:T_quadList;
-      todo:P_trianglesTodo;
+      builder:T_tileBuilder;
       i:longint;
   begin
-    BorderWidth:=parameters.f2/1000*context^.image.diagonal;
-    borderUpFraction    :=system.cos(parameters.f3*0.017453292519943295);
-    borderAcrossFraction:=system.sin(parameters.f3*0.017453292519943295);
     rawTriangles:=findApproximatingTriangles(context,parameters.i0,parameters.i1);
-
-    setLength(allQuads,100);
-    for i:=0 to length(rawTriangles)-1 do toRenderables(rawTriangles[i]);
-    setLength(allQuads,quadCount);
+    builder.create(context,parameters.f2,parameters.f3);
+    for i:=0 to length(rawTriangles)-1 do builder.addTriangle(rawTriangles[i]);
     setLength(rawTriangles,0);
-
-    context^.clearQueue;
-    context^.image.markChunksAsPending;
-    for i:=0 to context^.image.chunksInMap-1 do begin
-      new(todo,create(allQuads,i,@(context^.image)));
-      context^.enqueue(todo);
-    end;
+    builder.startExecution;
     context^.waitForFinishOfParallelTasks;
+    builder.destroy;
   end;
 
 PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
