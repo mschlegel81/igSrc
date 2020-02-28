@@ -131,7 +131,7 @@ PROCEDURE T_generateImageWorkflow.beforeAll;
     enterCriticalSection(contextCS);
     enterCriticalSection(relatedEditor^.contextCS);
     try
-      messageQueue^.Post('----------------------------------',false);
+      messageQueue^.postSeparator;
       messageQueue^.Post('Starting preview calculation',false);
       image.resize(relatedEditor^.config.initialResolution,res_dataResize);
       if (editingStep>0) and (editingStep-1<relatedEditor^.stepCount) and (relatedEditor^.step[editingStep-1]^.outputImage<>nil) then begin
@@ -376,7 +376,7 @@ PROCEDURE T_editorWorkflow.beforeAll;
       if currentExecution.currentStepIndex>0
       then image.copyFromPixMap(steps[currentExecution.currentStepIndex-1]^.outputImage^)
       else config.prepareImageForWorkflow(image);
-      messageQueue^.Post('----------------------------------',false);
+      messageQueue^.postSeparator;
       if currentExecution.currentStepIndex=0
       then messageQueue^.Post('Starting workflow',false)
       else messageQueue^.Post('Resuming workflow',false,currentExecution.currentStepIndex);

@@ -727,7 +727,7 @@ FUNCTION T_functionPerPixelAlgorithm.getParameter(CONST index: byte): T_paramete
 
 PROCEDURE T_functionPerPixelAlgorithm.execute(CONST context:P_abstractWorkflow);
   VAR i:longint;
-      pendingChunks:T_pendingList;
+      pendingChunks:T_arrayOfLongint;
 
   FUNCTION todo(CONST index:longint):P_workerThreadTodo;
     begin new(result,create(@self,index)); end;

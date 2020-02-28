@@ -1,7 +1,8 @@
 UNIT generationBasics;
 INTERFACE
 USES pixMaps,
-     mypics;
+     mypics,
+     myGenerics;
 CONST
     C_workflowExtension='.WF';
     C_nullSourceOrTargetFileName='-';
@@ -52,7 +53,7 @@ TYPE
     public
       CONSTRUCTOR create(CONST message:string; CONST isError:boolean=false; CONST relatesToStep:longint=-1);
       DESTRUCTOR destroy;
-      FUNCTION toString:string;
+      FUNCTION toString(CONST messageStringLengthLimit:longint):string;
       PROPERTY messageText:string read fMessageText;
       PROPERTY stepIndex:longint read fStepIndex;
       PROPERTY indicatesError:boolean read fIndicatesError;
@@ -65,17 +66,20 @@ TYPE
       queueCs:TRTLCriticalSection;
       first,last:P_structuredMessage;
     public
+      messageStringLengthLimit:longint;
       CONSTRUCTOR create;
       DESTRUCTOR destroy;
       FUNCTION get:P_structuredMessage;
+      PROCEDURE postSeparator;
       PROCEDURE Post(CONST message:string; CONST isError:boolean=true; CONST relatesToStep:longint=-1);
       PROCEDURE clear;
+      FUNCTION getText:T_arrayOfString;
   end;
-VAR messageStringLengthLimit:longint=100;
+
 IMPLEMENTATION
 USES sysutils;
 
-FUNCTION stringEllipse(CONST s:string):string;
+FUNCTION stringEllipse(CONST s:string; CONST messageStringLengthLimit:longint):string;
   begin
     if length(s)>messageStringLengthLimit
     then result:=copy(s,1,messageStringLengthLimit-3)+'...'
@@ -87,6 +91,7 @@ CONSTRUCTOR T_structuredMessageQueue.create;
     initCriticalSection(queueCs);
     first:=nil;
     last:=nil;
+    messageStringLengthLimit:=100;
   end;
 
 PROCEDURE T_structuredMessageQueue.clear;
@@ -122,6 +127,26 @@ FUNCTION T_structuredMessageQueue.get: P_structuredMessage;
     end;
   end;
 
+FUNCTION T_structuredMessageQueue.getText:T_arrayOfString;
+  VAR m:P_structuredMessage;
+  begin
+    setLength(result,0);
+    enterCriticalSection(queueCs);
+    while first<>nil do begin
+      append(result,first^.toString(messageStringLengthLimit));
+      m:=first;
+      first:=first^.nextMessage;
+      dispose(m,destroy);
+    end;
+    leaveCriticalSection(queueCs);
+  end;
+CONST C_SEPERATOR_MESSAGE_TEXT='''';
+
+PROCEDURE T_structuredMessageQueue.postSeparator;
+  begin
+    Post(C_SEPERATOR_MESSAGE_TEXT,false);
+  end;
+
 PROCEDURE T_structuredMessageQueue.Post(CONST message: string; CONST isError: boolean; CONST relatesToStep: longint);
   VAR m:P_structuredMessage;
   begin
@@ -133,7 +158,7 @@ PROCEDURE T_structuredMessageQueue.Post(CONST message: string; CONST isError: bo
       else last^.nextMessage:=m;
       last:=m;
       {$ifdef debugMode}
-      writeln(stdErr,'DEBUG T_structuredMessageQueue.Post: ',m^.toString);
+      writeln(stdErr,'DEBUG T_structuredMessageQueue.Post: ',m^.toString(maxLongint));
       {$endif}
     finally
       leaveCriticalSection(queueCs);
@@ -153,12 +178,13 @@ DESTRUCTOR T_structuredMessage.destroy;
   begin
   end;
 
-FUNCTION T_structuredMessage.toString: string;
+FUNCTION T_structuredMessage.toString(CONST messageStringLengthLimit:longint): string;
   begin
+    if fMessageText=C_SEPERATOR_MESSAGE_TEXT then exit('');
     result:=FormatDateTime('hh:mm:ss',fMessageCreatedAtTime)+' ';
     if (fStepIndex>=0) then result+='('+intToStr(fStepIndex)+') ';
     if fIndicatesError then result+='ERROR: ';
-    result:=stringEllipse(result+fMessageText);
+    result:=stringEllipse(result+fMessageText,messageStringLengthLimit);
   end;
 
 PROCEDURE T_imageWorkflowConfiguration.clearImage;

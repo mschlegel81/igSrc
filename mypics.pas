@@ -26,8 +26,6 @@ TYPE
                  res_fitRotate,
                  res_dataResize);
 
-  T_pendingList=array of longint;
-
   T_structuredHitColor=record
     rest:T_rgbFloatColor;
     antialiasingMask:byte;
@@ -68,7 +66,7 @@ TYPE
       //Chunk access:-----------------------------------------------------------
       FUNCTION chunksInMap:longint;
       PROCEDURE markChunksAsPending;
-      FUNCTION getPendingList:T_pendingList;
+      FUNCTION getPendingList:T_arrayOfLongint;
       PROCEDURE copyFromChunk(VAR chunk:T_colChunk);
       //-----------------------------------------------------------:Chunk access
       PROCEDURE clearWithColor(CONST color:T_rgbFloatColor);
@@ -313,7 +311,7 @@ PROCEDURE T_rawImage.markChunksAsPending;
       else pixel[x,y]:=BLACK;
   end;
 
-FUNCTION T_rawImage.getPendingList: T_pendingList;
+FUNCTION T_rawImage.getPendingList: T_arrayOfLongint;
   VAR xChunks,yChunks:longint;
       x,y,cx,cy,i:longint;
       isPending:array of array of boolean;
