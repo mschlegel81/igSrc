@@ -175,24 +175,12 @@ FUNCTION parseOperation(CONST specification:string):P_imageOperation;
       meta:P_imageOperationMeta;
   begin
     key:=extractName(specification);
-    {$ifdef debugMode}
-    writeln(stdErr,'DEBUG parsing "',specification,'" key="',key,'"');
-    {$endif}
     result:=nil;
     if operationMap.containsKey(key,value) then begin
-      {$ifdef debugMode}
-      writeln(stdErr,'DEBUG iterating over ',length(value),' metas');
-      {$endif}
       for meta in value do if (result=nil) then begin
-        {$ifdef debugMode}
-        writeln(stdErr,'DEBUG trying to apply meta "',meta^.getName,'"');
-        {$endif}
         result:=meta^.parse(specification);
       end;
     end
-    {$ifdef debugMode}
-    else writeln(stdErr,'DEBUG no operations found for key "',key,'"')
-    {$endif};
   end;
 
 DESTRUCTOR T_imageOperation.destroy; begin end;
@@ -244,7 +232,6 @@ PROCEDURE T_abstractWorkflow.notifyWorkerStopped;
     try
       dec(queue.workerCount);
       interlockedDecrement(globalWorkersRunning);
-      {$ifdef debugMode} writeln(stdErr,'DEBUG worker stopped (',queue.workerCount,'/',globalWorkersRunning,')'); {$endif}
     finally
       leaveCriticalSection(contextCS);
     end;
@@ -296,9 +283,6 @@ PROCEDURE T_abstractWorkflow.ensureWorkers;
       while (queue.workerCount<=0) or (globalWorkersRunning<maxImageManipulationThreads) do begin
         inc(queue.workerCount);
         interLockedIncrement(globalWorkersRunning);
-        {$ifdef debugMode}
-        writeln(stdErr,'DEBUG worker started (',queue.workerCount,'/',globalWorkersRunning,')');
-        {$endif}
         beginThread(@worker,@self);
       end;
     finally
@@ -439,9 +423,6 @@ PROCEDURE T_abstractWorkflow.waitForFinishOfParallelTasks;
 
 PROCEDURE T_abstractWorkflow.ensureStop;
   begin
-    {$ifdef debugMode}
-    writeln(stdErr,'DEBUG: T_imageGenerationContext.ensureStop (enter)');
-    {$endif}
     enterCriticalSection(contextCS);
     if currentExecution.workflowState=ts_evaluating then begin
       currentExecution.workflowState:=ts_stopRequested;
@@ -453,9 +434,6 @@ PROCEDURE T_abstractWorkflow.ensureStop;
       enterCriticalSection(contextCS);
     end;
     leaveCriticalSection(contextCS);
-    {$ifdef debugMode}
-    writeln(stdErr,'DEBUG: T_imageGenerationContext.ensureStop (exit)');
-    {$endif}
   end;
 
 PROCEDURE T_abstractWorkflow.postStop;

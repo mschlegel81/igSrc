@@ -108,6 +108,7 @@ USES imageManipulation,
      ig_factorTables,
      im_triangleSplit,
      ig_circlespirals,
+     ig_tesselation,
      myStringUtil,
      LazFileUtils;
 

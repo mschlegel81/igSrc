@@ -14,39 +14,186 @@ TYPE
     a,b,c,d:T_Complex;
     colorStyle:byte; //0: white circles; 1: white spheres; 2: bgColored circles; 3: bgColors spheres
 
-    backgroundImage:P_rawImage;
     CONSTRUCTOR create;
-    PROCEDURE cleanup; virtual;
     PROCEDURE resetParameters(CONST style:longint); virtual;
     FUNCTION numberOfParameters:longint; virtual;
     PROCEDURE setParameter(CONST index:byte; CONST value:T_parameterValue); virtual;
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE execute(CONST context:P_abstractWorkflow); virtual;
   end;
-TYPE T_circle=record
-       center:T_Complex;
-       radius:double;
-       color:T_rgbFloatColor;
-     end;
-     T_circles=array of T_circle;
-     T_sphereTodoMode=(stm_disjointCircles   ,stm_disjointBorderedCircles   ,stm_disjointShinySpheres   ,stm_disjointMatteSpheres   ,
-                       stm_overlappingCircles,stm_overlappingBorderedCircles,stm_overlappingShinySpheres,stm_overlappingMatteSpheres);
-     P_spheresTodo=^T_spheresTodo;
-     T_spheresTodo=object(T_parallelTask)
-       chunkIndex:longint;
-       circlesInRange:T_circles;
-       mode:T_sphereTodoMode;
 
-       CONSTRUCTOR create(CONST allCircles:T_circles;
-                          CONST todoMode:T_sphereTodoMode;
-                          CONST chunkIndex_:longint;
-                          CONST target_:P_rawImage);
-       DESTRUCTOR destroy; virtual;
-       PROCEDURE execute; virtual;
-     end;
+  T_circle=record
+    center:T_Complex;
+    radius:double;
+    color:T_rgbFloatColor;
+  end;
+  T_circles=array of T_circle;
+  T_sphereTodoMode=(stm_disjointCircles   ,stm_disjointBorderedCircles   ,stm_disjointShinySpheres   ,stm_disjointMatteSpheres   ,
+                    stm_overlappingCircles,stm_overlappingBorderedCircles,stm_overlappingShinySpheres,stm_overlappingMatteSpheres);
+  P_spheresTodo=^T_spheresTodo;
+  T_spheresTodo=object(T_parallelTask)
+    chunkIndex:longint;
+    circlesInRange:T_circles;
+    mode:T_sphereTodoMode;
+
+    CONSTRUCTOR create(CONST allCircles:T_circles;
+                       CONST todoMode:T_sphereTodoMode;
+                       CONST chunkIndex_:longint;
+                       CONST target_:P_rawImage);
+    DESTRUCTOR destroy; virtual;
+    PROCEDURE execute; virtual;
+  end;
+
+  T_spiralCircleProvider=object
+    private
+      a,b,c,d:T_Complex;
+      p0,p1,r0:double;
+      infPoint:T_Complex;
+      shiftK:longint;
+    public
+      CONSTRUCTOR create(CONST shiftParameter:longint; CONST moebiusA,moebiusB,moebiusC,moebiusD:T_Complex);
+      DESTRUCTOR destroy;
+      FUNCTION getCircle  (CONST index:longint; VAR scaler:T_scaler):T_circle;
+      FUNCTION getHexagon(CONST index:longint; VAR scaler:T_scaler; OUT h0,h1,h2,h3,h4,h5:T_Complex):boolean;
+      FUNCTION getQuad(CONST index:longint; VAR scaler:T_scaler; OUT t0,t1,t2,t3:T_Complex):boolean;
+  end;
 
 IMPLEMENTATION
 USES darts,math;
+
+CONSTRUCTOR T_spiralCircleProvider.create(CONST shiftParameter: longint; CONST moebiusA, moebiusB, moebiusC, moebiusD: T_Complex);
+  CONST param:array[2..100,0..1] of double=(                                          (2.890053638263965 ,2.237035759287413 ),(1.623275178749378 ,1.6907405560884021),
+    (1.3261093668522155,1.3462256354851088 ),(1.20405279586423,1.1147141326916035)   ,(1.1407625758592799,0.9497695138149853),(1.1033491647933114,0.82672953941405836),
+    (1.0792665862591149,0.73160150060949669),(1.0628016392740884,0.65593587595930847),(1.051024740256571,0.5943548410772794 ),(1.0422991049360375,0.5432826604016967),
+    (1.035648588678088 ,0.5002534505661441),(1.030460283227332,0.4635135784648558),(1.0263329383018096,0.43178282078031266),(1.0229946132207739,0.40410524404315346),
+    (1.0202555402152162,0.3797529354590343),(1.0179799400923284,0.35816201387347046),(1.016068534264215,0.33888899324403488),(1.0144473423326079,0.321580343300751),
+    (1.0130603042026645,0.3059508235127951),(1.0118643010755228,0.2917677806688046),(1.0108257219110692,0.27883958203659176),(1.0099180494989857,0.2670069686382692),
+    (1.0091201336563977,0.2561365044317434),(1.0084149364328363,0.2461155524220271),(1.0077886072145843,0.23684837845989873),(1.0072297920665294,0.22825309836578739),
+    (1.0067291118008954,0.22025926303716836),(1.0062787632004766,0.21280593136684717),(1.0058722112335006,0.20584011984966266),(1.0055039492573286,0.19931554575046298),
+    (1.005169310555847,0.19319160101507252),(1.0048643190130482,0.18743250900237313),(1.0045855698945159,0.18200662715495808),(1.0043301339877715,0.17688586698612557),
+    (1.0040954800093109,0.17204520899791645),(1.0038794114027734,0.1674622948943047),(1.003680014554451,0.16311708309922363),(1.0034956161267123,0.15899155640882917),
+    (1.0033247477184275,0.15506947280358802),(1.0031661164479719,0.15133615216825733),(1.0030185803503195,0.14777829302714335),(1.0028811277079226,0.14438381448138915),
+    (1.0027528596122279,0.14114171939713016),(1.0026329751910392,0.13804197558546344),(1.0025207590457168,0.13507541227402209),(1.0024155705281346,0.13223362962314275),
+    (1.0023168345556681,0.1295089194091527),(1.0022240337170429,0.12689419529974677),(1.0021367014657017,0.12438293139525805),(1.0020544162327125,0.12196910791505963),
+    (1.0019767963198702,0.11964716307862483),(1.0019034954569845,0.11741195037257052),(1.0018341989263919,0.11525870051342742),(1.001768620173384,0.11318298751507747),
+    (1.001706497834123,0.11118069835338937),(1.0016475931232707,0.10924800579094819),(1.0015916875324147,0.10738134398447215),(1.0015385807977215,0.10557738654813209),
+    (1.0014880891013989,0.10383302678911041),(1.0014400434767325,0.1021453598685848),(1.0013942883907556,0.10051166667282019),(1.0013506804823025,0.098929399206173718),
+    (1.001309087436268,0.09739616734108089),(1.0012693869775244,0.09590972678022),(1.0012314659701707,0.09446796810345213),(1.0011952196096994,0.09306890678717744),
+    (1.0011605506972763,0.09171067409689541),(1.0011273689867357,0.090391508765114148),(1.0010955905960746,0.0891097493767391),(1.001065137476266,0.0878638273927729),
+    (1.0010359369311008,0.08665226075075172),(1.0010079211825289,0.08547364798706765),(1.0009810269766286,0.08432666283220126),(1.0009551952259388,0.08321004923503586),
+    (1.0009303706843502,0.082122616777091179),(1.000906501651217,0.081063236441432249),(1.0008835397017348,0.08003083670469471),(1.0008614394409334,0.07902439992380426),
+    (1.0008401582789714,0.07804295899177471),(1.0008196562256284,0.07708559423950148),(1.0007998957021624,0.07615143056270182),(1.0007808413688604,0.0752396347551432),
+    (1.0007624599668121,0.07434941303107428),(1.000744720172578,0.073480008721403367),(1.0007275924645656,0.07263070012955458),(1.0007110490000444,0.07180079853424573),
+    (1.0006950635018521,0.07098964632758608),(1.0006796111539158,0.070196615277898458),(1.0006646685048237,0.06942110490764161),(1.0006502133787389,0.06866254097763571),
+    (1.0006362247930278,0.06792037406953215),(1.0006226828820279,0.06719407825920345),(1.0006095688264387,0.066483149874309019),(1.000596864787866,0.0657871063298622),
+    (1.000584553848098,0.06510548503617741),(1.000572619952716,0.06443784237395003),(1.0005610478587024,0.06378375273176964),(1.0005498230857168,0.0631428076016146),
+    (1.0005389318707527,0.06251461472832453));
+  begin
+    a:=moebiusA;
+    b:=moebiusB;
+    c:=moebiusC;
+    d:=moebiusD;
+
+    //möbius: T(x  )=(a*x+b)/(c*x+d)
+    //        T(0  )=b/d
+    //        T(inf)=a/c
+    //        inf         =  (a*x+b)/(c*x+d)
+    //        inf*(c*x+d) = (a*x+b)
+    //             c*x+d  = 0
+    //                 x  = -d/c
+    infPoint:=-1*d/c;
+    if not(isValid(infPoint)) then infPoint:=0;
+
+    p0:=param[shiftParameter,0];
+    p1:=param[shiftParameter,1];
+    r0:=complex.abs(p0*system.cos(p1)-1+
+                    p0*system.sin(p1)*II)/(1+p0);
+    p0:=system.ln(p0);
+    shiftK:=shiftParameter;
+  end;
+
+DESTRUCTOR T_spiralCircleProvider.destroy;
+  begin
+  end;
+
+FUNCTION T_spiralCircleProvider.getCircle(CONST index: longint;
+  VAR scaler: T_scaler): T_circle;
+  VAR t0,t1,tc:T_Complex;
+      mainAxis:T_Complex;
+  begin
+    //circle in spiral:
+    result.radius:=exp(p0*index);
+    result.center.re:=result.radius*system.cos(p1*index);
+    result.center.im:=result.radius*system.sin(p1*index);
+    result.radius*=r0;
+    if isValid(result.center) and not(isNan(result.radius)) and not(isInfinite(result.radius)) and (sqrabs(result.center-infPoint)>system.sqr(result.radius)) then begin
+      //Möbius transformation:
+      mainAxis:=result.center-infPoint;
+      mainAxis/=abs(mainAxis);
+      t0:=result.center+result.radius*mainAxis; t0:=(a*       t0    +b)/(c*       t0    +d);
+      t1:=result.center-result.radius*mainAxis; t1:=(a*       t1    +b)/(c*       t1    +d);
+      tc:=                                          (a*result.center+b)/(c*result.center+d);
+      if isValid(t0) and isValid(t1) and isValid(tc) then begin
+        result.center:=   (t0+t1)*0.5;
+        result.radius:=abs(t1-t0)*0.5;
+        //sanity check: the transformed center must be inside the transformed circle; otherwise the circle is "inside out"
+        if sqrabs(result.center-tc)<system.sqr(result.radius) then begin
+          result.center:=scaler.mrofsnart(result.center.re,result.center.im);
+          result.radius*=1/abs(scaler.getAbsoluteZoom);
+        end else result.radius:=0;
+      end else result.radius:=0;
+    end else result.radius:=0;
+  end;
+
+FUNCTION T_spiralCircleProvider.getHexagon(CONST index: longint; VAR scaler: T_scaler; OUT h0, h1, h2, h3, h4, h5: T_Complex): boolean;
+  VAR circle:T_circle;
+      q:array[-1..5] of T_Complex;
+
+  begin
+    circle:=getCircle(index         ,scaler); if circle.radius<=0 then exit(false) else q[-1]:=circle.center;
+    circle:=getCircle(index-shiftK-1,scaler); if circle.radius<=0 then exit(false) else q[ 0]:=circle.center;
+    circle:=getCircle(index-shiftK  ,scaler); if circle.radius<=0 then exit(false) else q[ 1]:=circle.center;
+    circle:=getCircle(index+1       ,scaler); if circle.radius<=0 then exit(false) else q[ 2]:=circle.center;
+    circle:=getCircle(index+shiftK+1,scaler); if circle.radius<=0 then exit(false) else q[ 3]:=circle.center;
+    circle:=getCircle(index+shiftK  ,scaler); if circle.radius<=0 then exit(false) else q[ 4]:=circle.center;
+    circle:=getCircle(index-1       ,scaler); if circle.radius<=0 then exit(false) else q[ 5]:=circle.center;
+
+    h0:=(q[-1]+q[0]+q[1])/3;
+    h1:=(q[-1]+q[1]+q[2])/3;
+    h2:=(q[-1]+q[2]+q[3])/3;
+    h3:=(q[-1]+q[3]+q[4])/3;
+    h4:=(q[-1]+q[4]+q[5])/3;
+    h5:=(q[-1]+q[5]+q[0])/3;
+    result:=true;
+    assert(isValid(h0));
+    assert(isValid(h1));
+    assert(isValid(h2));
+    assert(isValid(h3));
+    assert(isValid(h4));
+    assert(isValid(h5));
+  end;
+
+FUNCTION T_spiralCircleProvider.getQuad(CONST index: longint; VAR scaler: T_scaler; OUT t0, t1, t2, t3: T_Complex): boolean;
+  VAR circle:T_circle;
+  begin
+    //Triangles: (i,i-1,i+k) (i,i+k,i+k+1)
+    //Quad     : (i,i-1,i+k,i+k+1)
+    circle:=getCircle(index         ,scaler); if circle.radius<=0 then exit(false) else t0:=circle.center;
+    if (circle.center.re+circle.radius<0) or
+       (circle.center.im+circle.radius<0) or
+       (circle.center.re-circle.radius>scaler.getPixelsBoundingBox.x1) or
+       (circle.center.im-circle.radius>scaler.getPixelsBoundingBox.y1) then exit(false);
+
+    circle:=getCircle(index-1       ,scaler); if circle.radius<=0 then exit(false) else t1:=circle.center;
+    circle:=getCircle(index+shiftK  ,scaler); if circle.radius<=0 then exit(false) else t2:=circle.center;
+    circle:=getCircle(index+shiftK+1,scaler); if circle.radius<=0 then exit(false) else t3:=circle.center;
+    result:=true;
+    assert(isValid(t0));
+    assert(isValid(t1));
+    assert(isValid(t2));
+    assert(isValid(t3));
+  end;
+
 CONSTRUCTOR T_spheresTodo.create(CONST allCircles: T_circles;
                                  CONST todoMode:T_sphereTodoMode;
                                  CONST chunkIndex_: longint;
@@ -248,15 +395,6 @@ CONSTRUCTOR T_circleSpiralAlgorithm.create;
     addParameter('mb_d',pt_2floats);
     addParameter('style',pt_enum,0,11)^.setEnumValues(colorStyleNames);
     resetParameters(0);
-    backgroundImage:=nil;
-  end;
-
-PROCEDURE T_circleSpiralAlgorithm.cleanup;
-  begin
-    if backgroundImage<>nil then begin
-      dispose(backgroundImage,destroy);
-      backgroundImage:=nil;
-    end;
   end;
 
 PROCEDURE T_circleSpiralAlgorithm.resetParameters(CONST style: longint);
@@ -300,45 +438,16 @@ FUNCTION T_circleSpiralAlgorithm.getParameter(CONST index: byte): T_parameterVal
   end;
 
 PROCEDURE T_circleSpiralAlgorithm.execute(CONST context:P_abstractWorkflow);
-
-  CONST param:array[2..100,0..1] of double=(                                          (2.890053638263965 ,2.237035759287413 ),(1.623275178749378 ,1.6907405560884021),
-    (1.3261093668522155,1.3462256354851088 ),(1.20405279586423,1.1147141326916035)   ,(1.1407625758592799,0.9497695138149853),(1.1033491647933114,0.82672953941405836),
-    (1.0792665862591149,0.73160150060949669),(1.0628016392740884,0.65593587595930847),(1.051024740256571,0.5943548410772794 ),(1.0422991049360375,0.5432826604016967),
-    (1.035648588678088 ,0.5002534505661441),(1.030460283227332,0.4635135784648558),(1.0263329383018096,0.43178282078031266),(1.0229946132207739,0.40410524404315346),
-    (1.0202555402152162,0.3797529354590343),(1.0179799400923284,0.35816201387347046),(1.016068534264215,0.33888899324403488),(1.0144473423326079,0.321580343300751),
-    (1.0130603042026645,0.3059508235127951),(1.0118643010755228,0.2917677806688046),(1.0108257219110692,0.27883958203659176),(1.0099180494989857,0.2670069686382692),
-    (1.0091201336563977,0.2561365044317434),(1.0084149364328363,0.2461155524220271),(1.0077886072145843,0.23684837845989873),(1.0072297920665294,0.22825309836578739),
-    (1.0067291118008954,0.22025926303716836),(1.0062787632004766,0.21280593136684717),(1.0058722112335006,0.20584011984966266),(1.0055039492573286,0.19931554575046298),
-    (1.005169310555847,0.19319160101507252),(1.0048643190130482,0.18743250900237313),(1.0045855698945159,0.18200662715495808),(1.0043301339877715,0.17688586698612557),
-    (1.0040954800093109,0.17204520899791645),(1.0038794114027734,0.1674622948943047),(1.003680014554451,0.16311708309922363),(1.0034956161267123,0.15899155640882917),
-    (1.0033247477184275,0.15506947280358802),(1.0031661164479719,0.15133615216825733),(1.0030185803503195,0.14777829302714335),(1.0028811277079226,0.14438381448138915),
-    (1.0027528596122279,0.14114171939713016),(1.0026329751910392,0.13804197558546344),(1.0025207590457168,0.13507541227402209),(1.0024155705281346,0.13223362962314275),
-    (1.0023168345556681,0.1295089194091527),(1.0022240337170429,0.12689419529974677),(1.0021367014657017,0.12438293139525805),(1.0020544162327125,0.12196910791505963),
-    (1.0019767963198702,0.11964716307862483),(1.0019034954569845,0.11741195037257052),(1.0018341989263919,0.11525870051342742),(1.001768620173384,0.11318298751507747),
-    (1.001706497834123,0.11118069835338937),(1.0016475931232707,0.10924800579094819),(1.0015916875324147,0.10738134398447215),(1.0015385807977215,0.10557738654813209),
-    (1.0014880891013989,0.10383302678911041),(1.0014400434767325,0.1021453598685848),(1.0013942883907556,0.10051166667282019),(1.0013506804823025,0.098929399206173718),
-    (1.001309087436268,0.09739616734108089),(1.0012693869775244,0.09590972678022),(1.0012314659701707,0.09446796810345213),(1.0011952196096994,0.09306890678717744),
-    (1.0011605506972763,0.09171067409689541),(1.0011273689867357,0.090391508765114148),(1.0010955905960746,0.0891097493767391),(1.001065137476266,0.0878638273927729),
-    (1.0010359369311008,0.08665226075075172),(1.0010079211825289,0.08547364798706765),(1.0009810269766286,0.08432666283220126),(1.0009551952259388,0.08321004923503586),
-    (1.0009303706843502,0.082122616777091179),(1.000906501651217,0.081063236441432249),(1.0008835397017348,0.08003083670469471),(1.0008614394409334,0.07902439992380426),
-    (1.0008401582789714,0.07804295899177471),(1.0008196562256284,0.07708559423950148),(1.0007998957021624,0.07615143056270182),(1.0007808413688604,0.0752396347551432),
-    (1.0007624599668121,0.07434941303107428),(1.000744720172578,0.073480008721403367),(1.0007275924645656,0.07263070012955458),(1.0007110490000444,0.07180079853424573),
-    (1.0006950635018521,0.07098964632758608),(1.0006796111539158,0.070196615277898458),(1.0006646685048237,0.06942110490764161),(1.0006502133787389,0.06866254097763571),
-    (1.0006362247930278,0.06792037406953215),(1.0006226828820279,0.06719407825920345),(1.0006095688264387,0.066483149874309019),(1.000596864787866,0.0657871063298622),
-    (1.000584553848098,0.06510548503617741),(1.000572619952716,0.06443784237395003),(1.0005610478587024,0.06378375273176964),(1.0005498230857168,0.0631428076016146),
-    (1.0005389318707527,0.06251461472832453));
-
   VAR circlesOfImage:array of T_circle;
       picWidth :longint;
       picHeight:longint;
+      circleSource:T_spiralCircleProvider;
+
   PROCEDURE initCircles;
-    VAR p0,p1,r0:double;
-        radiusThreshold:double;
-        infPoint:T_Complex;
+    VAR radiusThreshold:double;
     FUNCTION getCircle(CONST index:longint):T_circle;
-      VAR t0,t1,tc:T_Complex;
-          mainAxis:T_Complex;
       begin
+        result:=circleSource.getCircle(index,scaler);
         case colorStyle of
           4,5: if (index mod spiralParameter+spiralParameter) mod spiralParameter=0
                then result.color:=RED
@@ -354,29 +463,6 @@ PROCEDURE T_circleSpiralAlgorithm.execute(CONST context:P_abstractWorkflow);
                    else result.color:=BLUE;
           else result.color:=WHITE;
         end;
-
-        //circle in spiral:
-        result.radius:=exp(p0*index);
-        result.center.re:=result.radius*system.cos(p1*index);
-        result.center.im:=result.radius*system.sin(p1*index);
-        result.radius*=r0;
-        if isValid(result.center) and not(isNan(result.radius)) and not(isInfinite(result.radius)) and (sqrabs(result.center-infPoint)>system.sqr(result.radius)) then begin
-          //Möbius transformation:
-          mainAxis:=result.center-infPoint;
-          mainAxis/=abs(mainAxis);
-          t0:=result.center+result.radius*mainAxis; t0:=(a*t0+b)/(c*t0+d);
-          t1:=result.center-result.radius*mainAxis; t1:=(a*t1+b)/(c*t1+d);
-          tc:=(a*result.center+b)/(c*result.center+d);
-          if isValid(t0) and isValid(t1) and isValid(tc) then begin
-            result.center:=   (t0+t1)*0.5;
-            result.radius:=abs(t1-t0)*0.5;
-            //sanity check: the transformed center must be inside the transformed circle; otherwise the circle is "inside out"
-            if sqrabs(result.center-tc)<system.sqr(result.radius) then begin
-              result.center:=scaler.mrofsnart(result.center.re,result.center.im);
-              result.radius*=1/abs(scaler.getAbsoluteZoom);
-            end else result.radius:=0;
-          end else result.radius:=0;
-        end else result.radius:=0;
       end;
 
     FUNCTION colorOfCircle(CONST c:T_circle):T_rgbFloatColor;
@@ -420,24 +506,9 @@ PROCEDURE T_circleSpiralAlgorithm.execute(CONST context:P_abstractWorkflow);
       if context^.previewQuality
       then radiusThreshold:=0.5
       else radiusThreshold:=0.01;
-      p0:=param[spiralParameter,0];
-      p1:=param[spiralParameter,1];
-      r0:=complex.abs(p0*system.cos(p1)-1+
-                      p0*system.sin(p1)*II)/(1+p0);
-      p0:=system.ln(p0);
+      circleSource.create(spiralParameter,a,b,c,d);
       picWidth :=context^.image.dimensions.width;
       picHeight:=context^.image.dimensions.height;
-
-      //möbius: T(x  )=(a*x+b)/(c*x+d)
-      //        T(0  )=b/d
-      //        T(inf)=a/c
-      //        inf         =  (a*x+b)/(c*x+d)
-      //        inf*(c*x+d) = (a*x+b)
-      //             c*x+d  = 0
-      //                 x  = -d/c
-      infPoint:=-1*d/c;
-      if not(isValid(infPoint)) then infPoint:=0;
-
       //initialize circles
       setLength(circlesOfImage,10);
       for i:=-100000 to 100000 do addCircle(getCircle(i));

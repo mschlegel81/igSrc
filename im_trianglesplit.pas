@@ -10,12 +10,7 @@ TYPE
 
   T_quadList=array of T_quad;
 
-  T_boundingBox=record
-    x0,y0,x1,y1:longint;
-  end;
-
   T_complexPair=array[0..1] of T_Complex;
-
   T_tileBuilder=object
     private
       drawable        :T_quadList;
@@ -37,22 +32,14 @@ TYPE
       DESTRUCTOR destroy;
 
       PROCEDURE addTriangle(CONST q:T_quad);
-      PROCEDURE addTriangle(CONST a,b,c:T_Complex; CONST color:T_rgbFloatColor);
-      {The color is given by the image}
-      PROCEDURE addTriangle(CONST a,b,c:T_Complex);
+      PROCEDURE addTriangle(CONST a,b,c      :T_Complex; color:T_rgbFloatColor; CONST scanColor:boolean=false);
+      PROCEDURE addQuad    (CONST a,b,c,d    :T_Complex; color:T_rgbFloatColor; CONST scanColor:boolean=false);
+      PROCEDURE addHexagon (CONST a,b,c,d,e,f:T_Complex; color:T_rgbFloatColor; CONST scanColor:boolean=false);
 
-      PROCEDURE addQuad(CONST q:T_quad);
-      PROCEDURE addQuad(CONST a,b,c,d:T_Complex; CONST color:T_rgbFloatColor);
-      {The color is given by the image}
-      PROCEDURE addQuad(CONST a,b,c,d:T_Complex);
-
-      PROCEDURE addHexagon(CONST a,b,c,d,e,f:T_Complex; CONST color:T_rgbFloatColor);
-      {The color is given by the image}
-      PROCEDURE addHexagon(CONST a,b,c,d,e,f:T_Complex);
-
-      PROCEDURE startExecution;
+      PROCEDURE execute;
   end;
 
+FUNCTION crossProduct(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
 IMPLEMENTATION
 USES imageManipulation,myParams,mypics,math,pixMaps,darts,ig_circlespirals,sysutils;
 
@@ -82,35 +69,142 @@ FUNCTION getBoundingBox(CONST q:T_quad):T_boundingBox;
     result.y1:=ceil (max(q.p0.im,max(q.p1.im,max(q.p2.im,q.p3.im))))+1;
   end;
 
-FUNCTION bbIntersect(CONST b1,b2:T_boundingBox):T_boundingBox;
+FUNCTION edgeCut(CONST a,b,c,d:T_Complex):T_Complex;
+  VAR X,Y,Z:T_Complex;
+      u:double;
   begin
-    result.x0:=max(b1.x0,b2.x0); result.y0:=max(b1.y0,b2.y0);
-    result.x1:=min(b1.x1,b2.x1); result.y1:=min(b1.y1,b2.y1);
+    X:=b-a;
+    Y:=d-c;
+    Z:=c-a;
+    u:=(Z.re*Y.im-Y.re*Z.im)/(X.re*Y.im-Y.re*X.im);
+    result:=a+X*u;
+  end;
+
+FUNCTION edgeCut(CONST edge1,edge2:T_complexPair):T_Complex;
+  begin
+    result:=edgeCut(edge1[0],edge1[1],edge2[0],edge2[1]);
+  end;
+
+{Use this only for pixel coordinates. Otherwise the epsilon is too large.}
+FUNCTION almostEqual(CONST a,b:T_Complex):boolean; inline;
+  begin result:=(abs(a.re-b.re)<1E-3) and (abs(a.im-b.im)<1E-3); end;
+
+FUNCTION isHorizontalEdgeCut(y,x0,x1:double; CONST a,b:T_Complex):boolean;
+  VAR t:double;
+  begin
+    // y = a.im+t*(b.im-a.im);
+    // y-a.im = t*(b.im-a.im);
+    // (y-a.im)  /(b.im-a.im) = t
+    t:=(y-a.im)/(b.im-a.im);
+    if (t>=0) and (t<=1) then begin
+      t:=a.re+t*(b.re-a.re);
+      result:=(t>=x0) and (t<=x1);
+    end else result:=false;
+  end;
+
+FUNCTION isVerticalEdgeCut(x,y0,y1:double; CONST a,b:T_Complex):boolean;
+  VAR t:double;
+  begin
+    t:=(x-a.re)/(b.re-a.re);
+    if (t>=0) and (t<=1) then begin
+      t:=a.im+t*(b.im-a.im);
+      result:=(t>=y0) and (t<=y1);
+    end else result:=false;
+  end;
+
+FUNCTION CohenSutherland_LineVisible(a,b:T_Complex; CONST box:T_boundingBox):boolean; //returns true if line visible
+  CONST
+    INSIDE = 0; // 0000
+    Left   = 1; // 0001
+    Right  = 2; // 0010
+    Bottom = 4; // 0100
+    top    = 8; // 1000
+  FUNCTION ComputeOutCode(CONST p:T_Complex):byte;
+    begin
+      if      (p.re < box.x0) then result := Left
+      else if (p.re > box.x1) then result := Right
+      else result:=INSIDE;
+      if      (p.im < box.y0) then result += Bottom
+      else if (p.im > box.y1) then result += top;
+    end;
+
+  VAR outcode0,outcode1,outcodeOut:integer;
+      x,y:double;
+  begin
+    // compute outcodes for P0, P1, and whatever point lies outside the clip rectangle
+    outcode0 := ComputeOutCode(a);
+    outcode1 := ComputeOutCode(b);
+    x:=0; y:=0;
+    while (true) do begin
+      if (outcode0 or outcode1 = 0 ) then begin
+        exit(true);
+        break;
+      end else if (outcode0 and outcode1<>0) then exit(false)
+      else begin
+        if (outcode0 <> 0) then outcodeOut:=outcode0
+          else outcodeOut:=outcode1;     //outcodeOut = outcode0 ? outcode0 : outcode1;
+        if (outcodeOut and top <>0 ) then           // point is above the clip rectangle
+          begin
+            x := a.re + (b.re - a.re) * (box.y1 - a.im) / (b.im - a.im);
+            y := box.y1;
+          end
+        else if (outcodeOut and Bottom <>0) then  // point is below the clip rectangle
+          begin
+            x := a.re + (b.re - a.re) * (box.y0 - a.im) / (b.im - a.im);
+            y := box.y0;
+          end
+        else if (outcodeOut and Right <>0) then  // point is to the right of clip rectangle
+          begin
+            y := a.im + (b.im - a.im) * (box.x1 - a.re) / (b.re - a.re);
+            x := box.x1;
+          end
+        else // point is to the left of clip rectangle
+          begin
+            y := a.im + (b.im - a.im) * (box.x0 - a.re) / (b.re - a.re);
+            x := box.x0;
+          end;
+
+        (* NOTE:if you follow this algorithm exactly(at least for c#), then you will fall into an infinite loop
+        in case a line crosses more than two segments. to avoid that problem, leave OUT the last else
+        if(outcodeOut & Left) and just make it else *)
+
+        // Now we move outside point to intersection point to clip
+        // and get ready for next pass.
+        if (outcodeOut = outcode0) then
+          begin
+            a.re := x;
+            a.im := y;
+            outcode0 := ComputeOutCode(a);
+          end
+          else begin
+            b.re := x;
+            b.im := y;
+            outcode1 := ComputeOutCode(b);
+          end;
+      end;
+    end;
   end;
 
 FUNCTION quadIsInBoundingBox(CONST q:T_quad; CONST box:T_boundingBox):boolean;
-  CONST outerLeft =1;
-        outerRight=2;
-        outerUp   =4;
-        outerDown =8;
-  VAR out0:byte=0;
-      out1:byte=0;
   begin
-    if q.p0.re<box.x0 then out0+=outerLeft else if q.p0.re>=box.x1 then out0+=outerRight;
-    if q.p0.im<box.y0 then out0+=outerUp   else if q.p0.im>=box.y1 then out0+=outerDown;
-    if q.p1.re<box.x0 then out1+=outerLeft else if q.p1.re>=box.x1 then out1+=outerRight;
-    if q.p1.im<box.y0 then out1+=outerUp   else if q.p1.im>=box.y1 then out1+=outerDown;
-    out0:=out0 and out1;
-    if out0=0 then exit(true);
-    out1:=0;
-    if q.p2.re<box.x0 then out1+=outerLeft else if q.p2.re>=box.x1 then out1+=outerRight;
-    if q.p2.im<box.y0 then out1+=outerUp   else if q.p2.im>=box.y1 then out1+=outerDown;
-    out0:=out0 and out1;
-    if (out0=0) or (q.isTriangle) then exit(out0=0);
-    out1:=0;
-    if q.p3.re<box.x0 then out1+=outerLeft else if q.p3.re>=box.x1 then out1+=outerRight;
-    if q.p3.im<box.y0 then out1+=outerUp   else if q.p3.im>=box.y1 then out1+=outerDown;
-    out0:=out0 and out1; result:=out0=0;
+    if (q.p0.re>=box.x0) and (q.p0.re<=box.x1) and (q.p0.im>=box.y0) and (q.p0.im<=box.y1) or
+       (q.p1.re>=box.x0) and (q.p1.re<=box.x1) and (q.p1.im>=box.y0) and (q.p1.im<=box.y1) or
+       (q.p2.re>=box.x0) and (q.p2.re<=box.x1) and (q.p2.im>=box.y0) and (q.p2.im<=box.y1) or
+       (q.p3.re>=box.x0) and (q.p3.re<=box.x1) and (q.p3.im>=box.y0) and (q.p3.im<=box.y1) or
+       isInside(box.x0,box.y0,q) or
+       isInside(box.x1,box.y0,q) or
+       isInside(box.x0,box.y1,q) or
+       isInside(box.x1,box.y1,q) then exit(true);
+    if q.isTriangle then begin
+      result:=CohenSutherland_LineVisible(q.p0,q.p1,box) or
+              CohenSutherland_LineVisible(q.p1,q.p2,box) or
+              CohenSutherland_LineVisible(q.p2,q.p0,box);
+    end else begin
+      result:=CohenSutherland_LineVisible(q.p0,q.p1,box) or
+              CohenSutherland_LineVisible(q.p2,q.p3,box) or
+              CohenSutherland_LineVisible(q.p1,q.p2,box) or
+              CohenSutherland_LineVisible(q.p3,q.p0,box);
+    end;
   end;
 
 TYPE
@@ -126,22 +220,19 @@ T_trianglesTodo=object(T_parallelTask)
   PROCEDURE execute; virtual;
 end;
 
-{Use this only for pixel coordinates. Otherwise the epsilon is too large.}
-FUNCTION almostEqual(CONST a,b:T_Complex):boolean; inline;
-  begin result:=(abs(a.re-b.re)<1E-3) and (abs(a.im-b.im)<1E-3); end;
-
-PROCEDURE T_tileBuilder.addFlatTriangle(CONST a, b, c: T_Complex; CONST color: T_rgbFloatColor);
+PROCEDURE T_tileBuilder.addFlatTriangle(CONST a, b, c: T_Complex;
+  CONST color: T_rgbFloatColor);
   begin
     //Only add triangles if orientation fits and the area is larger than epsilon
-    if crossProduct(a,b,c.re,c.im)<1E-3 then exit;
+    if crossProduct(a,b,c.re,c.im)<1 then exit;
     addFlatQuad(a,b,c,a,color);
-    drawable[drawableCount-1].isTriangle:=true;
   end;
 
-PROCEDURE T_tileBuilder.addFlatQuad(CONST a, b, c, d: T_Complex; CONST color: T_rgbFloatColor);
+PROCEDURE T_tileBuilder.addFlatQuad(CONST a, b, c, d: T_Complex;
+  CONST color: T_rgbFloatColor);
   begin
     //Only add triangles if orientation fits and the area is larger than epsilon
-    if crossProduct(a,b,c.re,c.im)+crossProduct(c,d,a.re,a.im)<1E-3 then exit;
+    if crossProduct(a,b,c.re,c.im)+crossProduct(c,d,a.re,a.im)<1 then exit;
     if drawableCount>=length(drawable) then setLength(drawable,1+round(length(drawable)*1.1));
     with drawable[drawableCount] do begin
       p0:=a;
@@ -156,10 +247,11 @@ PROCEDURE T_tileBuilder.addFlatQuad(CONST a, b, c, d: T_Complex; CONST color: T_
       else if almostEqual(p2,p3) then begin                         p3:=p0; isTriangle:=true; end;
     end;
     drawable[drawableCount].color:=color;
-    inc(drawableCount);
+    if quadIsInBoundingBox(drawable[drawableCount],imageBoundingBox) then inc(drawableCount);
   end;
 
-CONSTRUCTOR T_tileBuilder.create(CONST workflow: P_abstractWorkflow; CONST relativeBorderWidth, borderAngleInDegrees: double);
+CONSTRUCTOR T_tileBuilder.create(CONST workflow: P_abstractWorkflow;
+  CONST relativeBorderWidth, borderAngleInDegrees: double);
   begin
     setLength(drawable,1);
     drawableCount:=0;
@@ -179,7 +271,12 @@ DESTRUCTOR T_tileBuilder.destroy;
     setLength(drawable,0);
   end;
 
-FUNCTION T_tileBuilder.shiftEdge(CONST a,b:T_Complex):T_complexPair;
+PROCEDURE T_tileBuilder.addTriangle(CONST q: T_quad);
+  begin
+    addTriangle(q.p0,q.p1,q.p2,q.color,false);
+  end;
+
+FUNCTION T_tileBuilder.shiftEdge(CONST a, b: T_Complex): T_complexPair;
   VAR d:T_Complex;
   begin
     d.re:=a.im-b.im;
@@ -189,7 +286,8 @@ FUNCTION T_tileBuilder.shiftEdge(CONST a,b:T_Complex):T_complexPair;
     result[1]:=b+d;
   end;
 
-FUNCTION T_tileBuilder.colorOfSide(CONST a,b:T_Complex; CONST baseColor:T_rgbFloatColor):T_rgbFloatColor;
+FUNCTION T_tileBuilder.colorOfSide(CONST a, b: T_Complex;
+  CONST baseColor: T_rgbFloatColor): T_rgbFloatColor;
   VAR d:T_Complex;
   begin
     d:=b-a;
@@ -199,38 +297,51 @@ FUNCTION T_tileBuilder.colorOfSide(CONST a,b:T_Complex; CONST baseColor:T_rgbFlo
                            +borderUpFraction);
   end;
 
-PROCEDURE T_tileBuilder.addTriangle(CONST q: T_quad);
+TYPE T_triangleInfo=record
+  base:T_quad;
+  variance:double;
+end;
+
+FUNCTION scanTriangle(VAR triangleInfo:T_triangleInfo; CONST imgBB:T_boundingBox; VAR image:T_rawImage):longint;
+  VAR box:T_boundingBox;
+      x,y:longint;
+      k:longint=0;
+      c,s,ss:T_rgbFloatColor;
   begin
-    addTriangle(q.p0,q.p1,q.p2,q.color);
+    box:=bbIntersect(imgBB,getBoundingBox(triangleInfo.base));
+    s :=BLACK;
+    ss:=BLACK;
+    for y:=floor(box.y0) to ceil(box.y1)-1 do
+    for x:=floor(box.x0) to ceil(box.x1)-1 do if isInside(x,y,triangleInfo.base) then begin
+      c:=image[x,y];
+      k +=1;
+      s +=c;
+      ss+=c*c;
+    end;
+    ss-=s*s*(1/k);
+    triangleInfo.base.color:=s*(1/k);
+    result:=k;
+    if k=0
+    then triangleInfo.variance:=-1
+    else triangleInfo.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
   end;
 
-PROCEDURE T_tileBuilder.addQuad(CONST q: T_quad);
-  begin
-    addQuad(q.p0,q.p1,q.p2,q.p3);
-  end;
-
-FUNCTION edgeCut(CONST a,b,c,d:T_Complex):T_Complex;
-  VAR X,Y,Z:T_Complex;
-      u:double;
-  begin
-    X:=b-a;
-    Y:=d-c;
-    Z:=c-a;
-    u:=(Z.re*Y.im-Y.re*Z.im)/(X.re*Y.im-Y.re*X.im);
-    result:=a+X*u;
-  end;
-
-FUNCTION edgeCut(CONST edge1,edge2:T_complexPair):T_Complex;
-  begin
-    result:=edgeCut(edge1[0],edge1[1],edge2[0],edge2[1]);
-  end;
-
-PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex; CONST color: T_rgbFloatColor);
-  VAR ab_shifted,
+PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex;
+  color: T_rgbFloatColor; CONST scanColor: boolean);
+  VAR info:T_triangleInfo;
+      ab_shifted,
       bc_shifted,
       ca_shifted:T_complexPair;
       a_,b_,c_,X:T_Complex;
   begin
+    if almostEqual(a,b) or almostEqual(b,c) or almostEqual(c,a) then exit;
+    if scanColor then begin
+      with info.base do begin
+        p0:=a; p1:=b; p2:=c; p3:=a; isTriangle:=true;
+      end;
+      scanTriangle(info,imageBoundingBox,context^.image);
+      color:=info.base.color;
+    end;
     if flat then begin
       addFlatTriangle(a,b,c,color);
       exit;
@@ -256,13 +367,22 @@ PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex; CONST color: T_rgb
     addFlatQuad(c,a,a_,c_,colorOfSide(c,a,color));
   end;
 
-PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex; CONST color: T_rgbFloatColor);
+PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex; color: T_rgbFloatColor; CONST scanColor: boolean);
   VAR ab_shifted,
       bc_shifted,
       cd_shifted,
       da_shifted:T_complexPair;
       a_,b_,c_,d_,X:T_Complex;
+      info:T_triangleInfo;
   begin
+    if crossProduct(a,b,c.re,c.im)+crossProduct(b,c,d.re,d.im)<1 then exit;
+    if scanColor then begin
+      with info.base do begin
+        p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false;
+      end;
+      scanTriangle(info,imageBoundingBox,context^.image);
+      color:=info.base.color;
+    end;
     if flat then begin
       addFlatQuad(a,b,c,d,color);
       exit;
@@ -291,12 +411,13 @@ PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex; CONST color: T_rgbF
 
     addFlatQuad(a_,b_,c_,d_,color);
     addFlatQuad(a,b,b_,a_,colorOfSide(a,b,color));
-    addFlatQuad(b,c,c_,b_,colorOfSide(c,d,color));
+    addFlatQuad(b,c,c_,b_,colorOfSide(b,c,color));
     addFlatQuad(c,d,d_,c_,colorOfSide(c,d,color));
     addFlatQuad(d,a,a_,d_,colorOfSide(d,a,color));
   end;
 
-PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d,e,f: T_Complex; CONST color: T_rgbFloatColor);
+PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d, e, f: T_Complex;
+  color: T_rgbFloatColor; CONST scanColor: boolean);
   VAR ab_shifted,
       bc_shifted,
       cd_shifted,
@@ -304,7 +425,22 @@ PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d,e,f: T_Complex; CONST color:
       ef_shifted,
       fa_shifted:T_complexPair;
       a_,b_,c_,d_,e_,f_,X:T_Complex;
+  VAR half1,half2:T_triangleInfo;
+      w1,w2:longint;
+
   begin
+    if crossProduct(a,b,c.re,c.im)+
+       crossProduct(c,d,e.re,e.im)+
+       crossProduct(e,f,a.re,a.im)+
+       crossProduct(c,e,a.re,a.im)<1 then exit;
+    if scanColor then begin
+      with half1.base do begin p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false; end;
+      with half2.base do begin p0:=d; p1:=e; p2:=f; p3:=a; isTriangle:=false; end;
+      w1:=scanTriangle(half1,imageBoundingBox,context^.image);
+      w2:=scanTriangle(half2,imageBoundingBox,context^.image);
+      color:=(half1.base.color*w1 +
+              half2.base.color*w2)*(1/max(w1+w2,1));
+    end;
     if flat then begin
       addFlatQuad(a,b,c,d,color);
       addFlatQuad(d,e,f,a,color);
@@ -352,78 +488,22 @@ PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d,e,f: T_Complex; CONST color:
     addFlatQuad(f,a,a_,f_,colorOfSide(f,a,color));
   end;
 
-TYPE T_triangleInfo=record
-  base:T_quad;
-  variance:double;
-end;
-
-FUNCTION scanTriangle(VAR triangleInfo:T_triangleInfo; CONST imgBB:T_boundingBox; VAR image:T_rawImage):longint;
-  VAR box:T_boundingBox;
-      x,y:longint;
-      k:longint=0;
-      c,s,ss:T_rgbFloatColor;
-  begin
-    box:=bbIntersect(imgBB,getBoundingBox(triangleInfo.base));
-    s :=BLACK;
-    ss:=BLACK;
-    for y:=box.y0 to box.y1-1 do
-    for x:=box.x0 to box.x1-1 do if isInside(x,y,triangleInfo.base) then begin
-      c:=image[x,y];
-      k +=1;
-      s +=c;
-      ss+=c*c;
-    end;
-    ss-=s*s*(1/k);
-    triangleInfo.base.color:=s*(1/k);
-    result:=k;
-    if k=0
-    then triangleInfo.variance:=-1
-    else triangleInfo.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
-  end;
-
-PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex);
-  VAR info:T_triangleInfo;
-  begin
-    with info.base do begin
-      p0:=a; p1:=b; p2:=c; p3:=a; isTriangle:=true;
-    end;
-    scanTriangle(info,imageBoundingBox,context^.image);
-    addTriangle(a,b,c,info.base.color);
-  end;
-
-PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex);
-  VAR info:T_triangleInfo;
-  begin
-    with info.base do begin
-      p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false;
-    end;
-    scanTriangle(info,imageBoundingBox,context^.image);
-    addQuad(a,b,c,d,info.base.color);
-  end;
-
-PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d,e,f: T_Complex);
-  VAR half1,half2:T_triangleInfo;
-      w1,w2:longint;
-  begin
-    with half1.base do begin p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false; end;
-    with half2.base do begin p0:=d; p1:=e; p2:=f; p3:=a; isTriangle:=false; end;
-    w1:=scanTriangle(half1,imageBoundingBox,context^.image);
-    w2:=scanTriangle(half2,imageBoundingBox,context^.image);
-    addHexagon(a,b,c,d,e,f,
-               (half1.base.color*w1 +
-                half2.base.color*w2)*(1/max(w1+w1,1)));
-  end;
-
-PROCEDURE T_tileBuilder.startExecution;
+PROCEDURE T_tileBuilder.execute;
   VAR todo:P_trianglesTodo;
       i:longint;
   begin
     setLength(drawable,drawableCount);
-    context^.clearQueue;
-    context^.image.markChunksAsPending;
-    for i in context^.image.getPendingList do begin
-      new(todo,create(drawable,i,@(context^.image)));
-      context^.enqueue(todo);
+    {$ifdef debugMode} writeln('Rendering ',drawableCount,' tiles'); {$endif}
+    if drawableCount=0
+    then context^.image.clearWithColor(BLACK)
+    else begin
+      context^.clearQueue;
+      context^.image.markChunksAsPending;
+      for i in context^.image.getPendingList do begin
+        new(todo,create(drawable,i,@(context^.image)));
+        context^.enqueue(todo);
+      end;
+      context^.waitForFinishOfParallelTasks;
     end;
   end;
 
@@ -436,10 +516,10 @@ CONSTRUCTOR T_trianglesTodo.create(CONST allCircles: T_quadList; CONST chunkInde
     box.y0:=0;
     chunkIndex :=chunkIndex_;
     with box do for i:=0 to chunkIndex-1 do begin
-      inc(x0,CHUNK_BLOCK_SIZE);
+      x0+=CHUNK_BLOCK_SIZE;
       if x0>=target_^.dimensions.width then begin
         x0:=0;
-        inc(y0,CHUNK_BLOCK_SIZE);
+        y0+=CHUNK_BLOCK_SIZE;
       end;
     end;
     box.x1:=box.x0+CHUNK_BLOCK_SIZE;
@@ -452,6 +532,13 @@ CONSTRUCTOR T_trianglesTodo.create(CONST allCircles: T_quadList; CONST chunkInde
       quadsInRange[i]:=c;
       inc(i);
     end;
+    {$ifdef debugMode}
+    writeln('DEBUG: T_trianglesTodo.create: ',i);
+    {$endif}
+    if i=0 then begin
+      quadsInRange[0]:=allCircles[0];
+      i:=1;
+    end;
     setLength(quadsInRange,i);
   end;
 
@@ -462,7 +549,7 @@ DESTRUCTOR T_trianglesTodo.destroy;
 
 PROCEDURE T_trianglesTodo.execute;
   VAR prevHit:array[0..CHUNK_BLOCK_SIZE-1,0..CHUNK_BLOCK_SIZE-1] of longint;
-  FUNCTION getColorAt(CONST i,j:longint; CONST x,y:double):T_rgbFloatColor; inline;
+  FUNCTION getColorAt(CONST i,j:longint; CONST x,y:double):T_rgbFloatColor; {$ifndef debugMode} inline; {$endif}
     VAR k:longint;
     begin
       k:=prevHit[i,j];
@@ -643,8 +730,7 @@ PROCEDURE triangleSplit(CONST parameters:T_parameterValue; CONST context:P_abstr
     builder.create(context,parameters.f2,parameters.f3);
     for i:=0 to length(rawTriangles)-1 do builder.addTriangle(rawTriangles[i]);
     setLength(rawTriangles,0);
-    builder.startExecution;
-    context^.waitForFinishOfParallelTasks;
+    builder.execute;
     builder.destroy;
   end;
 

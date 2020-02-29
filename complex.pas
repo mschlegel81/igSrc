@@ -11,6 +11,10 @@ CONST
    C_invalidComplex:T_Complex=(re:Nan; im:Nan);
 
 TYPE
+  T_boundingBox=record
+    x0,y0,x1,y1:double;
+  end;
+
   T_scaler=object
     private
       //input
@@ -44,6 +48,8 @@ TYPE
       PROCEDURE   rotateToHorizontal(CONST screenDx,screenDy:longint);
       FUNCTION getAbsoluteZoom:T_Complex;
       FUNCTION getPositionString(CONST x,y:double; CONST Separator:ansistring='+i*'):ansistring;
+      FUNCTION getPixelsBoundingBox:T_boundingBox;
+      FUNCTION getWorldBoundingBox:T_boundingBox;
   end;
 
 OPERATOR :=(CONST x:double):T_Complex; inline;
@@ -68,6 +74,8 @@ FUNCTION sin(x:T_Complex):T_Complex; inline;
 FUNCTION cos(x:T_Complex):T_Complex; inline;
 FUNCTION tan(CONST x:T_Complex):T_Complex; inline;
 FUNCTION isValid(CONST c:T_Complex):boolean; inline;
+
+FUNCTION bbIntersect(CONST b1,b2:T_boundingBox):T_boundingBox;
 
 IMPLEMENTATION
 FUNCTION abs(CONST x:double):double;
@@ -256,6 +264,12 @@ FUNCTION isValid(CONST c:T_Complex):boolean; inline;
                 isInfinite(c.im));
   end;
 
+FUNCTION bbIntersect(CONST b1,b2:T_boundingBox):T_boundingBox;
+  begin
+    result.x0:=max(b1.x0,b2.x0); result.y0:=max(b1.y0,b2.y0);
+    result.x1:=min(b1.x1,b2.x1); result.y1:=min(b1.y1,b2.y1);
+  end;
+
 //T_scaler:======================================================================================================================================
 CONSTRUCTOR T_scaler.create(CONST width, height: longint; CONST centerX,centerY, zoom, rotationInDegrees: double);
   begin
@@ -384,6 +398,39 @@ FUNCTION T_scaler.getPositionString(CONST x, y: double; CONST Separator: ansistr
   begin
     p:=transform(x,y);
     result:=floatToStr(p.re)+Separator+floatToStr(p.im);
+  end;
+
+FUNCTION T_scaler.getPixelsBoundingBox:T_boundingBox;
+  begin
+    result.x0:=0;
+    result.y0:=0;
+    result.x1:=screenWidth ;
+    result.y1:=screenHeight;
+  end;
+
+FUNCTION T_scaler.getWorldBoundingBox:T_boundingBox;
+  VAR p:T_Complex;
+  begin
+    p:=transform(0,0);
+    result.x0:=p.re;
+    result.x1:=p.re;
+    result.y0:=p.im;
+    result.y1:=p.im;
+    p:=transform(screenWidth,0);
+    result.x0:=min(result.x0,p.re);
+    result.x1:=max(result.x1,p.re);
+    result.y0:=min(result.y0,p.im);
+    result.y1:=max(result.y1,p.im);
+    p:=transform(screenWidth,screenHeight);
+    result.x0:=min(result.x0,p.re);
+    result.x1:=max(result.x1,p.re);
+    result.y0:=min(result.y0,p.im);
+    result.y1:=max(result.y1,p.im);
+    p:=transform(0,screenHeight);
+    result.x0:=min(result.x0,p.re);
+    result.x1:=max(result.x1,p.re);
+    result.y0:=min(result.y0,p.im);
+    result.y1:=max(result.y1,p.im);
   end;
 
 INITIALIZATION
