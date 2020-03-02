@@ -16,6 +16,7 @@ TYPE
       drawable        :T_quadList;
       drawableCount   :longint;
       imageBoundingBox:T_boundingBox;
+      areaEpsilon     :double;
       flat            :boolean; //true depending on border width and angle
       BorderWidth         ,
       borderUpFraction    ,
@@ -42,6 +43,16 @@ TYPE
 FUNCTION crossProduct(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
 IMPLEMENTATION
 USES imageManipulation,myParams,mypics,math,pixMaps,darts,ig_circlespirals,sysutils;
+TYPE T_pixelCoordinate=record ix,iy:longint; end;
+     T_pixelCoordinates=array of T_pixelCoordinate;
+
+FUNCTION getBoundingBox(CONST q:T_quad):T_boundingBox;
+  begin
+    result.x0:=floor(min(q.p0.re,min(q.p1.re,min(q.p2.re,q.p3.re))));
+    result.y0:=floor(min(q.p0.im,min(q.p1.im,min(q.p2.im,q.p3.im))));
+    result.x1:=ceil (max(q.p0.re,max(q.p1.re,max(q.p2.re,q.p3.re))))+1;
+    result.y1:=ceil (max(q.p0.im,max(q.p1.im,max(q.p2.im,q.p3.im))))+1;
+  end;
 
 FUNCTION crossProduct(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
   begin
@@ -61,12 +72,87 @@ FUNCTION isInside(CONST x,y:double; CONST q:T_quad):boolean;
                  (crossProduct(q.p3,q.p0,x,y)>=0);
   end;
 
-FUNCTION getBoundingBox(CONST q:T_quad):T_boundingBox;
+FUNCTION getPixelCoordinates(CONST q:T_quad; CONST box:T_boundingBox; CONST deltaX:double=0; CONST deltaY:double=0):T_pixelCoordinates;
+  VAR a,b:array[0..2] of T_Complex;
+      tmp:T_Complex;
+      i,j:longint;
+      resCount:longint=0;
+
+      jab,ja0,ja1,jb0,jb1,jboth:longint;
+      xa0,xa1,dxa0,dxa1,
+      xb0,xb1,dxb0,dxb1:double;
   begin
-    result.x0:=floor(min(q.p0.re,min(q.p1.re,min(q.p2.re,q.p3.re))));
-    result.y0:=floor(min(q.p0.im,min(q.p1.im,min(q.p2.im,q.p3.im))));
-    result.x1:=ceil (max(q.p0.re,max(q.p1.re,max(q.p2.re,q.p3.re))))+1;
-    result.y1:=ceil (max(q.p0.im,max(q.p1.im,max(q.p2.im,q.p3.im))))+1;
+    //given a quad (p0,p1,p2,p3) we consider
+    //triangles (p0,p1,p2) and (p0,p3,p2)
+    tmp:=q.p0; i:=0;
+    if q.p1.im<tmp.im then begin i:=1; tmp:=q.p1; end;
+    if q.p2.im<tmp.im then begin i:=2; tmp:=q.p2; end;
+    if q.p3.im<tmp.im then begin i:=3; tmp:=q.p3; end;
+    tmp.re:=deltaX;
+    tmp.im:=deltaY;
+    //choose triangles so that they have their min-point in common
+    if (i=0) or (i=2) then begin
+      a[0]:=q.p0+tmp; a[1]:=q.p1+tmp; a[2]:=q.p2+tmp;
+      b[0]:=q.p0+tmp; b[1]:=q.p2+tmp; b[2]:=q.p3+tmp;
+    end else begin
+      a[0]:=q.p1+tmp; a[1]:=q.p2+tmp; a[2]:=q.p3+tmp;
+      b[0]:=q.p1+tmp; b[1]:=q.p3+tmp; b[2]:=q.p0+tmp;
+    end;
+    //sort triangles a and b by y-coordinate
+    for i:=1 to 2 do for j:=0 to i-1 do begin
+      if a[i].im<a[j].im then begin tmp:=a[i]; a[i]:=a[j]; a[j]:=tmp; end;
+      if b[i].im<b[j].im then begin tmp:=b[i]; b[i]:=b[j]; b[j]:=tmp; end;
+    end;
+    jab:=round(a[0].im);
+    ja0:=round(a[1].im); jb0:=round(b[1].im);
+    ja1:=round(a[2].im); jb1:=round(b[2].im);
+    if ja1<jb1 then jboth:=ja1 else jboth:=jb1;
+    setLength(result,100);
+    xa0:=a[0].re; dxa0:=(a[1].re-a[0].re)/(a[1].im-a[0].im);
+    xa1:=a[0].re; dxa1:=(a[2].re-a[0].re)/(a[2].im-a[0].im);
+    xb0:=b[0].re; dxb0:=(b[1].re-b[0].re)/(b[1].im-b[0].im);
+    xb1:=b[0].re; dxb1:=(b[2].re-b[0].re)/(b[2].im-b[0].im);
+    //iterate over shared y-range
+    for j:=jab to jboth do begin
+      if j=ja0 then begin xa0:=a[1].re; dxa0:=(a[2].re-a[1].re)/(a[2].im-a[1].im); end;
+      if j=jb0 then begin xb0:=b[1].re; dxb0:=(b[2].re-b[1].re)/(b[2].im-b[1].im); end;
+      if (j>=box.y0) and (j<box.y1) then for i:=round(max(box.x0,min(min(xa0,xb0),min(xa1,xb1)))) to
+                                                round(min(box.x1,max(max(xa0,xb0),max(xa1,xb1)))) do begin
+        if resCount>=length(result) then setLength(result,resCount*2);
+        result[resCount].ix:=i;
+        result[resCount].iy:=j;
+        inc(resCount);
+      end;
+      xa0+=dxa0;
+      xa1+=dxa1;
+      xb0+=dxb0;
+      xb1+=dxb1;
+    end;
+    //iterate over a-only
+    for j:=jboth+1 to min(ja1,round(box.y1)-1) do begin
+      if (j>=box.y0) and (j<box.y1) then for i:=round(max(box.x0,min(xa0,xa1))) to
+                                                round(min(box.x1,max(xa0,xa1))) do begin
+        if resCount>=length(result) then setLength(result,resCount*2);
+        result[resCount].ix:=i;
+        result[resCount].iy:=j;
+        inc(resCount);
+      end;
+      xa0+=dxa0;
+      xa1+=dxa1;
+    end;
+    //iterate over b-only
+    for j:=jboth+1 to min(jb1,round(box.y1)-1) do begin
+      if (j>=box.y0) and (j<box.y1) then for i:=round(max(box.x0,min(xb0,xb1))) to
+                                                round(min(box.x1,max(xb0,xb1))) do begin
+        if resCount>=length(result) then setLength(result,resCount*2);
+        result[resCount].ix:=i;
+        result[resCount].iy:=j;
+        inc(resCount);
+      end;
+      xb0+=dxb0;
+      xb1+=dxb1;
+    end;
+    setLength(result,resCount);
   end;
 
 FUNCTION edgeCut(CONST a,b,c,d:T_Complex):T_Complex;
@@ -224,7 +310,7 @@ PROCEDURE T_tileBuilder.addFlatTriangle(CONST a, b, c: T_Complex;
   CONST color: T_rgbFloatColor);
   begin
     //Only add triangles if orientation fits and the area is larger than epsilon
-    if crossProduct(a,b,c.re,c.im)<1 then exit;
+    if crossProduct(a,b,c.re,c.im)<areaEpsilon then exit;
     addFlatQuad(a,b,c,a,color);
   end;
 
@@ -232,7 +318,7 @@ PROCEDURE T_tileBuilder.addFlatQuad(CONST a, b, c, d: T_Complex;
   CONST color: T_rgbFloatColor);
   begin
     //Only add triangles if orientation fits and the area is larger than epsilon
-    if crossProduct(a,b,c.re,c.im)+crossProduct(c,d,a.re,a.im)<1 then exit;
+    if crossProduct(a,b,c.re,c.im)+crossProduct(c,d,a.re,a.im)<areaEpsilon then exit;
     if drawableCount>=length(drawable) then setLength(drawable,1+round(length(drawable)*1.1));
     with drawable[drawableCount] do begin
       p0:=a;
@@ -264,6 +350,7 @@ CONSTRUCTOR T_tileBuilder.create(CONST workflow: P_abstractWorkflow;
     imageBoundingBox.y0:=0;
     imageBoundingBox.x1:=context^.image.dimensions.width;
     imageBoundingBox.y1:=context^.image.dimensions.height;
+    if workflow^.previewQuality then areaEpsilon:=10 else areaEpsilon:=0.1;
   end;
 
 DESTRUCTOR T_tileBuilder.destroy;
@@ -319,15 +406,20 @@ FUNCTION scanTriangle(VAR triangleInfo:T_triangleInfo; CONST imgBB:T_boundingBox
       ss+=c*c;
     end;
     ss-=s*s*(1/k);
-    triangleInfo.base.color:=s*(1/k);
-    result:=k;
-    if k=0
-    then triangleInfo.variance:=-1
-    else triangleInfo.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
+    if k=0 then begin
+      triangleInfo.variance:=-1;
+      x:=round(max(imgBB.x0,min(imgBB.x1, (triangleInfo.base.p0.re+triangleInfo.base.p1.re+triangleInfo.base.p2.re)/3)));
+      y:=round(max(imgBB.y0,min(imgBB.y1, (triangleInfo.base.p0.im+triangleInfo.base.p1.im+triangleInfo.base.p2.im)/3)));
+      triangleInfo.base.color:=image.pixel[x,y];
+      result:=0;
+    end else begin
+      triangleInfo.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
+      triangleInfo.base.color:=s*(1/k);
+      result:=k;
+    end;
   end;
 
-PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex;
-  color: T_rgbFloatColor; CONST scanColor: boolean);
+PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex; color: T_rgbFloatColor; CONST scanColor: boolean);
   VAR info:T_triangleInfo;
       ab_shifted,
       bc_shifted,
@@ -375,7 +467,7 @@ PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex; color: T_rgbFloatCo
       a_,b_,c_,d_,X:T_Complex;
       info:T_triangleInfo;
   begin
-    if crossProduct(a,b,c.re,c.im)+crossProduct(b,c,d.re,d.im)<1 then exit;
+    if crossProduct(a,b,c.re,c.im)+crossProduct(b,c,d.re,d.im)<areaEpsilon then exit;
     if scanColor then begin
       with info.base do begin
         p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false;
@@ -432,7 +524,7 @@ PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d, e, f: T_Complex;
     if crossProduct(a,b,c.re,c.im)+
        crossProduct(c,d,e.re,e.im)+
        crossProduct(e,f,a.re,a.im)+
-       crossProduct(c,e,a.re,a.im)<1 then exit;
+       crossProduct(c,e,a.re,a.im)<areaEpsilon then exit;
     if scanColor then begin
       with half1.base do begin p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false; end;
       with half2.base do begin p0:=d; p1:=e; p2:=f; p3:=a; isTriangle:=false; end;
@@ -499,7 +591,7 @@ PROCEDURE T_tileBuilder.execute;
     else begin
       context^.clearQueue;
       context^.image.markChunksAsPending;
-      for i in context^.image.getPendingList do begin
+      for i in context^.image.getPendingList do if not(context^.cancellationRequested) then begin
         new(todo,create(drawable,i,@(context^.image)));
         context^.enqueue(todo);
       end;
@@ -522,9 +614,10 @@ CONSTRUCTOR T_trianglesTodo.create(CONST allCircles: T_quadList; CONST chunkInde
         y0+=CHUNK_BLOCK_SIZE;
       end;
     end;
-    box.x1:=box.x0+CHUNK_BLOCK_SIZE;
-    box.y1:=box.y0+CHUNK_BLOCK_SIZE;
-
+    box.x1:=box.x0+CHUNK_BLOCK_SIZE+1;
+    box.y1:=box.y0+CHUNK_BLOCK_SIZE+1;
+    box.x0-=1;
+    box.y0-=1;
     setLength(quadsInRange,1);
     i:=0;
     for c in allCircles do if quadIsInBoundingBox(c,box) then begin
@@ -562,27 +655,28 @@ PROCEDURE T_trianglesTodo.execute;
     end;
 
   VAR chunk:T_colChunk;
-      i,j,k,k0,k1:longint;
+      i,j,k:longint;
   begin
     chunk.create;
     chunk.initForChunk(containedIn^.image.dimensions.width,containedIn^.image.dimensions.height,chunkIndex);
     for i:=0 to CHUNK_BLOCK_SIZE-1 do for j:=0 to CHUNK_BLOCK_SIZE-1 do prevHit[i,j]:=0;
     for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do rest:=getColorAt(i,j,chunk.getPicX(i),chunk.getPicY(j));
-    if not(containedIn^.previewQuality) then
-    while chunk.markAlias(0.1) and not(containedIn^.cancellationRequested) do
-    for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do if odd(antialiasingMask) then begin
-      if antialiasingMask=1 then begin
-        k0:=1; k1:=2; antialiasingMask:=2; k1:=2*k1;
-      end else begin
-        k0:=antialiasingMask-1;
-        k1:=k0+2;
-        if k1>254 then k1:=254;
-        antialiasingMask:=k1;
-        k0:=2*k0; k1:=2*k1;
+
+    if not(containedIn^.previewQuality) and not(containedIn^.cancellationRequested) then begin
+      for i:=1 to chunk.width-1 do for j:=0 to chunk.height-1 do if prevHit[i-1,j]<>prevHit[i,j] then begin
+        chunk.col[i-1,j].antialiasingMask:=chunk.col[i-1,j].antialiasingMask or 1;
+        chunk.col[i  ,j].antialiasingMask:=chunk.col[  i,j].antialiasingMask or 1;
       end;
-      for k:=k0 to k1-1 do rest:=rest+getColorAt(i,j,
-        chunk.getPicX(i)+darts_delta[k,0],
-        chunk.getPicY(j)+darts_delta[k,1]);
+      for i:=0 to chunk.width-1 do for j:=1 to chunk.height-1 do if prevHit[i,j-1]<>prevHit[i,j] then begin
+        chunk.col[i,j-1].antialiasingMask:=chunk.col[i,j-1].antialiasingMask or 1;
+        chunk.col[i,j  ].antialiasingMask:=chunk.col[i,j  ].antialiasingMask or 1;
+      end;
+      for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do if odd(antialiasingMask) then begin
+        antialiasingMask:=8;
+        for k:=1 to 16-1 do rest:=rest+getColorAt(i,j,
+          chunk.getPicX(i)+darts_delta[k,0],
+          chunk.getPicY(j)+darts_delta[k,1]);
+      end;
     end;
     containedIn^.image.copyFromChunk(chunk);
     chunk.destroy;

@@ -179,11 +179,6 @@ FUNCTION T_spiralCircleProvider.getQuad(CONST index: longint; VAR scaler: T_scal
     //Triangles: (i,i-1,i+k) (i,i+k,i+k+1)
     //Quad     : (i,i-1,i+k,i+k+1)
     circle:=getCircle(index         ,scaler); if circle.radius<=0 then exit(false) else t0:=circle.center;
-    if (circle.center.re+circle.radius<0) or
-       (circle.center.im+circle.radius<0) or
-       (circle.center.re-circle.radius>scaler.getPixelsBoundingBox.x1) or
-       (circle.center.im-circle.radius>scaler.getPixelsBoundingBox.y1) then exit(false);
-
     circle:=getCircle(index-1       ,scaler); if circle.radius<=0 then exit(false) else t1:=circle.center;
     circle:=getCircle(index+shiftK  ,scaler); if circle.radius<=0 then exit(false) else t2:=circle.center;
     circle:=getCircle(index+shiftK+1,scaler); if circle.radius<=0 then exit(false) else t3:=circle.center;

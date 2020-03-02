@@ -29,7 +29,7 @@ IMPLEMENTATION
 USES ig_circlespirals,im_triangleSplit,math;
 
 CONSTRUCTOR T_tilesAlgorithm.create;
-  CONST geometryNames:array[0..9] of string=('squares',
+  CONST geometryNames:array[0..11] of string=('squares',
                                              'triangles',
                                              'hexagons',
                                              'archimedic',
@@ -38,13 +38,15 @@ CONSTRUCTOR T_tilesAlgorithm.create;
                                              'spiral_triangles',
                                              'spiral_hexagons',
                                              'double_spiral_triangles',
-                                             'double_spiral_hexagons');
+                                             'double_spiral_hexagons',
+                                             'sunflower',
+                                             'fishbone');
         colorSourceNames:array[0..1] of string=('fixed',
                                                 'by_input');
 
   begin
     inherited create;
-    addParameter('geometry',pt_enum,0,9)^.setEnumValues(geometryNames);
+    addParameter('geometry',pt_enum,0,11)^.setEnumValues(geometryNames);
     addParameter('spiral_parameter',pt_integer,2,100);
     addParameter('coloring',pt_enum,0,1)^.setEnumValues(colorSourceNames);
     addParameter('color'   ,pt_color);
@@ -98,6 +100,61 @@ FUNCTION T_tilesAlgorithm.getParameter(CONST index: byte): T_parameterValue;
 PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
   VAR tileBuilder:T_tileBuilder;
       scanColor:boolean;
+
+  PROCEDURE initSunflowerGeometry;
+    FUNCTION fibPoint(CONST i:longint):T_Complex;
+      CONST gamma=2*pi/system.sqr((system.sqrt(5)-1)/2);
+      begin
+        result.re:=system.cos(gamma*i);
+        result.im:=system.sin(gamma*i);
+        result*=system.sqrt(i);
+        result:=scaler.mrofsnart(result.re,result.im);
+      end;
+
+    PROCEDURE addFibTriangle(CONST i0,i1,i2:longint); inline;
+      begin tileBuilder.addTriangle(fibPoint(i0),fibPoint(i1),fibPoint(i2),color,scanColor); end;
+
+    PROCEDURE addFibQuad(CONST i0,i1,i2,i3:longint); inline;
+      begin tileBuilder.addQuad(fibPoint(i0),fibPoint(i1),fibPoint(i2),fibPoint(i3),color,scanColor); end;
+
+    VAR i:longint;
+    begin
+      addFibTriangle(1, 2, 3);
+      addFibTriangle(1, 4, 2);
+      addFibTriangle(2,10, 5);
+      addFibTriangle(5,13, 8);
+      addFibTriangle(1, 9, 4);
+      addFibQuad(2, 4,12,7);
+      addFibQuad(2, 5, 8,3);
+      addFibQuad(1, 3,11,6);
+      addFibQuad(1, 6,14,9);
+
+      for i:=     1+1 to      1+   8 do addFibTriangle(i,i+   5,i+  13);
+      for i:=     1+1 to     18      do addFibQuad    (i,i+  13,i+  21,i+   8);
+      for i:=    18+1 to     18+  13 do addFibTriangle(i,i+  21,i+   8);
+      for i:=    18+1 to     67      do addFibQuad    (i,i+  13,i+  34,i+  21);
+      for i:=    67+1 to     67+  21 do addFibTriangle(i,i+  13,i+  34);
+      for i:=    67+1 to    187      do addFibQuad    (i,i+  34,i+  55,i+  21);
+      for i:=   187+1 to    187+  34 do addFibTriangle(i,i+  55,i+  21);
+      for i:=   187+1 to    508      do addFibQuad    (i,i+  34,i+  89,i+  55);
+      for i:=   508+1 to    508+  55 do addFibTriangle(i,i+  34,i+  89);
+      for i:=   508+1 to   1360      do addFibQuad    (i,i+  89,i+ 144,i+  55);
+      for i:=  1360+1 to   1360+  89 do addFibTriangle(i,i+ 144,i+  55);
+      for i:=  1360+1 to   3610      do addFibQuad    (i,i+  89,i+ 233,i+ 144);
+      for i:=  3610+1 to   3610+ 144 do addFibTriangle(i,i+  89,i+ 233);
+      for i:=  3610+1 to   9530      do addFibQuad    (i,i+ 233,i+ 377,i+ 144);
+      for i:=  9530+1 to   9530+ 233 do addFibTriangle(i,i+ 377,i+ 144);
+      for i:=  9530+1 to  25080      do addFibQuad    (i,i+ 233,i+ 610,i+ 377);
+      for i:= 25080+1 to  25080+ 377 do addFibTriangle(i,i+ 233,i+ 610);
+      for i:= 25080+1 to  65871      do addFibQuad    (i,i+ 610,i+ 987,i+ 377);
+      for i:= 65871+1 to  65871+ 610 do addFibTriangle(i,i+ 987,i+ 377);
+      for i:= 65871+1 to 172793      do addFibQuad    (i,i+ 610,i+1597,i+ 987);
+      for i:=172793+1 to 172793+ 987 do addFibTriangle(i,i+ 610,i+1597);
+      for i:=172793+1 to 452929      do addFibQuad    (i,i+1597,i+2584,i+ 987);
+      for i:=452929+1 to 452929+1597 do addFibTriangle(i,i+2584,i+ 987);
+      for i:=452929+1 to 997415      do addFibQuad    (i,i+1597,i+4181,i+2584);
+      for i:=997415+1 to 997415+2584 do addFibTriangle(i,i+1597,i+4181);
+    end;
 
   PROCEDURE createGeometry;
     CONST COS_60= 0.8660254037844387;
@@ -390,7 +447,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
         end;
         6..9: //spiral_triangles, spiral_hexagons, double_spiral_triangles, double_spiral_hexagons
         begin
-          {$ifdef debugMode} writeln('Initializing spiral tiling with parameter ',geometryKind,'/',spiralParameter); {$endif}
+          //TODO: Near the singularity there is a "hole" where tiny polygons are rejected due to "negligible size"
           if geometryKind in [6,7]
           then circleProvider.create(spiralParameter,1, 0,0,1)
           else circleProvider.create(spiralParameter,1,-1,1,1);
@@ -405,6 +462,27 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
             then tileBuilder.addHexagon(p0,p1,p2,p3,p4,p5,color,scanColor);
           end;
           circleProvider.destroy;
+        end;
+        10:initSunflowerGeometry;
+        11:begin
+          i0:=floor(world.x0/8)-1;
+          i1:=ceil (world.x1/8);
+          j0:=floor(world.y0/2)-2;
+          j1:=ceil (world.y1/2);
+          for i:=i0 to i1 do for j:=j0 to j1 do begin
+            p0.re:=i*8;
+            p0.im:=j*2;
+            tileBuilder.addQuad(scaler.mrofsnart(p0.re  ,p0.im  ),
+                                scaler.mrofsnart(p0.re+4,p0.im+4),
+                                scaler.mrofsnart(p0.re+5,p0.im+3),
+                                scaler.mrofsnart(p0.re+1,p0.im-1),
+                                color,scanColor);
+            tileBuilder.addQuad(scaler.mrofsnart(p0.re-4,p0.im+4),
+                                scaler.mrofsnart(p0.re-3,p0.im+5),
+                                scaler.mrofsnart(p0.re+1,p0.im+1),
+                                scaler.mrofsnart(p0.re  ,p0.im  ),
+                                color,scanColor);
+          end;
         end;
       end;
 
