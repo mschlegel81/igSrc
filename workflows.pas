@@ -55,6 +55,7 @@ TYPE
       PROCEDURE stepChanged(CONST index:longint);
       PROCEDURE swapStepDown(CONST index:longint);
       PROCEDURE removeStep(CONST index:longint);
+      FUNCTION isEditorWorkflow: boolean; virtual;
   end;
 
   P_generateImageWorkflow=^T_generateImageWorkflow;
@@ -271,7 +272,8 @@ PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint;
     end;
   end;
 
-PROCEDURE T_editorWorkflow.afterStep(CONST stepIndex: longint; CONST elapsed: double);
+PROCEDURE T_editorWorkflow.afterStep(CONST stepIndex: longint;
+  CONST elapsed: double);
   begin
     if elapsed>reportStepTimeIfLargerThan then messageQueue^.Post('Finished step after '+myTimeToStr(elapsed),false,currentStepIndex);
     step[stepIndex]^.saveOutputImage(image);
@@ -585,6 +587,11 @@ PROCEDURE T_editorWorkflow.removeStep(CONST index: longint);
     end;
   end;
 
+FUNCTION T_editorWorkflow.isEditorWorkflow: boolean;
+  begin
+    result:=true;
+  end;
+
 FUNCTION T_simpleWorkflow.workflowType: T_workflowType;
   begin
     if (length(steps)<=0) or not(isValid) then exit(wft_empty_or_unknown);
@@ -638,10 +645,12 @@ FUNCTION T_simpleWorkflow.isValid: boolean;
         result:=false;
       end;
 
-      fileName:=steps[i]^.operation^.writesFile;
-      if  (fileName<>'') and fileExists(fileName) then begin
-        messageQueue^.Post('File "'+fileName+'" already exists. The workflow will not be exeuted to prevent overwriting.',true,i);
-        result:=false;
+      if not(isEditorWorkflow) then begin
+        fileName:=steps[i]^.operation^.writesFile;
+        if  (fileName<>'') and fileExists(fileName) then begin
+          messageQueue^.Post('File "'+fileName+'" already exists. The workflow will not be exeuted to prevent overwriting.',true,i);
+          result:=false;
+        end;
       end;
     end;
   end;
@@ -661,7 +670,8 @@ PROCEDURE T_editorWorkflow.configChanged;
     stepChanged(0);
   end;
 
-CONSTRUCTOR T_editorWorkflow.createEditorWorkflow(CONST messageQueue_: P_structuredMessageQueue);
+CONSTRUCTOR T_editorWorkflow.createEditorWorkflow(
+  CONST messageQueue_: P_structuredMessageQueue);
   begin
     inherited createContext(messageQueue_);
     config.create(@configChanged);

@@ -118,6 +118,7 @@ TYPE
       PROCEDURE executeWorkflowInBackground(CONST preview: boolean);
       FUNCTION isValid: boolean; virtual; abstract;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual; abstract;
+      FUNCTION isEditorWorkflow:boolean; virtual;
   end;
 
 VAR maxImageManipulationThreads:longint=1;
@@ -453,7 +454,7 @@ FUNCTION T_abstractWorkflow.executing: boolean;
     leaveCriticalSection(contextCS);
   end;
 
-FUNCTION T_abstractWorkflow.isDone:boolean;
+FUNCTION T_abstractWorkflow.isDone: boolean;
   begin
     enterCriticalSection(contextCS);
     result:=currentExecution.workflowState=ts_ready;
@@ -503,6 +504,11 @@ PROCEDURE T_abstractWorkflow.executeWorkflowInBackground(CONST preview: boolean)
     previewQuality:=preview;
     beforeAll;
     beginThread(@runWorkflow,@self);
+  end;
+
+FUNCTION T_abstractWorkflow.isEditorWorkflow: boolean;
+  begin
+    result:=false;
   end;
 
 PROCEDURE finalizeAlgorithms;

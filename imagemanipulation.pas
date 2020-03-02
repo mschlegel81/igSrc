@@ -210,8 +210,8 @@ PROCEDURE loadImage_impl(CONST parameters:T_parameterValue; CONST context:P_abst
 
 PROCEDURE saveImage_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    if context^.previewQuality then begin
-      context^.messageQueue^.Post('No images are saved in preview mode',false,context^.currentStepIndex);
+    if context^.isEditorWorkflow then begin
+      context^.messageQueue^.Post('No images are saved in editor mode',false,context^.currentStepIndex);
       exit;
     end;
     //TODO: Handle file access errors
@@ -222,6 +222,10 @@ PROCEDURE saveImage_impl(CONST parameters:T_parameterValue; CONST context:P_abst
 
 PROCEDURE deleteFile_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
+    if context^.isEditorWorkflow then begin
+      context^.cancelWithError('"delete" is not expected in editor mode');
+      exit;
+    end;
     DeleteFile(parameters.fileName);
   end;
 
