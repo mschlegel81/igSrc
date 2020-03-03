@@ -29,7 +29,7 @@ IMPLEMENTATION
 USES ig_circlespirals,im_triangleSplit,math;
 
 CONSTRUCTOR T_tilesAlgorithm.create;
-  CONST geometryNames:array[0..11] of string=('squares',
+  CONST geometryNames:array[0..12] of string=('squares',
                                              'triangles',
                                              'hexagons',
                                              'archimedic',
@@ -40,13 +40,14 @@ CONSTRUCTOR T_tilesAlgorithm.create;
                                              'double_spiral_triangles',
                                              'double_spiral_hexagons',
                                              'sunflower',
-                                             'fishbone');
+                                             'fishbone',
+                                             'Conway');
         colorSourceNames:array[0..1] of string=('fixed',
                                                 'by_input');
 
   begin
     inherited create;
-    addParameter('geometry',pt_enum,0,11)^.setEnumValues(geometryNames);
+    addParameter('geometry',pt_enum,0,12)^.setEnumValues(geometryNames);
     addParameter('spiral_parameter',pt_integer,2,100);
     addParameter('coloring',pt_enum,0,1)^.setEnumValues(colorSourceNames);
     addParameter('color'   ,pt_color);
@@ -154,6 +155,39 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
       for i:=452929+1 to 452929+1597 do addFibTriangle(i,i+2584,i+ 987);
       for i:=452929+1 to 997415      do addFibQuad    (i,i+1597,i+4181,i+2584);
       for i:=997415+1 to 997415+2584 do addFibTriangle(i,i+1597,i+4181);
+    end;
+
+  PROCEDURE initConwayGeometry;
+    VAR worldBox:T_boundingBox;
+    PROCEDURE recurse(CONST a,b,c:T_Complex; CONST depth:byte);
+      VAR x,y:T_Complex;
+      begin
+        if depth=0 then begin
+          if crossProduct(a,b,c.re,c.im)<0
+          then begin x:=b; y:=c; end
+          else begin x:=c; y:=b; end;
+          tileBuilder.addTriangle(scaler.mrofsnart(a.re,a.im),
+                                  scaler.mrofsnart(x.re,x.im),
+                                  scaler.mrofsnart(y.re,y.im),
+                                  color,scanColor);
+        end else if (max(a.re,max(b.re,c.re))>=worldBox.x0) and
+                    (min(a.re,min(b.re,c.re))<=worldBox.x1) and
+                    (max(a.im,max(b.im,c.im))>=worldBox.y0) and
+                    (min(a.im,min(b.im,c.im))<=worldBox.y1) then begin
+          x:=(b-a)*0.5;
+          y:= c-a;
+          recurse(a+2/5*x+4/5*y, a            , a+y          ,depth-1);
+          recurse(a+1/5*x+2/5*y, a+  x        , a            ,depth-1);
+          recurse(a+6/5*x+2/5*y, a+2*x        , a+x          ,depth-1);
+          recurse(a+1/5*x+2/5*y, a+x          , a+2/5*x+4/5*y,depth-1);
+          recurse(a+6/5*x+2/5*y, a+2/5*x+4/5*y, a+x          ,depth-1);
+        end;
+      end;
+
+    begin
+      worldBox:=scaler.getWorldBoundingBox;
+      recurse((-1-II*0.5)*100,( 1-II*0.5)*100,(-1+II*0.5)*100,8);
+      recurse(( 1+II*0.5)*100,(-1+II*0.5)*100,( 1-II*0.5)*100,8);
     end;
 
   PROCEDURE createGeometry;
@@ -484,6 +518,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
                                 color,scanColor);
           end;
         end;
+        12: initConwayGeometry;
       end;
 
     end;
