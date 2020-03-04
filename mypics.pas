@@ -68,6 +68,7 @@ TYPE
       PROCEDURE markChunksAsPending;
       FUNCTION getPendingList:T_arrayOfLongint;
       PROCEDURE copyFromChunk(VAR chunk:T_colChunk);
+      FUNCTION getChunkCopy(CONST chunkIndex:longint):T_colChunk;
       //-----------------------------------------------------------:Chunk access
       PROCEDURE clearWithColor(CONST color:T_rgbFloatColor);
       PROCEDURE drawCheckerboard;
@@ -358,6 +359,16 @@ PROCEDURE T_rawImage.copyFromChunk(VAR chunk: T_colChunk);
   begin
     for j:=0 to chunk.height-1 do for i:=0 to chunk.width-1 do with chunk.col[i,j] do
       pixel[chunk.getPicX(i),chunk.getPicY(j)]:=combinedColor(chunk.col[i,j]);
+  end;
+
+FUNCTION T_rawImage.getChunkCopy(CONST chunkIndex:longint):T_colChunk;
+  VAR i,j:longint;
+  begin
+    result.initForChunk(dimensions.width,dimensions.height,chunkIndex);
+    for j:=0 to result.height-1 do for i:=0 to result.width-1 do with result.col[i,j] do begin
+      rest:=pixel[result.getPicX(i),result.getPicY(j)];
+      antialiasingMask:=0;
+    end;
   end;
 
 PROCEDURE T_rawImage.clearWithColor(CONST color:T_rgbFloatColor);

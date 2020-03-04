@@ -553,9 +553,8 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
     scaler.rescale(image.dimensions.width,image.dimensions.height);
     tileBuilder.create(context,BorderWidth,borderAngle);
     scanColor:=colorStyle=1;
-
     createGeometry;
-    tileBuilder.execute;
+    tileBuilder.execute(not(scanColor),color);
     tileBuilder.destroy;
   end; end;
 

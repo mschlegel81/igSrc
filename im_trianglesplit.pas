@@ -37,7 +37,7 @@ TYPE
       PROCEDURE addQuad    (CONST a,b,c,d    :T_Complex; color:T_rgbFloatColor; CONST scanColor:boolean=false);
       PROCEDURE addHexagon (CONST a,b,c,d,e,f:T_Complex; color:T_rgbFloatColor; CONST scanColor:boolean=false);
 
-      PROCEDURE execute;
+      PROCEDURE execute(CONST doClear:boolean; CONST clearColor:T_rgbFloatColor);
   end;
 
 FUNCTION crossProduct(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
@@ -580,20 +580,25 @@ PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d, e, f: T_Complex;
     addFlatQuad(f,a,a_,f_,colorOfSide(f,a,color));
   end;
 
-PROCEDURE T_tileBuilder.execute;
+PROCEDURE T_tileBuilder.execute(CONST doClear:boolean; CONST clearColor:T_rgbFloatColor);
   VAR todo:P_trianglesTodo;
+      chunkCount:longint;
       i:longint;
+      k:longint=256;
+
   begin
     setLength(drawable,drawableCount);
     {$ifdef debugMode} writeln('Rendering ',drawableCount,' tiles'); {$endif}
-    if drawableCount=0
-    then context^.image.clearWithColor(BLACK)
-    else begin
+    if doClear then context^.image.clearWithColor(clearColor);
+    if drawableCount>0 then begin
       context^.clearQueue;
-      context^.image.markChunksAsPending;
-      for i in context^.image.getPendingList do if not(context^.cancellationRequested) then begin
-        new(todo,create(drawable,i,@(context^.image)));
-        context^.enqueue(todo);
+      chunkCount:=context^.image.chunksInMap-1;
+      i:=0;
+      while (i<chunkCount) and not(context^.cancellationRequested) do begin new(todo,create(drawable,i,@(context^.image))); context^.enqueue(todo); i+=k; end;
+      while k>1 do begin
+        i:=k shr 1;
+        while (i<chunkCount) and not(context^.cancellationRequested) do begin new(todo,create(drawable,i,@(context^.image))); context^.enqueue(todo); i+=k; end;
+        k:=k shr 1;
       end;
       context^.waitForFinishOfParallelTasks;
     end;
@@ -642,6 +647,8 @@ DESTRUCTOR T_trianglesTodo.destroy;
 
 PROCEDURE T_trianglesTodo.execute;
   VAR prevHit:array[0..CHUNK_BLOCK_SIZE-1,0..CHUNK_BLOCK_SIZE-1] of longint;
+      background:T_colChunk;
+
   FUNCTION getColorAt(CONST i,j:longint; CONST x,y:double):T_rgbFloatColor; {$ifndef debugMode} inline; {$endif}
     VAR k:longint;
     begin
@@ -651,12 +658,13 @@ PROCEDURE T_trianglesTodo.execute;
         prevHit[i,j]:=k;
         exit(quadsInRange[k].color);
       end;
-      result:=BLACK;
+      result:=background.col[i,j].rest;
     end;
 
   VAR chunk:T_colChunk;
       i,j,k:longint;
   begin
+    background:=containedIn^.image.getChunkCopy(chunkIndex);
     chunk.create;
     chunk.initForChunk(containedIn^.image.dimensions.width,containedIn^.image.dimensions.height,chunkIndex);
     for i:=0 to CHUNK_BLOCK_SIZE-1 do for j:=0 to CHUNK_BLOCK_SIZE-1 do prevHit[i,j]:=0;
@@ -680,6 +688,7 @@ PROCEDURE T_trianglesTodo.execute;
     end;
     containedIn^.image.copyFromChunk(chunk);
     chunk.destroy;
+    background.destroy;
   end;
 
 FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST count:longint; CONST style:byte):T_quadList;
@@ -824,7 +833,7 @@ PROCEDURE triangleSplit(CONST parameters:T_parameterValue; CONST context:P_abstr
     builder.create(context,parameters.f2,parameters.f3);
     for i:=0 to length(rawTriangles)-1 do builder.addTriangle(rawTriangles[i]);
     setLength(rawTriangles,0);
-    builder.execute;
+    builder.execute(false,BLACK);
     builder.destroy;
   end;
 
