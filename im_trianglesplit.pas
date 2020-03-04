@@ -585,14 +585,13 @@ PROCEDURE T_tileBuilder.execute(CONST doClear:boolean; CONST clearColor:T_rgbFlo
       chunkCount:longint;
       i:longint;
       k:longint=256;
-
   begin
     setLength(drawable,drawableCount);
     {$ifdef debugMode} writeln('Rendering ',drawableCount,' tiles'); {$endif}
     if doClear then context^.image.clearWithColor(clearColor);
     if drawableCount>0 then begin
       context^.clearQueue;
-      chunkCount:=context^.image.chunksInMap-1;
+      chunkCount:=context^.image.chunksInMap;
       i:=0;
       while (i<chunkCount) and not(context^.cancellationRequested) do begin new(todo,create(drawable,i,@(context^.image))); context^.enqueue(todo); i+=k; end;
       while k>1 do begin
