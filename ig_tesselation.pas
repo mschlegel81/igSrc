@@ -118,8 +118,22 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
     PROCEDURE addFibQuad(CONST i0,i1,i2,i3:longint); inline;
       begin tileBuilder.addQuad(fibPoint(i0),fibPoint(i1),fibPoint(i2),fibPoint(i3),color,scanColor); end;
 
-    VAR i:longint;
+    FUNCTION maxSqrRadius:longint;
+      VAR box:T_boundingBox;
+          f:double;
+      begin
+        box:=scaler.getWorldBoundingBox;
+        f:=max(box.x0*box.x0,box.x1*box.x1)+
+           max(box.y0*box.y0,box.y1*box.y1);
+        if f<10 then result:=11
+        else if f>1004180 then result:=1004180
+        else result:=ceil(result);
+      end;
+
+    VAR i,imax:longint;
     begin
+
+      imax:=maxSqrRadius;
       addFibTriangle(1, 2, 3);
       addFibTriangle(1, 4, 2);
       addFibTriangle(2,10, 5);
@@ -132,28 +146,40 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
 
       for i:=     1+1 to      1+   8 do addFibTriangle(i,i+   5,i+  13);
       for i:=     1+1 to     18      do addFibQuad    (i,i+  13,i+  21,i+   8);
+      if imax<   18 then exit;
       for i:=    18+1 to     18+  13 do addFibTriangle(i,i+  21,i+   8);
       for i:=    18+1 to     67      do addFibQuad    (i,i+  13,i+  34,i+  21);
+      if imax<   67 then exit;
       for i:=    67+1 to     67+  21 do addFibTriangle(i,i+  13,i+  34);
       for i:=    67+1 to    187      do addFibQuad    (i,i+  34,i+  55,i+  21);
+      if imax<  187 then exit;
       for i:=   187+1 to    187+  34 do addFibTriangle(i,i+  55,i+  21);
       for i:=   187+1 to    508      do addFibQuad    (i,i+  34,i+  89,i+  55);
+      if imax<  508 then exit;
       for i:=   508+1 to    508+  55 do addFibTriangle(i,i+  34,i+  89);
       for i:=   508+1 to   1360      do addFibQuad    (i,i+  89,i+ 144,i+  55);
+      if imax< 1360 then exit;
       for i:=  1360+1 to   1360+  89 do addFibTriangle(i,i+ 144,i+  55);
       for i:=  1360+1 to   3610      do addFibQuad    (i,i+  89,i+ 233,i+ 144);
+      if imax< 3610 then exit;
       for i:=  3610+1 to   3610+ 144 do addFibTriangle(i,i+  89,i+ 233);
       for i:=  3610+1 to   9530      do addFibQuad    (i,i+ 233,i+ 377,i+ 144);
+      if imax< 9530 then exit;
       for i:=  9530+1 to   9530+ 233 do addFibTriangle(i,i+ 377,i+ 144);
       for i:=  9530+1 to  25080      do addFibQuad    (i,i+ 233,i+ 610,i+ 377);
+      if imax<1825080 then exit;
       for i:= 25080+1 to  25080+ 377 do addFibTriangle(i,i+ 233,i+ 610);
       for i:= 25080+1 to  65871      do addFibQuad    (i,i+ 610,i+ 987,i+ 377);
+      if imax<65871 then exit;
       for i:= 65871+1 to  65871+ 610 do addFibTriangle(i,i+ 987,i+ 377);
       for i:= 65871+1 to 172793      do addFibQuad    (i,i+ 610,i+1597,i+ 987);
+      if imax<172793 then exit;
       for i:=172793+1 to 172793+ 987 do addFibTriangle(i,i+ 610,i+1597);
       for i:=172793+1 to 452929      do addFibQuad    (i,i+1597,i+2584,i+ 987);
+      if imax<452929 then exit;
       for i:=452929+1 to 452929+1597 do addFibTriangle(i,i+2584,i+ 987);
       for i:=452929+1 to 997415      do addFibQuad    (i,i+1597,i+4181,i+2584);
+      if imax<997415 then exit;
       for i:=997415+1 to 997415+2584 do addFibTriangle(i,i+1597,i+4181);
     end;
 

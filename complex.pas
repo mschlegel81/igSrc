@@ -76,6 +76,9 @@ FUNCTION tan(CONST x:T_Complex):T_Complex; inline;
 FUNCTION isValid(CONST c:T_Complex):boolean; inline;
 
 FUNCTION bbIntersect(CONST b1,b2:T_boundingBox):T_boundingBox;
+FUNCTION allOutside(CONST b:T_boundingBox; CONST p0,p1,p2      :T_Complex):boolean;
+FUNCTION allOutside(CONST b:T_boundingBox; CONST p0,p1,p2,p3   :T_Complex):boolean;
+FUNCTION allOutside(CONST b:T_boundingBox; CONST p0,p1,p2,p3,p4,p5:T_Complex):boolean;
 
 IMPLEMENTATION
 FUNCTION abs(CONST x:double):double;
@@ -268,6 +271,30 @@ FUNCTION bbIntersect(CONST b1,b2:T_boundingBox):T_boundingBox;
   begin
     result.x0:=max(b1.x0,b2.x0); result.y0:=max(b1.y0,b2.y0);
     result.x1:=min(b1.x1,b2.x1); result.y1:=min(b1.y1,b2.y1);
+  end;
+
+FUNCTION allOutside(CONST b:T_boundingBox; CONST p0,p1,p2      :T_Complex):boolean;
+  begin
+    result:=(max(p0.re,max(p1.re,p2.re))<b.x0) or
+            (min(p0.re,min(p1.re,p2.re))>b.x1) or
+            (max(p0.im,max(p1.im,p2.im))<b.y0) or
+            (min(p0.im,min(p1.im,p2.im))>b.y1);
+  end;
+
+FUNCTION allOutside(CONST b:T_boundingBox; CONST p0,p1,p2,p3   :T_Complex):boolean;
+  begin
+    result:=(max(p0.re,max(p1.re,max( p2.re,p3.re)))<b.x0) or
+            (min(p0.re,min(p1.re,min( p2.re,p3.re)))>b.x1) or
+            (max(p0.im,max(p1.im,max( p2.im,p3.im)))<b.y0) or
+            (min(p0.im,min(p1.im,min( p2.im,p3.im)))>b.y1);
+  end;
+
+FUNCTION allOutside(CONST b:T_boundingBox; CONST p0,p1,p2,p3,p4,p5:T_Complex):boolean;
+  begin
+    result:=(max(p0.re,max(p1.re,max( p2.re,max(p3.re,max(p4.re,p5.re)))))<b.x0) or
+            (min(p0.re,min(p1.re,min( p2.re,min(p3.re,min(p4.re,p5.re)))))>b.x1) or
+            (max(p0.im,max(p1.im,max( p2.im,max(p3.im,max(p4.im,p5.im)))))<b.y0) or
+            (min(p0.im,min(p1.im,min( p2.im,min(p3.im,min(p4.im,p5.im)))))>b.y1);
   end;
 
 //T_scaler:======================================================================================================================================

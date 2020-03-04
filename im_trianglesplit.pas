@@ -426,7 +426,7 @@ PROCEDURE T_tileBuilder.addTriangle(CONST a, b, c: T_Complex; color: T_rgbFloatC
       ca_shifted:T_complexPair;
       a_,b_,c_,X:T_Complex;
   begin
-    if almostEqual(a,b) or almostEqual(b,c) or almostEqual(c,a) then exit;
+    if almostEqual(a,b) or almostEqual(b,c) or almostEqual(c,a) or allOutside(imageBoundingBox,a,b,c) then exit;
     if scanColor then begin
       with info.base do begin
         p0:=a; p1:=b; p2:=c; p3:=a; isTriangle:=true;
@@ -467,7 +467,7 @@ PROCEDURE T_tileBuilder.addQuad(CONST a, b, c, d: T_Complex; color: T_rgbFloatCo
       a_,b_,c_,d_,X:T_Complex;
       info:T_triangleInfo;
   begin
-    if crossProduct(a,b,c.re,c.im)+crossProduct(b,c,d.re,d.im)<areaEpsilon then exit;
+    if (crossProduct(a,b,c.re,c.im)+crossProduct(b,c,d.re,d.im)<areaEpsilon) or allOutside(imageBoundingBox,a,b,c,d) then exit;
     if scanColor then begin
       with info.base do begin
         p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false;
@@ -521,10 +521,10 @@ PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d, e, f: T_Complex;
       w1,w2:longint;
 
   begin
-    if crossProduct(a,b,c.re,c.im)+
-       crossProduct(c,d,e.re,e.im)+
-       crossProduct(e,f,a.re,a.im)+
-       crossProduct(c,e,a.re,a.im)<areaEpsilon then exit;
+    if (crossProduct(a,b,c.re,c.im)+
+        crossProduct(c,d,e.re,e.im)+
+        crossProduct(e,f,a.re,a.im)+
+        crossProduct(c,e,a.re,a.im)<areaEpsilon) or allOutside(imageBoundingBox,a,b,c,d,e,f) then exit;
     if scanColor then begin
       with half1.base do begin p0:=a; p1:=b; p2:=c; p3:=d; isTriangle:=false; end;
       with half2.base do begin p0:=d; p1:=e; p2:=f; p3:=a; isTriangle:=false; end;
