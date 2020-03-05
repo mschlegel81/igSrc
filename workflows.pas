@@ -494,9 +494,17 @@ PROCEDURE T_simpleWorkflow.appendSaveStep(CONST savingToFile: string;
   end;
 
 PROCEDURE T_simpleWorkflow.executeAsTodo;
+  VAR i:longint;
+      todoDir:string;
   begin
+    todoDir:=ExtractFileDir(config.workflowFilename);
+    for i:=0 to stepCount-1 do
+    if (step[i]^.operation^.readsFile<>'') or (step[i]^.operation^.writesFile<>'') then begin
+                         step[i]^.operation^.getSimpleParameterValue^.fileName:=
+      ExpandFileNameUTF8(step[i]^.operation^.getSimpleParameterValue^.fileName,todoDir);
+      step[i]^.refreshSpecString;
+    end;
     if not(isValid) then exit;
-    SetCurrentDir(ExtractFileDir(config.workflowFilename));
     if step[stepCount-1]^.operation^.writesFile='' then begin
       messageQueue^.Post('Invalid todo workflow. The last operation must be a save statement.');
       exit;
