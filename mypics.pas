@@ -191,7 +191,7 @@ FUNCTION T_colChunk.markAlias(CONST globalTol:single):boolean;
     result:=false;
     for i:=0 to width-1 do for j:=0 to height-1 do tempColor[i,j]:=combinedColor(col[i,j]);
 
-    for i:=0 to width-1 do for j:=0 to height-1 do begin
+    for i:=0 to width-1 do for j:=0 to height-1 do if col[i,j].antialiasingMask<64 then begin
       localRefFactor:=(col[i,j].antialiasingMask and 254)/254;
       localTol:=(1+localRefFactor*localRefFactor)*globalTol;
       localError:=getErrorAt(i,j);
