@@ -168,7 +168,7 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
       r.mean:=s*(1/k);
       if k=0
       then r.variance:=-1
-      else r.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue])*k;
+      else r.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
     end;
 
   PROCEDURE splitRectangle;
