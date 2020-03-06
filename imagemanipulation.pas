@@ -231,7 +231,7 @@ PROCEDURE deleteFile_impl(CONST parameters:T_parameterValue; CONST context:P_abs
 
 CONSTRUCTOR T_deleteFileMeta.create;
   begin
-    inherited create(imc_misc,newParameterDescription('delete',pt_fileName)^.setDefaultValue('123.todo'),@deleteFile_impl,sok_inputIndependent);
+    inherited create(imc_misc,newParameterDescription('delete',pt_fileName)^.setDefaultValue('123'+lowercase(C_todoExtension)),@deleteFile_impl,sok_inputIndependent);
   end;
 
 FUNCTION T_deleteFileMeta.getOperationToDeleteFile(CONST fileName: string): P_simpleImageOperation;

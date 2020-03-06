@@ -469,10 +469,10 @@ PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWi
     append(temporaryWorkflow,saveStep^.toString(tsm_withNiceParameterName));
     dispose(saveStep,destroy);
     todoBase:=ExtractFileNameWithoutExt(savingToFile);
-    todoName:=todoBase+'.todo';
+    todoName:=todoBase+lowercase(C_todoExtension);
     while fileExists(todoName) do begin
       inc(counter);
-      todoName:=todoBase+'_'+intToStr(counter)+'.todo';
+      todoName:=todoBase+'_'+intToStr(counter)+lowercase(C_todoExtension);
     end;
     messageQueue^.Post('Writing todo to file: '+todoName,false);
     writeFile(todoName,temporaryWorkflow);

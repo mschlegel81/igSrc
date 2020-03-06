@@ -48,7 +48,10 @@ PROCEDURE fillRotate_impl(CONST parameters:T_parameterValue; CONST context:P_abs
   begin context^.image.resize(targetDimensions(parameters,context),res_cropRotate); end;
 
 PROCEDURE crop_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.crop(parameters.f0,parameters.f1,parameters.f2,parameters.f3); end;
+  begin
+    context^.image.crop(parameters.f0,parameters.f1,parameters.f2,parameters.f3);
+    //TODO: limit output resolution
+  end;
 
 PROCEDURE zoom_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin context^.image.zoom(parameters.f0); end;
@@ -60,10 +63,16 @@ PROCEDURE flop_impl(CONST parameters:T_parameterValue; CONST context:P_abstractW
   begin context^.image.flop; end;
 
 PROCEDURE rotL_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.rotLeft; end;
+  begin
+    context^.image.rotLeft;
+    //TODO: limit output resolution
+  end;
 
 PROCEDURE rotR_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.rotRight; end;
+  begin
+    context^.image.rotRight;
+    //TODO: limit output resolution
+  end;
 
 PROCEDURE rotDegrees_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin context^.image.rotate(parameters.f0); end;

@@ -12,11 +12,6 @@ USES dos,sysutils,Interfaces,Classes, ExtCtrls, Graphics, IntfGraphics, GraphTyp
 {$define include_interface}
 
 CONST CHUNK_BLOCK_SIZE =64;
-      JPG_EXT='.JPG';
-      BMP_EXT='.BMP';
-      PNG_EXT='.PNG';
-      RAW_EXT='.VRAW';
-      SUPPORTED_IMAGE_TYPES:array[0..3] of string=(JPG_EXT,BMP_EXT,PNG_EXT,RAW_EXT);
 TYPE
   T_resizeStyle=(res_exact,
                  res_cropToFill,
@@ -236,22 +231,25 @@ PROCEDURE T_rawImage.copyToImage(CONST srcRect: TRect; VAR destImage: TImage);
       pix:PByte;
   begin
     ScanLineImage:=TLazIntfImage.create(srcRect.Right-srcRect.Left,srcRect.Bottom-srcRect.top);
-    ImgFormatDescription.Init_BPP24_B8G8R8_BIO_TTB(srcRect.Right-srcRect.Left,srcRect.Bottom-srcRect.top);
-    ImgFormatDescription.ByteOrder:=riboMSBFirst;
-    ScanLineImage.DataDescription:=ImgFormatDescription;
-    for y:=0 to srcRect.Bottom-srcRect.top-1 do begin
-      pix:=ScanLineImage.GetDataLineStart(y);
-      for x:=0 to srcRect.Right-srcRect.Left-1 do begin
-        pc:=getPixel(srcRect.Left+x,srcRect.top+y);
-        move(pc,(pix+3*x)^,3);
+    try
+      ImgFormatDescription.Init_BPP24_B8G8R8_BIO_TTB(srcRect.Right-srcRect.Left,srcRect.Bottom-srcRect.top);
+      ImgFormatDescription.ByteOrder:=riboMSBFirst;
+      ScanLineImage.DataDescription:=ImgFormatDescription;
+      for y:=0 to srcRect.Bottom-srcRect.top-1 do begin
+        pix:=ScanLineImage.GetDataLineStart(y);
+        for x:=0 to srcRect.Right-srcRect.Left-1 do begin
+          pc:=getPixel(srcRect.Left+x,srcRect.top+y);
+          move(pc,(pix+3*x)^,3);
+        end;
       end;
+      destImage.picture.Bitmap.setSize(srcRect.Right-srcRect.Left,srcRect.Bottom-srcRect.top);
+      tempIntfImage:=destImage.picture.Bitmap.CreateIntfImage;
+      tempIntfImage.CopyPixels(ScanLineImage);
+      destImage.picture.Bitmap.LoadFromIntfImage(tempIntfImage);
+      tempIntfImage.free;
+    finally
+      ScanLineImage.free;
     end;
-    destImage.picture.Bitmap.setSize(srcRect.Right-srcRect.Left,srcRect.Bottom-srcRect.top);
-    tempIntfImage:=destImage.picture.Bitmap.CreateIntfImage;
-    tempIntfImage.CopyPixels(ScanLineImage);
-    destImage.picture.Bitmap.LoadFromIntfImage(tempIntfImage);
-    tempIntfImage.free;
-    ScanLineImage.free;
   end;
 
 PROCEDURE T_rawImage.copyToImage(VAR destImage: TImage);

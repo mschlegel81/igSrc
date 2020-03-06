@@ -2,8 +2,13 @@ UNIT myParams;
 INTERFACE
 USES myColors,myGenerics,math,myStringUtil,sysutils;
 CONST
-  IMAGE_TYPE_EXTENSIONS :array[0..4] of string=('.JPG','.JPEG','.PNG','.BMP','.VRAW');
-  SIZE_LIMITABLE_EXTENSION='.JPG';
+  JPG_EXT='.JPG';
+  BMP_EXT='.BMP';
+  PNG_EXT='.PNG';
+  RAW_EXT='.VRAW';
+  SUPPORTED_IMAGE_TYPES:array[0..3] of string=(JPG_EXT,BMP_EXT,PNG_EXT,RAW_EXT);
+
+  SIZE_LIMITABLE_EXTENSION=JPG_EXT;
 TYPE
   T_parameterType=(pt_none,
 
@@ -301,7 +306,7 @@ FUNCTION T_parameterDescription.areValuesInRange(CONST p:T_parameterValue):boole
     result:=result and (not(typ in F2_RELEVANT_PARAMETER_TYPES) or (p.F2>=minValue) and (p.F2<=maxValue));
     result:=result and (not(typ in F3_RELEVANT_PARAMETER_TYPES) or (p.F3>=minValue) and (p.F3<=maxValue));;
     case typ of
-      pt_fileName       : result:=result and isFilename(p.fileNameValue,                IMAGE_TYPE_EXTENSIONS    );
+      pt_fileName       : result:=result and isFilename(p.fileNameValue,                SUPPORTED_IMAGE_TYPES    );
       pt_jpgNameWithSize: result:=result and isFilename(p.fileNameValue,T_arrayOfString(SIZE_LIMITABLE_EXTENSION));
     end;
     for i:=0 to length(children)-1 do result:=result and getSubDescription(i)^.areValuesInRange(getSubParameter(i,p));

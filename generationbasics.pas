@@ -5,6 +5,7 @@ USES pixMaps,
      myGenerics;
 CONST
     C_workflowExtension='.WF';
+    C_todoExtension='.TODO';
     C_nullSourceOrTargetFileName='-';
     C_loadStatementName='load';
     C_resizeStatementName='resize';
