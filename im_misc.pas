@@ -168,7 +168,7 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
       r.mean:=s*(1/k);
       if k=0
       then r.variance:=-1
-      else r.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue]);
+      else r.variance:=(ss[cc_red]+ss[cc_green]+ss[cc_blue])*k;
     end;
 
   PROCEDURE splitRectangle;
@@ -220,6 +220,22 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
           rectangles[i+1     ]:=b0;
           rectangles[i+2     ]:=b1;
         end;
+        3: with rectangles[splitIdx] do begin
+          a0.x1:=round(x0+0.5*(x1-x0)); a1.x0:=a0.x1;
+          b0.y1:=round(y0+0.5*(y1-y0)); b1.y0:=b0.y1;
+          scanRectangle(a0);
+          scanRectangle(a1);
+          scanRectangle(b0);
+          scanRectangle(b1);
+          if b0.variance+b1.variance<a0.variance+a1.variance then begin
+            a0:=b0;
+            a1:=b1;
+          end;
+          i:=length(rectangles);
+          setLength(rectangles,i+1);
+          rectangles[splitIdx]:=a0;
+          rectangles[i       ]:=a1;
+        end;
         else with rectangles[splitIdx] do begin
           if x1-x0>=y1-y0 then begin
             a0.x1:=round(x0+0.5*(x1-x0)); a1.x0:=a0.x1;
@@ -234,6 +250,7 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
           rectangles[i       ]:=a1;
         end;
       end;
+
     end;
 
   VAR topEdgeLight   :double=1.1785113019775793 ;
@@ -340,7 +357,7 @@ registerSimpleOperation(imc_misc,
     .setDefaultValue('500,0,2,45')^
     .addChildParameterDescription(spa_i0,'count',pt_integer,2,200000)^
     .addEnumChildDescription(spa_i1,'split style',
-     'half split','golden section split','quadrats split')^
+     'half split','golden section split','quadrats split','half adaptive split')^
     .addChildParameterDescription(spa_f2,'border width',pt_float,0)^
     .addChildParameterDescription(spa_f3,'border angle',pt_float,0,90),
   @rectagleSplit_impl);
