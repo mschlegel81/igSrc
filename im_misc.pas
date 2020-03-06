@@ -227,7 +227,7 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
           scanRectangle(a1);
           scanRectangle(b0);
           scanRectangle(b1);
-          if b0.variance+b1.variance<a0.variance+a1.variance then begin
+          if (x1-x0)*(b0.variance+b1.variance)<(y1-y0)*(a0.variance+a1.variance) then begin
             a0:=b0;
             a1:=b1;
           end;
@@ -354,7 +354,7 @@ registerSimpleOperation(imc_misc,
   @halftone_impl);
 registerSimpleOperation(imc_misc,
   newParameterDescription('rectangleSplit',pt_2I2F)^
-    .setDefaultValue('500,0,2,45')^
+    .setDefaultValue('2000,0,1,20')^
     .addChildParameterDescription(spa_i0,'count',pt_integer,2,200000)^
     .addEnumChildDescription(spa_i1,'split style',
      'half split','golden section split','quadrats split','half adaptive split')^

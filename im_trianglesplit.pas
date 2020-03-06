@@ -787,6 +787,23 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
           setLength(tri,i+1);
           tri[toSplit]:=a0;
           tri[i      ]:=a1;
+        end;
+        3: begin
+          a0.base.p1:=a0.base.p0*0.5+a0.base.p1*0.5; a1.base.p0:=a0.base.p1;                         //a0.p0,a1.p1
+          b0.base.p2:=b0.base.p1*0.5+b0.base.p2*0.5; b1.base.p1:=b0.base.p2; b0.base.p3:=b0.base.p2; //b0.p1,b1.p2
+          c0.base.p2:=c0.base.p2*0.5+c0.base.p0*0.5; c1.base.p0:=c0.base.p2; c0.base.p3:=c0.base.p2; //c0.p0,c1.p2
+          scanTriangle(a0,imgBB,context^.image); scanTriangle(a1,imgBB,context^.image);
+          scanTriangle(b0,imgBB,context^.image); scanTriangle(b1,imgBB,context^.image);
+          scanTriangle(c0,imgBB,context^.image); scanTriangle(c1,imgBB,context^.image);
+          l :=abs(a0.base.p0-a1.base.p1);
+          l2:=abs(b0.base.p1-b1.base.p2);
+          if l*(b0.variance+b1.variance)<l2*(a0.variance+a1.variance) then begin a0:=b0; a1:=b1; l:=l2; end;
+          l2:=abs(c0.base.p0-c1.base.p2);
+          if l*(c0.variance+c1.variance)<l2*(a0.variance+a1.variance) then begin a0:=c0; a1:=c1; end;
+          i:=length(tri);
+          setLength(tri,i+1);
+          tri[toSplit]:=a0;
+          tri[i      ]:=a1;
         end
         else begin
           case edgeToSplit of
@@ -897,7 +914,7 @@ registerSimpleOperation(imc_misc,
   newParameterDescription('triangleSplit',pt_2I2F)^
     .setDefaultValue('500,0,1,20')^
     .addChildParameterDescription(spa_i0,'count',pt_integer,2,200000)^
-    .addEnumChildDescription(spa_i1,'split','half-split','quarter-split','half adaptive')^
+    .addEnumChildDescription(spa_i1,'split','half-split','quarter-split','half adaptive','half adaptive 2')^
     .addChildParameterDescription(spa_f2,'border width',pt_float,0)^
     .addChildParameterDescription(spa_f3,'border angle',pt_float,0,90),
   @triangleSplit);
