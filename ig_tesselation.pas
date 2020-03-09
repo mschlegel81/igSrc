@@ -507,7 +507,6 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
         end;
         6..9: //spiral_triangles, spiral_hexagons, double_spiral_triangles, double_spiral_hexagons
         begin
-          //TODO: Near the singularity there is a "hole" where tiny polygons are rejected due to "negligible size"
           if geometryKind in [6,7]
           then circleProvider.create(spiralParameter,1, 0,0,1)
           else circleProvider.create(spiralParameter,1,-1,1,1);

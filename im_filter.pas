@@ -167,6 +167,7 @@ PROCEDURE nlm_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWo
     if parameters.f1<1E-10 then exit;
     temp.create(context^.image);
     pIn:=temp.rawData;
+    context^.clearQueue;
     for y:=0 to temp.dimensions.height-1 do if y and 15=0 then begin
       task:=nil;
       new(task,create(parameters.i0,parameters.f1,pIn,y));

@@ -33,7 +33,7 @@ TYPE
       PROCEDURE saveToFile(CONST fileName:string);
       PROCEDURE saveAsTodo(CONST savingToFile:string; CONST savingWithSizeLimit:longint);
       PROCEDURE appendSaveStep(CONST savingToFile:string; CONST savingWithSizeLimit:longint);
-      PROCEDURE executeAsTodo;
+      FUNCTION executeAsTodo:boolean;
 
       FUNCTION workflowType:T_workflowType;
       FUNCTION proposedImageFileName(CONST resString:ansistring):string;
@@ -42,6 +42,7 @@ TYPE
 
       FUNCTION isValid: boolean; virtual;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual;
+      FUNCTION limitImageSize:boolean; virtual;
   end;
 
   P_editorWorkflow=^T_editorWorkflow;
@@ -79,6 +80,7 @@ TYPE
       PROCEDURE confirmEditing;
       FUNCTION isValid: boolean; virtual;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual;
+      FUNCTION limitImageSize:boolean; virtual;
   end;
 
   T_standaloneWorkflow=object(T_simpleWorkflow)
@@ -234,6 +236,11 @@ FUNCTION T_generateImageWorkflow.isValid: boolean;
 FUNCTION T_generateImageWorkflow.limitedDimensionsForResizeStep(CONST tgtDim: T_imageDimensions): T_imageDimensions;
   begin
     result:=relatedEditor^.config.limitedDimensionsForResizeStep(tgtDim);
+  end;
+
+FUNCTION T_generateImageWorkflow.limitImageSize: boolean;
+  begin
+    result:=relatedEditor^.config.limitImageSize(image);
   end;
 
 PROCEDURE T_simpleWorkflow.headlessWorkflowExecution;
@@ -493,7 +500,7 @@ PROCEDURE T_simpleWorkflow.appendSaveStep(CONST savingToFile: string;
     if not(steps[k]^.isValid) then raise Exception.create('The automatically generated save step is invalid');
   end;
 
-PROCEDURE T_simpleWorkflow.executeAsTodo;
+FUNCTION T_simpleWorkflow.executeAsTodo: boolean;
   VAR i:longint;
       todoDir:string;
   begin
@@ -504,13 +511,14 @@ PROCEDURE T_simpleWorkflow.executeAsTodo;
       ExpandFileNameUTF8(step[i]^.operation^.getSimpleParameterValue^.fileName,todoDir);
       step[i]^.refreshSpecString;
     end;
-    if not(isValid) then exit;
+    if not(isValid) then exit(false);
     if step[stepCount-1]^.operation^.writesFile='' then begin
       messageQueue^.Post('Invalid todo workflow. The last operation must be a save statement.');
-      exit;
+      exit(false);
     end;
     addStep(deleteOp.getOperationToDeleteFile(config.workflowFilename));
     executeWorkflowInBackground(false);
+    result:=true;
   end;
 
 PROCEDURE T_editorWorkflow.stepChanged(CONST index: longint);
@@ -666,6 +674,11 @@ FUNCTION T_simpleWorkflow.isValid: boolean;
 FUNCTION T_simpleWorkflow.limitedDimensionsForResizeStep(CONST tgtDim: T_imageDimensions): T_imageDimensions;
   begin
     result:=config.limitedDimensionsForResizeStep(tgtDim);
+  end;
+
+FUNCTION T_simpleWorkflow.limitImageSize: boolean;
+  begin
+    result:=config.limitImageSize(image);
   end;
 
 PROCEDURE T_simpleWorkflow.configChanged;

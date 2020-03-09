@@ -118,6 +118,7 @@ TYPE
       PROCEDURE executeWorkflowInBackground(CONST preview: boolean);
       FUNCTION isValid: boolean; virtual; abstract;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual; abstract;
+      FUNCTION limitImageSize:boolean; virtual; abstract;
       FUNCTION isEditorWorkflow:boolean; virtual;
   end;
 
