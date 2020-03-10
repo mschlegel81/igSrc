@@ -474,7 +474,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
         end;
         prepareColorList;
-        if length(result.sample)>40000*27 then begin
+        if length(result.sample)>10000*27 then begin
           setLength(arr,context^.image.pixelCount);
           for i:=0 to context^.image.pixelCount-1 do begin
             tmp:=projectedColor(raw[i]);
@@ -483,7 +483,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
             arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
           end;
           prepareColorList;
-        end else if length(result.sample)>40000*8 then begin
+        end else if length(result.sample)>10000*8 then begin
           setLength(arr,context^.image.pixelCount);
           for i:=0 to context^.image.pixelCount-1 do begin
             tmp:=projectedColor(raw[i]);
@@ -594,7 +594,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       for i:=0 to length(buckets)-1 do buckets[i].spread:=averageColor(buckets[i]);
       nextDefaultColor:=0;
       i:=0;
-      while redistributeSamples and (i<50) and not(context^.cancellationRequested) do inc(i);
+      while redistributeSamples and (i<100) and not(context^.cancellationRequested) do inc(i);
       setLength(colorTable,parameters.i0);
       for i:=0 to length(colorTable)-1 do colorTable[i]:=buckets[i].spread;
     end;
