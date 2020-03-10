@@ -609,14 +609,24 @@ FUNCTION T_editorWorkflow.isEditorWorkflow: boolean;
   end;
 
 FUNCTION T_simpleWorkflow.workflowType: T_workflowType;
+  VAR startFixed:boolean;
+      endFixed  :boolean;
   begin
     if (length(steps)<=0) or not(isValid) then exit(wft_empty_or_unknown);
-    if not(step[0]^.operation^.dependsOnImageBefore) then exit(wft_generative);
-    result:=wft_manipulative;
+    startFixed:=(steps[0]^.operation^.readsFile<>'') or isResizeOperation(steps[0]^.operation);
+    if startFixed then begin
+      endFixed  :=(steps[stepCount-1]^.operation^.writesFile<>'');
+      if endFixed
+      then result:=wft_fixated
+      else result:=wft_halfFix;
+    end else begin
+      if step[0]^.operation^.dependsOnImageBefore
+      then result:=wft_manipulative
+      else result:=wft_generative;
+    end;
   end;
 
-FUNCTION T_simpleWorkflow.proposedImageFileName(CONST resString: ansistring
-  ): string;
+FUNCTION T_simpleWorkflow.proposedImageFileName(CONST resString: ansistring): string;
   VAR i:longint;
       newExt:ansistring;
   begin

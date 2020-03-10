@@ -1,6 +1,6 @@
 UNIT im_geometry;
 INTERFACE
-USES pixMaps,imageManipulation;
+USES pixMaps,imageManipulation,imageContexts;
 CONST OP_NAME_CROP='crop';
 
 TYPE
@@ -12,8 +12,9 @@ end;
 
 VAR cropMeta:^T_cropMeta;
 FUNCTION canParseResolution(CONST s:string; OUT dim:T_imageDimensions):boolean;
+FUNCTION isResizeOperation(CONST op:P_imageOperation):boolean;
 IMPLEMENTATION
-USES imageContexts,myParams,mypics;
+USES myParams,mypics;
 VAR pd_resize:P_parameterDescription=nil;
 
 FUNCTION canParseResolution(CONST s: string; OUT dim: T_imageDimensions): boolean;
@@ -22,6 +23,11 @@ FUNCTION canParseResolution(CONST s: string; OUT dim: T_imageDimensions): boolea
     p.createToParse(pd_resize,s);
     dim:=imageDimensions(p.i0,p.i1);
     result:=p.isValid;
+  end;
+
+FUNCTION isResizeOperation(CONST op:P_imageOperation):boolean;
+  begin
+    result:= op^.meta^.getSimpleParameterDescription=pd_resize;
   end;
 
 FUNCTION targetDimensions(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow):T_imageDimensions;
