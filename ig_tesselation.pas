@@ -16,6 +16,7 @@ TYPE
     BorderWidth,
     borderAngle: double;
     color:T_rgbFloatColor;
+    moebiusA,moebiusB,moebiusC,moebiusD:T_Complex;
 
     CONSTRUCTOR create;
     PROCEDURE resetParameters(CONST style:longint); virtual;
@@ -29,47 +30,53 @@ IMPLEMENTATION
 USES ig_circlespirals,im_triangleSplit,math;
 
 CONSTRUCTOR T_tilesAlgorithm.create;
-  CONST geometryNames:array[0..12] of string=('squares',
-                                             'triangles',
-                                             'hexagons',
-                                             'archimedic',
-                                             'demiregular_a',
-                                             'demiregular_b',
-                                             'spiral_triangles',
-                                             'spiral_hexagons',
-                                             'double_spiral_triangles',
-                                             'double_spiral_hexagons',
-                                             'sunflower',
-                                             'fishbone',
-                                             'Conway');
+  CONST geometryNames:array[0..10] of string=({ 0} 'squares',
+                                              { 1} 'triangles',
+                                              { 2} 'hexagons',
+                                              { 3} 'archimedic',
+                                              { 4} 'demiregular_a',
+                                              { 5} 'demiregular_b',
+                                              { 6} 'spiral_triangles',
+                                              { 7} 'spiral_hexagons',
+                                              { 8} 'sunflower',
+                                              { 9} 'fishbone',
+                                              {10} 'Conway');
         colorSourceNames:array[0..1] of string=('fixed',
                                                 'by_input');
 
   begin
     inherited create;
     addParameter('geometry',pt_enum,0,12)^.setEnumValues(geometryNames);
-    addParameter('spiral_parameter',pt_integer,2,100);
     addParameter('coloring',pt_enum,0,1)^.setEnumValues(colorSourceNames);
     addParameter('color'   ,pt_color);
     addParameter('border_width',pt_float,0);
     addParameter('border_angle',pt_float,0,90);
+    addParameter('spiral_parameter',pt_integer,2,100);
+    addParameter('mt_a',pt_2floats);
+    addParameter('mt_b',pt_2floats);
+    addParameter('mt_c',pt_2floats);
+    addParameter('mt_d',pt_2floats);
     resetParameters(0);
   end;
 
 PROCEDURE T_tilesAlgorithm.resetParameters(CONST style: longint);
   begin
     inherited resetParameters(style);
-    spiralParameter:=20;
     geometryKind:=0;
     colorStyle:=0;
     BorderWidth:=1;
     borderAngle:=20;
     color:=WHITE*0.5;
+    spiralParameter:=20;
+    moebiusA:=1;
+    moebiusB:=0;
+    moebiusC:=0;
+    moebiusD:=1;
   end;
 
 FUNCTION T_tilesAlgorithm.numberOfParameters: longint;
   begin
-    result:=inherited numberOfParameters+6;
+    result:=inherited numberOfParameters+10;
   end;
 
 PROCEDURE T_tilesAlgorithm.setParameter(CONST index: byte; CONST value: T_parameterValue);
@@ -77,11 +84,15 @@ PROCEDURE T_tilesAlgorithm.setParameter(CONST index: byte; CONST value: T_parame
     if index<inherited numberOfParameters then inherited setParameter(index,value)
     else case byte(index-inherited numberOfParameters) of
       0: geometryKind   :=value.i0;
-      1: spiralParameter:=value.i0;
-      2: colorStyle     :=value.i0;
-      3: color          :=value.color;
-      4: BorderWidth    :=value.f0;
-      5: borderAngle    :=value.f0;
+      1: colorStyle     :=value.i0;
+      2: color          :=value.color;
+      3: BorderWidth    :=value.f0;
+      4: borderAngle    :=value.f0;
+      5: spiralParameter:=value.i0;
+      6: moebiusA:=value.f0+II*value.f1;
+      7: moebiusB:=value.f0+II*value.f1;
+      8: moebiusC:=value.f0+II*value.f1;
+      9: moebiusD:=value.f0+II*value.f1;
     end;
   end;
 
@@ -90,11 +101,15 @@ FUNCTION T_tilesAlgorithm.getParameter(CONST index: byte): T_parameterValue;
     if index<inherited numberOfParameters then exit(inherited getParameter(index));
     case byte(index-inherited numberOfParameters) of
       0: result.createFromValue(parameterDescription(inherited numberOfParameters+0),geometryKind   );
-      1: result.createFromValue(parameterDescription(inherited numberOfParameters+1),spiralParameter);
-      2: result.createFromValue(parameterDescription(inherited numberOfParameters+2),colorStyle     );
-      3: result.createFromValue(parameterDescription(inherited numberOfParameters+3),color          );
-      4: result.createFromValue(parameterDescription(inherited numberOfParameters+4),BorderWidth    );
-      5: result.createFromValue(parameterDescription(inherited numberOfParameters+5),borderAngle    );
+      1: result.createFromValue(parameterDescription(inherited numberOfParameters+1),colorStyle     );
+      2: result.createFromValue(parameterDescription(inherited numberOfParameters+2),color          );
+      3: result.createFromValue(parameterDescription(inherited numberOfParameters+3),BorderWidth    );
+      4: result.createFromValue(parameterDescription(inherited numberOfParameters+4),borderAngle    );
+      5: result.createFromValue(parameterDescription(inherited numberOfParameters+5),spiralParameter);
+      6: result.createFromValue(parameterDescription(inherited numberOfParameters+6),moebiusA.re,moebiusA.im);
+      7: result.createFromValue(parameterDescription(inherited numberOfParameters+7),moebiusB.re,moebiusB.im);
+      8: result.createFromValue(parameterDescription(inherited numberOfParameters+8),moebiusC.re,moebiusC.im);
+      9: result.createFromValue(parameterDescription(inherited numberOfParameters+9),moebiusD.re,moebiusD.im);
     end;
   end;
 
@@ -505,12 +520,10 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
               color,scanColor);
           end;
         end;
-        6..9: //spiral_triangles, spiral_hexagons, double_spiral_triangles, double_spiral_hexagons
+        6..7: //spiral_triangles, spiral_hexagons
         begin
-          if geometryKind in [6,7]
-          then circleProvider.create(spiralParameter,1, 0,0,1)
-          else circleProvider.create(spiralParameter,1,-1,1,1);
-          if geometryKind in [6,8] then for i:=-10000 to 10000 do begin
+          circleProvider.create(spiralParameter,moebiusA,moebiusB,moebiusC,moebiusD);
+          if geometryKind=6 then for i:=-10000 to 10000 do begin
             if circleProvider.getQuad(i,scaler,p0,p1,p2,p3)
             then begin
               tileBuilder.addTriangle(p0,p2,p1,color,scanColor);
@@ -522,8 +535,8 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
           end;
           circleProvider.destroy;
         end;
-        10:initSunflowerGeometry;
-        11:begin
+        8:initSunflowerGeometry;
+        9:begin
           i0:=floor(world.x0/8)-1;
           i1:=ceil (world.x1/8);
           j0:=floor(world.y0/2)-2;
@@ -543,7 +556,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
                                 color,scanColor);
           end;
         end;
-        12: initConwayGeometry;
+        10: initConwayGeometry;
       end;
 
     end;
