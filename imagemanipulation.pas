@@ -49,7 +49,7 @@ T_deleteFileMeta=object(T_simpleImageOperationMeta)
   public
     CONSTRUCTOR create;
     FUNCTION getOperationToDeleteFile(CONST fileName:string):P_simpleImageOperation;
-end;
+  end;
 
 FUNCTION registerSimpleOperation(CONST cat_:T_imageManipulationCategory; CONST sig:P_parameterDescription; CONST op:F_simpleImageOperation; CONST kind:T_simpleOperationKind=sok_inputDependent):P_simpleImageOperationMeta;
 FUNCTION canParseSizeLimit(CONST s:string; OUT size:longint):boolean;
