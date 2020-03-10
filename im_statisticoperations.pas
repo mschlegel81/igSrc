@@ -246,7 +246,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
   (252,227,101),(214,171,116),(91,219,249),(250,105,153),(241,110,100),(52,157,3),(5,166,246),(201,165,84),
   (203,93,112),(93,55,117),(123,12,205),(202,247,44),(79,23,77),(152,251,236),(99,105,58),(50,241,72),
   (35,6,235),(3,230,236),(133,128,89),(77,199,91),(193,85,138),(137,95,114),(66,57,224),(16,0,102));
-  VAR colorTable:array of T_rgbFloatColor;
+  TYPE T_colorTable=array of T_rgbFloatColor;
+  VAR colorTable:T_colorTable;
   PROCEDURE standardAdaptiveColors;
     VAR i:longint;
         tree:T_colorTree;
@@ -393,24 +394,29 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       end;
 
     VAR buckets:T_colorLists;
-    PROCEDURE splitOneList;
+    FUNCTION splitOneList:boolean;
       VAR i:longint;
           toSplit:longint=0;
 
       begin
         for i:=1 to length(buckets)-1 do if buckets[i].maxSpread>buckets[toSplit].maxSpread then toSplit:=i;
+        if buckets[toSplit].maxSpread<0 then exit(false) else result:=true;
         i:=length(buckets);
         setLength(buckets,i+1);
         split(buckets[toSplit],buckets[i]);
+        if length(buckets[toSplit].sample)=0 then begin
+          buckets[toSplit]:=buckets[i];
+          buckets[toSplit].maxSpread:=-1;
+          setLength(buckets,i);
+        end else if length(buckets[i].sample)=0 then begin
+          buckets[toSplit].maxSpread:=-1;
+          setLength(buckets,i);
+        end;
       end;
 
-    PROCEDURE splitAllLists;
+    PROCEDURE dropEmptyBuckets;
       VAR i,i0:longint;
       begin
-        i0:=length(buckets);
-        setLength(buckets,i0+i0);
-        for i:=0 to i0-1 do split(buckets[i],buckets[i0+i]);
-        //Check if an empty bucket has been created
         i0:=0;
         for i:=0 to length(buckets)-1 do if length(buckets[i].sample)>0 then begin
           if i0<>i then buckets[i0]:=buckets[i];
@@ -419,40 +425,82 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         if i0<>length(buckets) then setLength(buckets,i0);
       end;
 
+    PROCEDURE splitAllLists;
+      VAR i,i0:longint;
+      begin
+        i0:=length(buckets);
+        setLength(buckets,i0+i0);
+        for i:=0 to i0-1 do split(buckets[i],buckets[i0+i]);
+        dropEmptyBuckets;
+      end;
+
     FUNCTION firstBucket:T_colorList;
       VAR raw:P_floatColor;
           i,j:longint;
           tmp:T_rgbColor;
           arr:T_arrayOfLongint;
+      PROCEDURE prepareColorList; inline;
+        begin
+          sort(arr);
+          j:=0; i:=0;
+          setLength(result.sample,length(arr));
+          tmp[cc_red  ]:= arr[i]         and 255;
+          tmp[cc_green]:=(arr[i] shr  8) and 255;
+          tmp[cc_blue ]:= arr[i] shr 16;
+          result.sample[0].color:=tmp; inc(i);
+          result.sample[0].count:=1;
+          while i<length(arr) do begin
+            if arr[i]=arr[i-1] then inc(result.sample[j].count)
+            else begin
+              inc(j);
+              tmp[cc_red  ]:= arr[i]         and 255;
+              tmp[cc_green]:=(arr[i] shr  8) and 255;
+              tmp[cc_blue ]:= arr[i] shr 16;
+              result.sample[j].color:=tmp;
+              result.sample[j].count:=1;
+            end;
+            inc(i);
+          end;
+          setLength(arr,0);
+          setLength(result.sample,j+1);
+        end;
+
+      VAR channel:T_colorChannel;
       begin
         raw:=context^.image.rawData;
         setLength(arr,context^.image.pixelCount);
         for i:=0 to context^.image.pixelCount-1 do begin
-          tmp:=raw[i];
+          tmp:=projectedColor(raw[i]);
           arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
         end;
-        sort(arr);
-        j:=0; i:=0;
-        setLength(result.sample,length(arr));
-        tmp[cc_red  ]:= arr[i]         and 255;
-        tmp[cc_green]:=(arr[i] shr  8) and 255;
-        tmp[cc_blue ]:= arr[i] shr 16;
-        result.sample[0].color:=tmp; inc(i);
-        result.sample[0].count:=1;
-        while i<length(arr) do begin
-          if arr[i]=arr[i-1] then inc(result.sample[j].count)
-          else begin
-            inc(j);
-            tmp[cc_red  ]:= arr[i]         and 255;
-            tmp[cc_green]:=(arr[i] shr  8) and 255;
-            tmp[cc_blue ]:= arr[i] shr 16;
-            result.sample[j].color:=tmp;
-            result.sample[j].count:=1;
+        prepareColorList;
+        if length(result.sample)>40000*27 then begin
+          setLength(arr,context^.image.pixelCount);
+          for i:=0 to context^.image.pixelCount-1 do begin
+            tmp:=projectedColor(raw[i]);
+            for channel in RGB_CHANNELS do
+              tmp[channel]:=round(tmp[channel]/3)*3;
+            arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
           end;
-          inc(i);
+          prepareColorList;
+        end else if length(result.sample)>40000*8 then begin
+          setLength(arr,context^.image.pixelCount);
+          for i:=0 to context^.image.pixelCount-1 do begin
+            tmp:=projectedColor(raw[i]);
+            for channel in RGB_CHANNELS do begin
+              if tmp[channel]<127 then begin
+                if odd(tmp[channel]) then dec(tmp[channel]);
+              end else begin
+                if not(odd(tmp[channel])) then inc(tmp[channel]);
+              end;
+            end;
+            arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
+          end;
+          prepareColorList;
         end;
-        setLength(arr,0);
-        setLength(result.sample,j+1);
+        {$ifdef debugMode}
+        writeln(stdErr,'DEBUG: median cut works on ',length(result.sample),' distinct colors');
+        {$endif}
         updateSpreads(result);
       end;
 
@@ -460,7 +508,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       setLength(buckets,1);
       buckets[0]:=firstBucket;
       while (length(buckets)*2<=parameters.i0) and not context^.cancellationRequested do splitAllLists;
-      while (length(buckets)  < parameters.i0) and not context^.cancellationRequested do splitOneList;
+      while (length(buckets)  < parameters.i0) and not context^.cancellationRequested and splitOneList do begin end;
       result:=buckets;
     end;
 
@@ -572,13 +620,14 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         minDist:double=infinity;
     begin
       for k:=0 to length(colorTable)-1 do begin
-        dist:=subjectiveColDiff(colorTable[k],pixel);
+        dist:=colDiff(colorTable[k],pixel);
         if dist<minDist then begin
           minDist:=dist;
           kBest  :=k;
         end;
       end;
-      result:=colorTable[kBest];
+      if kBest<0 then result:=colorTable[0]
+                 else result:=colorTable[kBest];
     end;
 
   PROCEDURE noDither;
@@ -699,6 +748,44 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         end else error:=BLACK;
       end;
     end;
+
+  PROCEDURE blockDither_4x4;
+    CONST j:array[0..15] of longint=(4,0,1,5,6,2,3,7,11,15,14,10,9,13,12,8);
+    VAR xm,ym,ix,iy,dx,dy,k,run:longint;
+        col:array[0..15] of T_rgbFloatColor;
+        error,oldPixel,newPixel:T_rgbFloatColor;
+        change:boolean=true;
+    begin
+      xm:=context^.image.dimensions.width -1;
+      ym:=context^.image.dimensions.height-1;
+      for iy:=0 to ym do if (iy and 3=0) then
+      for ix:=0 to xm do if (ix and 3=0) then begin
+        //Fetch block:
+        for dy:=0 to 3 do if iy+dy<=ym then begin
+          for dx:=0 to 3 do if ix+dx<=xm
+          then col[dx+4*dy]:=context^.image[ix+dx,iy+dy]
+          else col[dx+4*dy]:=col[dx+4*dy-1];
+        end else for dx:=0 to 3 do col[dx+4*dy]:=col[dx+4*dy-4];
+        //Process block:
+        error:=BLACK;
+        change:=true;
+        for run:=0 to 9 do if change then begin
+          change:=false;
+          for k in j do begin
+            oldPixel:=col[k]+error;
+            newPixel:=nearestColor(oldPixel);
+            change:=change or (col[k]<>newPixel);
+            col[k]:=newPixel;
+            error:=oldPixel-col[k];
+          end;
+        end;
+        //Write back block:
+        for dy:=0 to 3 do if iy+dy<=ym then
+        for dx:=0 to 3 do if ix+dx<=xm then
+          context^.image[ix+dx,iy+dy]:=col[dx+4*dy];
+      end;
+    end;
+
   begin
     case byte(parameters.i1 mod 6) of
       0: standardAdaptiveColors;
@@ -708,11 +795,12 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       4: medianCutColors;
       5: kMeansColorTable;
     end;
-    case byte(parameters.i2 and 3) of
+    case byte(parameters.i2) of
       0: noDither;
       1: floydSteinbergDither;
       2: lineBasedDither;
       3: kochCurveDither;
+      4: blockDither_4x4;
     end;
   end;
 
@@ -736,7 +824,8 @@ registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_
                                                         ^.addEnumChildDescription(spa_i2,'Dither mode','none',
                                                                                                        'Floyd-Steinberg',
                                                                                                        'Line-Based',
-                                                                                                       'Koch-Curve'),
+                                                                                                       'Koch-Curve',
+                                                                                                       'Block-Dither'),
                                                         @quantizeCustom_impl);
 
 end.
