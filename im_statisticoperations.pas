@@ -2,7 +2,7 @@ UNIT im_statisticOperations;
 INTERFACE
 
 IMPLEMENTATION
-USES imageManipulation,imageContexts,myParams,mypics,myColors,math,myGenerics;
+USES imageManipulation,imageContexts,myParams,mypics,myColors,math,myGenerics,im_colors;
 FUNCTION measure(CONST a,b:single):single;
   CONST a0=1/0.998;
         b0= -0.001;
@@ -533,6 +533,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         sample:T_sample;
         globalAverageColor:T_rgbColor;
         dist,newDist:double;
+        i,j:longint;
+        color:T_rgbFloatColor;
     begin
       buckets:=medianCutBuckets;
       globalAverageColor:=BLACK;
@@ -541,8 +543,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         n                 +=             sample.count;
       end;
       globalAverageColor*=(1/n);
-
       setLength(colorTable,length(buckets));
+
       for k:=0 to length(buckets)-1 do begin
         dist:=0;
         for sample in buckets[k].sample do begin
@@ -552,7 +554,23 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
             colorTable[k]:=sample.color;
           end;
         end;
+      end;
+
+      for i:=1 to length(colorTable)-1 do for j:=0 to i-1 do if colDiff(globalAverageColor,colorTable[i])>colDiff(globalAverageColor,colorTable[j]) then begin
+        bucket    :=buckets[i];
+        buckets[i]:=buckets[j];
+        buckets[j]:=bucket;
+        color        :=colorTable[i];
+        colorTable[i]:=colorTable[j];
+        colorTable[j]:=color;
+      end;
+
+      for k:=0 to min(8,length(buckets))-1 do setLength(buckets[k].sample,0);
+      dist:=0.9;
+      for k:=8 to length(buckets)-1 do begin
+        colorTable[k]:=colorTable[k]*dist+averageColor(buckets[k])*(1-dist);
         setLength(buckets[k].sample,0);
+        dist*=0.9;
       end;
       setLength(buckets,0);
     end;
@@ -819,6 +837,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   begin
+    //project does not take parameters into account, so we can just pass the current parameters
+    project_impl(parameters,context);
     case byte(parameters.i1 mod 6) of
       0: standardAdaptiveColors;
       1: defaultColorTable;

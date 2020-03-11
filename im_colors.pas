@@ -1,7 +1,9 @@
 UNIT im_colors;
 INTERFACE
+USES imageContexts,myParams;
+PROCEDURE project_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
 IMPLEMENTATION
-USES imageManipulation,imageContexts,myParams,mypics,myColors,math;
+USES imageManipulation,mypics,myColors,math;
 
 {$MACRO ON}
 {$define genericColorOperation:=
