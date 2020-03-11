@@ -474,7 +474,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
         end;
         prepareColorList;
-        if length(result.sample)>10000*27 then begin
+        if length(result.sample)>50000*27 then begin
           setLength(arr,context^.image.pixelCount);
           for i:=0 to context^.image.pixelCount-1 do begin
             tmp:=projectedColor(raw[i]);
@@ -483,7 +483,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
             arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
           end;
           prepareColorList;
-        end else if length(result.sample)>10000*8 then begin
+        end else if length(result.sample)>50000*8 then begin
           setLength(arr,context^.image.pixelCount);
           for i:=0 to context^.image.pixelCount-1 do begin
             tmp:=projectedColor(raw[i]);
@@ -520,6 +520,38 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       setLength(colorTable,length(buckets));
       for k:=0 to length(buckets)-1 do begin
         colorTable[k]:=averageColor(buckets[k]);
+        setLength(buckets[k].sample,0);
+      end;
+      setLength(buckets,0);
+    end;
+
+  PROCEDURE modifiedMedianCut;
+    VAR k:longint;
+        n:longint=0;
+        buckets:T_colorLists;
+        bucket:T_colorList;
+        sample:T_sample;
+        globalAverageColor:T_rgbColor;
+        dist,newDist:double;
+    begin
+      buckets:=medianCutBuckets;
+      globalAverageColor:=BLACK;
+      for bucket in buckets do for sample in bucket.sample do begin
+        globalAverageColor+=sample.color*sample.count;
+        n                 +=             sample.count;
+      end;
+      globalAverageColor*=(1/n);
+
+      setLength(colorTable,length(buckets));
+      for k:=0 to length(buckets)-1 do begin
+        dist:=0;
+        for sample in buckets[k].sample do begin
+          newDist:=colDiff(sample.color,globalAverageColor);
+          if newDist>dist then begin
+            dist:=newDist;
+            colorTable[k]:=sample.color;
+          end;
+        end;
         setLength(buckets[k].sample,0);
       end;
       setLength(buckets,0);
@@ -595,7 +627,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       nextDefaultColor:=0;
       i:=0;
       while redistributeSamples and (i<100) and not(context^.cancellationRequested) do inc(i);
-      setLength(colorTable,parameters.i0);
+      setLength(colorTable,length(buckets));
       for i:=0 to length(colorTable)-1 do colorTable[i]:=buckets[i].spread;
     end;
 
@@ -794,6 +826,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       3: simpleLinearColors;
       4: medianCutColors;
       5: kMeansColorTable;
+      6: modifiedMedianCut;
     end;
     case byte(parameters.i2) of
       0: noDither;
@@ -819,8 +852,9 @@ registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_
                                                                                                       'Fixed table 1',
                                                                                                       'Fixed table 2',
                                                                                                       'Monochrome adaptive',
-                                                                                                      'Median cut adaptive',
-                                                                                                      'k-means adaptive')
+                                                                                                      'Median cut',
+                                                                                                      'k-means adaptive',
+                                                                                                      'Modified median cut')
                                                         ^.addEnumChildDescription(spa_i2,'Dither mode','none',
                                                                                                        'Floyd-Steinberg',
                                                                                                        'Line-Based',
