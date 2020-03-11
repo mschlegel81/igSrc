@@ -377,11 +377,11 @@ FUNCTION T_tileBuilder.colorOfSide(CONST a, b: T_Complex;
   CONST baseColor: T_rgbFloatColor): T_rgbFloatColor;
   VAR d:T_Complex;
   begin
-    d:=b-a;
+    d:=a-b;
     d:=d*II/complex.abs(d);
-    result:=baseColor*max(0,borderAcrossFraction*d.re*1/3
-                           +borderAcrossFraction*d.im*2/3
-                           +borderUpFraction);
+    result:=simpleIlluminatedColor(baseColor,borderAcrossFraction*d.re,
+                                             borderAcrossFraction*d.im,
+                                             borderUpFraction);
   end;
 
 TYPE T_triangleInfo=record

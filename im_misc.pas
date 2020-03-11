@@ -253,10 +253,9 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
 
     end;
 
-  VAR topEdgeLight   :double=1.1785113019775793 ;
-      bottomEdgeLight:double=0.23570226039551595;
-      leftEdgeLight  :double=0.47140452079103179;
-      rightEdgeLight :double=0.94280904158206336;
+  VAR leftNx,leftNz:double;
+      topNy,topNz  :double;
+
       borderWitdh    :double=20;
 
   PROCEDURE drawRectangle(CONST r:T_rectData);
@@ -270,10 +269,10 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
         dn:=(cy-r.y0); if (dn<borderWitdh) and (dn<d) then begin b:=3; d:=dn; end;
         dn:=(r.y1-cy); if (dn<borderWitdh) and (dn<d) then begin b:=4; d:=dn; end;
         case b of
-          1: result:=r.mean*leftEdgeLight;
-          2: result:=r.mean*rightEdgeLight;
-          3: result:=r.mean*topEdgeLight;
-          4: result:=r.mean*bottomEdgeLight;
+          1: result:=simpleIlluminatedColor(r.mean, leftNx,0,leftNz);  //r.mean*leftEdgeLight;
+          2: result:=simpleIlluminatedColor(r.mean,-leftNx,0,leftNz); //r.mean*rightEdgeLight;
+          3: result:=simpleIlluminatedColor(r.mean,0, topNy,topNz); //r.mean*topEdgeLight;
+          4: result:=simpleIlluminatedColor(r.mean,0,-topNy,topNz); //r.mean*bottomEdgeLight;
         else result:=r.mean;
         end;
       end;
@@ -292,10 +291,11 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
 
   begin
     borderWitdh:=parameters.f2/1000*context^.image.diagonal;
-    topEdgeLight   :=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*  2/3 );
-    bottomEdgeLight:=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*(-2/3));
-    leftEdgeLight  :=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*(-1/3));
-    rightEdgeLight :=max(0,cos(parameters.f3*0.017453292519943295)+sin(parameters.f3*0.017453292519943295)*( 1/3));
+    topNz := cos(parameters.f3*0.017453292519943295);
+    leftNz:= cos(parameters.f3*0.017453292519943295);
+    topNy :=-sin(parameters.f3*0.017453292519943295);
+    leftNx:=-sin(parameters.f3*0.017453292519943295);
+
     xRes:=context^.image.dimensions.width;
     yRes:=context^.image.dimensions.height;
     setLength(rectangles,1);
