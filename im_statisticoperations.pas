@@ -800,11 +800,15 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE blockDither_4x4;
-    CONST j:array[0..15] of longint=(4,0,1,5,6,2,3,7,11,15,14,10,9,13,12,8);
+    CONST KOCH:array[0..3,0..15] of longint=((4,0,1,5,6,2,3,7,11,15,14,10,9,13,12,8),
+                                             (6,5,1,0,4,8,12,13,9,10,14,15,11,7,3,2),
+                                             (5,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9),
+                                             (10,6,7,3,2,1,0,4,5,9,8,12,13,14,15,11));
     VAR xm,ym,ix,iy,dx,dy,k,run:longint;
-        col:array[0..15] of T_rgbFloatColor;
-        error,oldPixel,newPixel:T_rgbFloatColor;
-        change:boolean=true;
+        bestRun:longint=0;
+        col:array[0..3,0..15] of T_rgbFloatColor;
+        err:array[0..3] of T_rgbFloatColor;
+        oldPixel:T_rgbFloatColor;
     begin
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
@@ -813,26 +817,24 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         //Fetch block:
         for dy:=0 to 3 do if iy+dy<=ym then begin
           for dx:=0 to 3 do if ix+dx<=xm
-          then col[dx+4*dy]:=context^.image[ix+dx,iy+dy]
-          else col[dx+4*dy]:=col[dx+4*dy-1];
-        end else for dx:=0 to 3 do col[dx+4*dy]:=col[dx+4*dy-4];
+          then col[3,dx+4*dy]:=context^.image[ix+dx,iy+dy]
+          else col[3,dx+4*dy]:=col[3,dx+4*dy-1];
+        end else for dx:=0 to 3 do col[3,dx+4*dy]:=col[3,dx+4*dy-4];
         //Process block:
-        error:=BLACK;
-        change:=true;
-        for run:=0 to 9 do if change then begin
-          change:=false;
-          for k in j do begin
-            oldPixel:=col[k]+error;
-            newPixel:=nearestColor(oldPixel);
-            change:=change or (col[k]<>newPixel);
-            col[k]:=newPixel;
-            error:=oldPixel-col[k];
+        for run:=0 to 3 do begin
+          err[run]:=BLACK;
+          for k in KOCH[run] do begin
+            oldPixel:=col[3,k]+err[run];
+            col[run,k]:=nearestColor(oldPixel);
+            err[run]:=oldPixel-col[run,k];
           end;
+          err[run][cc_red]:=colDiff(err[run],BLACK);
+          if err[run][cc_red]<err[bestRun][cc_red] then bestRun:=run;
         end;
         //Write back block:
         for dy:=0 to 3 do if iy+dy<=ym then
         for dx:=0 to 3 do if ix+dx<=xm then
-          context^.image[ix+dx,iy+dy]:=col[dx+4*dy];
+          context^.image[ix+dx,iy+dy]:=col[bestrun,dx+4*dy];
       end;
     end;
 
