@@ -318,120 +318,127 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       result*=1/count;
     end;
 
+  PROCEDURE updateSpreads(VAR bucket:T_colorList);
+    VAR r :double=0;
+        g :double=0;
+        b :double=0;
+        rr:double=0;
+        gG:double=0;
+        bb:double=0;
+        count:longint=0;
+        s:T_sample;
+    begin
+      with bucket do begin
+        for s in sample do begin
+          count+=                    s.count;
+          r +=    s.color[cc_red  ] *s.count;
+          g +=    s.color[cc_green] *s.count;
+          b +=    s.color[cc_blue ] *s.count;
+          rr+=sqr(s.color[cc_red  ])*s.count;
+          gG+=sqr(s.color[cc_green])*s.count;
+          bb+=sqr(s.color[cc_blue ])*s.count;
+        end;
+        spread:=rgbColor(SUBJECTIVE_GREY_RED_WEIGHT  *(rr-sqr(r)/count),
+                         SUBJECTIVE_GREY_GREEN_WEIGHT*(gG-sqr(g)/count),
+                         SUBJECTIVE_GREY_BLUE_WEIGHT *(bb-sqr(b)/count));
+        if length(sample)<=1
+        then maxSpread:=-1
+        else maxSpread:=spread[cc_red]+spread[cc_green]+spread[cc_blue];
+      end;
+    end;
+
+  PROCEDURE split(VAR list:T_colorList; OUT halfList:T_colorList);
+    VAR channel:T_colorChannel;
+    FUNCTION partition(CONST Left,Right:longint):longint;
+      VAR pivot:byte;
+          i:longint;
+          tmp:T_sample;
+      begin
+        pivot:=list.sample[Left+random(Right-Left)].color[channel];
+        result:=Left;
+        for i:=Left to Right-1 do if list.sample[i].color[channel]<pivot then begin
+          tmp                :=list.sample[result];
+          list.sample[result]:=list.sample[i];
+          list.sample[i     ]:=tmp;
+          inc(result);
+        end;
+      end;
+
+    PROCEDURE sort(CONST Left,Right:longint);
+      VAR pivotIdx:longint;
+      begin
+        if Left=Right then exit;
+        pivotIdx:=partition(Left,Right);
+        if pivotIdx>Left  then sort(Left,pivotIdx-1);
+        if pivotIdx<Right then sort(pivotIdx+1,Right);
+      end;
+
+    VAR i,i0,splitCount:longint;
+        popCount:longint=0;
+    begin
+      if list.spread[cc_red]>list.spread[cc_green] then channel:=cc_red else channel:=cc_green;
+      if list.spread[cc_blue]>list.spread[channel] then channel:=cc_blue;
+      sort(0,length(list.sample)-1);
+      for i:=0 to length(list.sample)-1 do popCount+=list.sample[i].count;
+      splitCount:=popCount shr 1;
+      popCount:=0; i0:=0;
+      while (popCount<splitCount) do begin
+        popCount+=list.sample[i0].count;
+        inc(i0);
+      end;
+      if i0=length(list.sample) then dec(i0);
+
+      setLength(halfList.sample,length(list.sample)-i0);
+      for i:=0 to length(halfList.sample)-1 do halfList.sample[i]:=list.sample[i+i0];
+      updateSpreads(halfList);
+
+      setLength(list.sample,i0);
+      updateSpreads(list);
+    end;
+
+  FUNCTION dropEmptyBuckets(VAR buckets:T_colorLists):boolean;
+    VAR i,i0:longint;
+    begin
+      i0:=0;
+      for i:=0 to length(buckets)-1 do if length(buckets[i].sample)>0 then begin
+        if i0<>i then buckets[i0]:=buckets[i];
+        inc(i0);
+      end;
+      if i0<>length(buckets) then begin
+        setLength(buckets,i0);
+        result:=true;
+      end else result:=false;
+    end;
+
+  FUNCTION splitOneList(VAR buckets:T_colorLists):boolean;
+    VAR i:longint;
+        toSplit:longint=0;
+    begin
+      for i:=1 to length(buckets)-1 do if buckets[i].maxSpread>buckets[toSplit].maxSpread then toSplit:=i;
+      if buckets[toSplit].maxSpread<0 then exit(false) else result:=true;
+      i:=length(buckets);
+      setLength(buckets,i+1);
+      split(buckets[toSplit],buckets[i]);
+      if length(buckets[toSplit].sample)=0 then begin
+        buckets[toSplit]:=buckets[i];
+        buckets[toSplit].maxSpread:=-1;
+        setLength(buckets,i);
+      end else if length(buckets[i].sample)=0 then begin
+        buckets[toSplit].maxSpread:=-1;
+        setLength(buckets,i);
+      end;
+    end;
+
   FUNCTION medianCutBuckets:T_colorLists;
-    PROCEDURE updateSpreads(VAR bucket:T_colorList);
-      VAR r :double=0;
-          g :double=0;
-          b :double=0;
-          rr:double=0;
-          gG:double=0;
-          bb:double=0;
-          count:longint=0;
-          s:T_sample;
-      begin
-        with bucket do begin
-          for s in sample do begin
-            inc(count,s.count);
-            r +=    s.color[cc_red  ] *s.count;
-            g +=    s.color[cc_green] *s.count;
-            b +=    s.color[cc_blue ] *s.count;
-            rr+=sqr(s.color[cc_red  ])*s.count;
-            gG+=sqr(s.color[cc_green])*s.count;
-            bb+=sqr(s.color[cc_blue ])*s.count;
-          end;
-          spread:=rgbColor(SUBJECTIVE_GREY_RED_WEIGHT  *(rr-sqr(r)/count),
-                           SUBJECTIVE_GREY_GREEN_WEIGHT*(gG-sqr(g)/count),
-                           SUBJECTIVE_GREY_BLUE_WEIGHT *(bb-sqr(b)/count));
-          maxSpread:=spread[cc_red]+spread[cc_green]+spread[cc_blue];
-        end;
-      end;
-
-    PROCEDURE split(VAR list:T_colorList; OUT halfList:T_colorList);
-      VAR channel:T_colorChannel;
-      FUNCTION partition(CONST Left,Right:longint):longint;
-        VAR pivot:byte;
-            i:longint;
-            tmp:T_sample;
-        begin
-          pivot:=list.sample[Left+random(Right-Left)].color[channel];
-          result:=Left;
-          for i:=Left to Right-1 do if list.sample[i].color[channel]<pivot then begin
-            tmp                :=list.sample[result];
-            list.sample[result]:=list.sample[i];
-            list.sample[i     ]:=tmp;
-            inc(result);
-          end;
-        end;
-
-      PROCEDURE sort(CONST Left,Right:longint);
-        VAR pivotIdx:longint;
-        begin
-          if Left=Right then exit;
-          pivotIdx:=partition(Left,Right);
-          if pivotIdx>Left  then sort(Left,pivotIdx-1);
-          if pivotIdx<Right then sort(pivotIdx+1,Right);
-        end;
-
-      VAR i,i0,splitCount:longint;
-          popCount:longint=0;
-      begin
-        if list.spread[cc_red]>list.spread[cc_green] then channel:=cc_red else channel:=cc_green;
-        if list.spread[cc_blue]>list.spread[channel] then channel:=cc_blue;
-        sort(0,length(list.sample)-1);
-        for i:=0 to length(list.sample)-1 do popCount+=list.sample[i].count;
-        splitCount:=popCount shr 1;
-        popCount:=0; i0:=0;
-        while (popCount<splitCount) do begin
-          popCount+=list.sample[i0].count; inc(i0);
-        end;
-
-        setLength(halfList.sample,length(list.sample)-i0);
-        for i:=0 to length(halfList.sample)-1 do halfList.sample[i]:=list.sample[i+i0];
-        updateSpreads(halfList);
-
-        setLength(list.sample,i0);
-        updateSpreads(list);
-      end;
-
     VAR buckets:T_colorLists;
-    FUNCTION splitOneList:boolean;
-      VAR i:longint;
-          toSplit:longint=0;
-
-      begin
-        for i:=1 to length(buckets)-1 do if buckets[i].maxSpread>buckets[toSplit].maxSpread then toSplit:=i;
-        if buckets[toSplit].maxSpread<0 then exit(false) else result:=true;
-        i:=length(buckets);
-        setLength(buckets,i+1);
-        split(buckets[toSplit],buckets[i]);
-        if length(buckets[toSplit].sample)=0 then begin
-          buckets[toSplit]:=buckets[i];
-          buckets[toSplit].maxSpread:=-1;
-          setLength(buckets,i);
-        end else if length(buckets[i].sample)=0 then begin
-          buckets[toSplit].maxSpread:=-1;
-          setLength(buckets,i);
-        end;
-      end;
-
-    PROCEDURE dropEmptyBuckets;
-      VAR i,i0:longint;
-      begin
-        i0:=0;
-        for i:=0 to length(buckets)-1 do if length(buckets[i].sample)>0 then begin
-          if i0<>i then buckets[i0]:=buckets[i];
-          inc(i0);
-        end;
-        if i0<>length(buckets) then setLength(buckets,i0);
-      end;
-
-    PROCEDURE splitAllLists;
+    FUNCTION splitAllLists:boolean;
       VAR i,i0:longint;
       begin
         i0:=length(buckets);
         setLength(buckets,i0+i0);
         for i:=0 to i0-1 do split(buckets[i],buckets[i0+i]);
-        dropEmptyBuckets;
+        dropEmptyBuckets(buckets);
+        result:=length(buckets)>i0;
       end;
 
     FUNCTION firstBucket:T_colorList;
@@ -507,8 +514,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     begin
       setLength(buckets,1);
       buckets[0]:=firstBucket;
-      while (length(buckets)*2<=parameters.i0) and not context^.cancellationRequested do splitAllLists;
-      while (length(buckets)  < parameters.i0) and not context^.cancellationRequested and splitOneList do begin end;
+      while (length(buckets)*3<=parameters.i0) and not context^.cancellationRequested and splitAllLists do begin end;
+      while (length(buckets)  < parameters.i0) and not context^.cancellationRequested and splitOneList(buckets) do begin end;
       result:=buckets;
     end;
 
@@ -527,51 +534,66 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
   PROCEDURE modifiedMedianCut;
     VAR k:longint;
-        n:longint=0;
+        i:longint=0;
         buckets:T_colorLists;
-        bucket:T_colorList;
+        allSamples:array of T_sample;
         sample:T_sample;
-        globalAverageColor:T_rgbColor;
-        dist,newDist:double;
-        i,j:longint;
-        color:T_rgbFloatColor;
-    begin
-      buckets:=medianCutBuckets;
-      globalAverageColor:=BLACK;
-      for bucket in buckets do for sample in bucket.sample do begin
-        globalAverageColor+=sample.color*sample.count;
-        n                 +=             sample.count;
-      end;
-      globalAverageColor*=(1/n);
-      setLength(colorTable,length(buckets));
-
-      for k:=0 to length(buckets)-1 do begin
-        dist:=0;
-        for sample in buckets[k].sample do begin
-          newDist:=colDiff(sample.color,globalAverageColor);
-          if newDist>dist then begin
-            dist:=newDist;
-            colorTable[k]:=sample.color;
-          end;
+    PROCEDURE collectAveragePerBucket;
+      VAR k:longint;
+      begin
+        //collect average colors per bucket
+        setLength(colorTable,length(buckets));
+        for k:=0 to length(buckets)-1 do begin
+          colorTable[k]:=averageColor(buckets[k]);
+          i+=length(buckets[k].sample);
         end;
       end;
 
-      for i:=1 to length(colorTable)-1 do for j:=0 to i-1 do if colDiff(globalAverageColor,colorTable[i])>colDiff(globalAverageColor,colorTable[j]) then begin
-        bucket    :=buckets[i];
-        buckets[i]:=buckets[j];
-        buckets[j]:=bucket;
-        color        :=colorTable[i];
-        colorTable[i]:=colorTable[j];
-        colorTable[j]:=color;
+    PROCEDURE redistributeSamples;
+      VAR sample:T_sample;
+          k,i:longint;
+          dist,bestDist:double;
+      begin
+        //redistribute samples
+        for sample in allSamples do begin
+          bestDist:=infinity; i:=0;
+          for k:=0 to length(colorTable)-1 do begin
+            dist:=colDiff(colorTable[k],sample.color);
+            if dist<bestDist then begin
+              bestDist:=dist;
+              i:=k;
+            end;
+          end;
+          setLength(buckets[i].sample,length(buckets[i].sample)+1);
+                    buckets[i].sample[length(buckets[i].sample)-1]:=sample;
+        end;
       end;
 
-      for k:=0 to min(8,length(buckets))-1 do setLength(buckets[k].sample,0);
-      dist:=0.9;
-      for k:=8 to length(buckets)-1 do begin
-        colorTable[k]:=colorTable[k]*dist+averageColor(buckets[k])*(1-dist);
+    begin
+      buckets:=medianCutBuckets;
+      collectAveragePerBucket;
+      //collect all samples
+      setLength(allSamples,i);
+      i:=0;
+      for k:=0 to length(buckets)-1 do begin
+        for sample in buckets[k].sample do begin
+          allSamples[i]:=sample;
+          inc(i);
+        end;
         setLength(buckets[k].sample,0);
-        dist*=0.9;
       end;
+      redistributeSamples;
+      //while some buckets remain empty, drop them and resplit
+      while dropEmptyBuckets(buckets) and not context^.cancellationRequested do begin
+        for k:=0 to length(buckets)-1 do updateSpreads(buckets[k]);
+        while (length(buckets) < parameters.i0) and not context^.cancellationRequested and splitOneList(buckets) do begin end;
+        collectAveragePerBucket;
+        for k:=0 to length(buckets)-1 do setLength(buckets[k].sample,0);
+        redistributeSamples;
+      end;
+
+      collectAveragePerBucket;
+      for k:=0 to length(buckets)-1 do setLength(buckets[k].sample,0);
       setLength(buckets,0);
     end;
 
@@ -597,7 +619,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           bestDist:=infinity;
           bestIdx :=-1;
           for i:=0 to length(buckets)-1 do begin
-            tmp:=subjectiveColDiff(buckets[i].spread,s.color);
+            tmp:=colDiff(buckets[i].spread,s.color);
             if tmp<bestDist then begin
               bestIdx :=i;
               bestDist:=tmp;
@@ -644,7 +666,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       for i:=0 to length(buckets)-1 do buckets[i].spread:=averageColor(buckets[i]);
       nextDefaultColor:=0;
       i:=0;
-      while redistributeSamples and (i<100) and not(context^.cancellationRequested) do inc(i);
+      while (i<10) and redistributeSamples and not(context^.cancellationRequested) do i+=1;
       setLength(colorTable,length(buckets));
       for i:=0 to length(colorTable)-1 do colorTable[i]:=buckets[i].spread;
     end;
@@ -800,14 +822,20 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE blockDither_4x4;
-    CONST KOCH:array[0..3,0..15] of longint=((4,0,1,5,6,2,3,7,11,15,14,10,9,13,12,8),
-                                             (6,5,1,0,4,8,12,13,9,10,14,15,11,7,3,2),
-                                             (5,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9),
-                                             (10,6,7,3,2,1,0,4,5,9,8,12,13,14,15,11));
+    CONST KOCH:array[0..7,0..15] of longint=
+          ((5,6,2,3,7,11,15,14,10,9,13,12,8,4,0,1),
+           (5,1,0,4,8,12,13,9,10,14,15,11,7,3,2,6),
+           (5,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9),
+           (5,9,8,12,13,14,15,11,10,6,7,3,2,1,0,4),
+           (10,9,13,12,8,4,0,1,5,6,2,3,7,11,15,14),
+           (10,14,15,11,7,3,2,6,5,1,0,4,8,12,13,9),
+           (10,11,15,14,13,12,8,9,5,4,0,1,2,3,7,6),
+           (10,6,7,3,2,1,0,4,5,9,8,12,13,14,15,11));
+
     VAR xm,ym,ix,iy,dx,dy,k,run:longint;
         bestRun:longint=0;
-        col:array[0..3,0..15] of T_rgbFloatColor;
-        err:array[0..3] of T_rgbFloatColor;
+        col:array[0..7,0..15] of T_rgbFloatColor;
+        err:array[0..7] of T_rgbFloatColor;
         oldPixel:T_rgbFloatColor;
     begin
       xm:=context^.image.dimensions.width -1;
@@ -821,7 +849,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           else col[3,dx+4*dy]:=col[3,dx+4*dy-1];
         end else for dx:=0 to 3 do col[3,dx+4*dy]:=col[3,dx+4*dy-4];
         //Process block:
-        for run:=0 to 3 do begin
+        for run:=0 to 7 do begin
           err[run]:=BLACK;
           for k in KOCH[run] do begin
             oldPixel:=col[3,k]+err[run];
@@ -841,7 +869,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
   begin
     //project does not take parameters into account, so we can just pass the current parameters
     project_impl(parameters,context);
-    case byte(parameters.i1 mod 6) of
+    case byte(parameters.i1) of
       0: standardAdaptiveColors;
       1: defaultColorTable;
       2: boundsColorTable;

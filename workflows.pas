@@ -259,7 +259,7 @@ PROCEDURE T_simpleWorkflow.headlessWorkflowExecution;
     leaveCriticalSection(contextCS);
   end;
 
-CONST reportStepTimeIfLargerThan=5/(24*60*60);
+CONST reportStepTimeIfLargerThan={$ifdef debugMode}0.1/(24*60*60){$else}5/(24*60*60){$endif};
 PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint;
   CONST elapsed: double);
   VAR accessedStash:string='';
