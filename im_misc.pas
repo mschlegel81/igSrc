@@ -309,6 +309,26 @@ PROCEDURE rectagleSplit_impl(CONST parameters:T_parameterValue; CONST context:P_
     setLength(rectangles,0);
   end;
 
+PROCEDURE slope_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
+  VAR nx,ny:double;
+      ix,iy,rx,ry:longint;
+      ySlope,xSlope,col:T_rgbFloatColor;
+      temp:T_rawImage;
+  begin
+    nx:=parameters.f0*context^.image.diagonal*1E-3;
+    ny:=parameters.f1*context^.image.diagonal*1E-3;
+    rx:=context^.image.dimensions.width;
+    ry:=context^.image.dimensions.height;
+    temp.create(context^.image);
+    for iy:=0 to ry-1 do for ix:=0 to rx-1 do begin
+      col:=                                 temp[ix  ,iy  ];
+      if iy=0 then ySlope:=col else ySlope:=temp[ix  ,iy-1];
+      if ix=0 then xSlope:=col else xSlope:=temp[ix-1,iy  ];
+      context^.image[ix,iy]:=(col-xSlope)*nx+(col-ySlope)*ny;
+    end;
+    temp.destroy;
+  end;
+
 INITIALIZATION
 registerSimpleOperation(imc_misc,
   newParameterDescription('sketch',pt_4floats)^
@@ -361,6 +381,12 @@ registerSimpleOperation(imc_misc,
     .addChildParameterDescription(spa_f2,'border width',pt_float,0)^
     .addChildParameterDescription(spa_f3,'border angle',pt_float,0,90),
   @rectagleSplit_impl);
+registerSimpleOperation(imc_misc,
+  newParameterDescription('slope',pt_2floats)^
+    .setDefaultValue('0.7,-0.7')^
+    .addChildParameterDescription(spa_f0,'nx',pt_float)^
+    .addChildParameterDescription(spa_f1,'ny',pt_float),
+    @slope_impl);
 
 end.
 
