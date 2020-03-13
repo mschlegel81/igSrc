@@ -598,7 +598,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE kMeansColorTable;
-    VAR allSamples:T_colorList;
+    VAR allSamples:array of T_sample;
         buckets:T_colorLists;
         nextDefaultColor:longint;
     FUNCTION redistributeSamples:boolean;
@@ -615,7 +615,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           previousBucketSizes[i]:=length(buckets[i].sample);
           setLength(buckets[i].sample,0);
         end;
-        for s in allSamples.sample do begin
+        //Cost = O(length(allSamples.sample) * length(buckets)
+        for s in allSamples do begin
           bestDist:=infinity;
           bestIdx :=-1;
           for i:=0 to length(buckets)-1 do begin
@@ -657,16 +658,16 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       buckets:=medianCutBuckets;
       k:=0;
       for i:=0 to length(buckets)-1 do k+=length(buckets[i].sample);
-      setLength(allSamples.sample,k);
+      setLength(allSamples,k);
       k:=0;
       for i:=0 to length(buckets)-1 do for j:=0 to length(buckets[i].sample)-1 do begin
-        allSamples.sample[k]:=buckets[i].sample[j];
+        allSamples[k]:=buckets[i].sample[j];
         inc(k);
       end;
       for i:=0 to length(buckets)-1 do buckets[i].spread:=averageColor(buckets[i]);
       nextDefaultColor:=0;
       i:=0;
-      while (i<10) and redistributeSamples and not(context^.cancellationRequested) do i+=1;
+      while (i*length(buckets)*length(allSamples)<20000000) and redistributeSamples and not(context^.cancellationRequested) do i+=1;
       setLength(colorTable,length(buckets));
       for i:=0 to length(colorTable)-1 do colorTable[i]:=buckets[i].spread;
     end;
@@ -717,12 +718,12 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
       for y:=0 to ym do if not(context^.cancellationRequested) then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=oldPixel-newPixel;
-        if x<xm then context^.image.multIncPixel(x+1,y,1,error*(7/16));
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.05625;
+        if x<xm then context^.image.multIncPixel(x+1,y,1,error*7);
         if y<ym then begin
-          if x>0  then context^.image.multIncPixel(x-1,y+1,1,error*(3/16));
-                       context^.image.multIncPixel(x  ,y+1,1,error*(5/16));
-          if x<xm then context^.image.multIncPixel(x  ,y+1,1,error*(1/16));
+          if x>0  then context^.image.multIncPixel(x-1,y+1,1,error*3);
+                       context^.image.multIncPixel(x  ,y+1,1,error*5);
+          if x<xm then context^.image.multIncPixel(x  ,y+1,1,error*1);
         end;
       end;
     end;
@@ -822,20 +823,11 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE blockDither_4x4;
-    CONST KOCH:array[0..7,0..15] of longint=
-          ((5,6,2,3,7,11,15,14,10,9,13,12,8,4,0,1),
-           (5,1,0,4,8,12,13,9,10,14,15,11,7,3,2,6),
-           (5,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9),
-           (5,9,8,12,13,14,15,11,10,6,7,3,2,1,0,4),
-           (10,9,13,12,8,4,0,1,5,6,2,3,7,11,15,14),
-           (10,14,15,11,7,3,2,6,5,1,0,4,8,12,13,9),
-           (10,11,15,14,13,12,8,9,5,4,0,1,2,3,7,6),
-           (10,6,7,3,2,1,0,4,5,9,8,12,13,14,15,11));
+    CONST KOCH:array[0..30] of longint=(5,6,2,3,7,11,15,14,10,9,13,12,8,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9,5,4,0);
 
-    VAR xm,ym,ix,iy,dx,dy,k,run:longint;
-        bestRun:longint=0;
-        col:array[0..7,0..15] of T_rgbFloatColor;
-        err:array[0..7] of T_rgbFloatColor;
+    VAR xm,ym,ix,iy,dx,dy,k:longint;
+        col:array[0..15] of T_rgbFloatColor;
+        err:T_rgbFloatColor;
         oldPixel:T_rgbFloatColor;
     begin
       xm:=context^.image.dimensions.width -1;
@@ -845,24 +837,20 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         //Fetch block:
         for dy:=0 to 3 do if iy+dy<=ym then begin
           for dx:=0 to 3 do if ix+dx<=xm
-          then col[3,dx+4*dy]:=context^.image[ix+dx,iy+dy]
-          else col[3,dx+4*dy]:=col[3,dx+4*dy-1];
-        end else for dx:=0 to 3 do col[3,dx+4*dy]:=col[3,dx+4*dy-4];
+          then col[dx+4*dy]:=context^.image[ix+dx,iy+dy]
+          else col[dx+4*dy]:=col[dx+4*dy-1];
+        end else for dx:=0 to 3 do col[dx+4*dy]:=col[dx+4*dy-4];
         //Process block:
-        for run:=0 to 7 do begin
-          err[run]:=BLACK;
-          for k in KOCH[run] do begin
-            oldPixel:=col[3,k]+err[run];
-            col[run,k]:=nearestColor(oldPixel);
-            err[run]:=oldPixel-col[run,k];
-          end;
-          err[run][cc_red]:=colDiff(err[run],BLACK);
-          if err[run][cc_red]<err[bestRun][cc_red] then bestRun:=run;
+        err:=BLACK;
+        for k in KOCH do begin
+          oldPixel:=col[k]+err;
+          col[k]:=nearestColor(oldPixel);
+          err:=oldPixel-col[k];
         end;
         //Write back block:
         for dy:=0 to 3 do if iy+dy<=ym then
         for dx:=0 to 3 do if ix+dx<=xm then
-          context^.image[ix+dx,iy+dy]:=col[bestrun,dx+4*dy];
+          context^.image[ix+dx,iy+dy]:=col[dx+4*dy];
       end;
     end;
 
