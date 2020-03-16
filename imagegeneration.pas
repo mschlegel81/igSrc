@@ -32,7 +32,7 @@ TYPE
       FUNCTION toFullString():ansistring;
       FUNCTION canParseParametersFromString(CONST s:ansistring; CONST doParse:boolean=false):boolean;
       FUNCTION parValue(CONST index:byte; CONST i0:longint; CONST i1:longint=0; CONST i2:longint=0; CONST i3:longint=0):T_parameterValue;
-      FUNCTION parValue(CONST index:byte; CONST f0:double; CONST f1:double=0; CONST f2:double=0):T_parameterValue;
+      FUNCTION parValue(CONST index:byte; CONST f0:double; CONST f1:double=0; CONST f2:double=0; CONST f3:double=0):T_parameterValue;
       FUNCTION parValue(CONST index:byte; CONST color:T_rgbFloatColor):T_parameterValue;
       FUNCTION parValue(CONST index:byte; CONST txt:ansistring; CONST sizeLimit:longint=-1):T_parameterValue;
       FUNCTION dependsOnImageBefore:boolean; virtual;
@@ -581,10 +581,9 @@ FUNCTION T_generalImageGenrationAlgorithm.parValue(CONST index: byte;
     result.createFromValue(parameterDescriptors[index],i0,i1,i2,i3);
   end;
 
-FUNCTION T_generalImageGenrationAlgorithm.parValue(CONST index: byte;
-  CONST f0: double; CONST f1: double; CONST f2: double): T_parameterValue;
+FUNCTION T_generalImageGenrationAlgorithm.parValue(CONST index: byte; CONST f0: double; CONST f1: double; CONST f2: double; CONST f3:double=0): T_parameterValue;
   begin
-    result.createFromValue(parameterDescriptors[index],f0,f1,f2);
+    result.createFromValue(parameterDescriptors[index],f0,f1,f2,f3);
   end;
 
 FUNCTION T_generalImageGenrationAlgorithm.parValue(CONST index: byte;
