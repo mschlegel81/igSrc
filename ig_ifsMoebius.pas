@@ -61,18 +61,26 @@ CONSTRUCTOR T_moebiusIfs.create;
 
 FUNCTION T_moebiusIfs.parameterResetStyles: T_arrayOfString;
   begin
-    result:='Zero';
-    append(result,'Random');
-    append(result,'reduced dynamic range');
-    append(result,'linear IFS');
-    append(result,'Sierpinski Triangle');
-    append(result,'Sierpinski Carpet');
-    append(result,'Barnsley Fern');
+    result:='Zero';                       //0
+    append(result,'Random');              //1
+    append(result,'linear IFS');          //2
+    append(result,'Sierpinski Triangle'); //3
+    append(result,'Sierpinski Carpet');   //4
+    append(result,'Barnsley Fern');       //5
+    append(result,'8-symmetric random');  //6
+    append(result,'7-symmetric random');  //7
+    append(result,'6-symmetric random');  //8
+    append(result,'5-symmetric random');  //9
+    append(result,'4-symmetric random');  //10
+    append(result,'3-symmetric random');  //11
+    append(result,'2-symmetric random');  //12
   end;
 
 PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
-  VAR i:longint;
+  VAR i,j:longint;
+      rotK:longint;
       f:double=0;
+      rot:T_Complex;
   begin
     inherited resetParameters(style);
     par_depth  :=128;
@@ -81,10 +89,9 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
     par_bright :=1;
     par_symmex :=0;
     case style of
-        1  : f:=2;
-        2  : f:=0.5;
-        3  : f:=sqrt(0.5);
-      else   f:=0;
+      0:   f:=0;
+      2:   f:=sqrt(0.5);
+      else f:=2;
     end;
     for i:=0 to 7 do with par_trafo[i] do begin
       if style=0
@@ -105,61 +112,112 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
       d   .re:=f*(0.5-random);
       d   .im:=f*(0.5-random);
     end;
-    if style in [3..6] then for i:=0 to 7 do with par_trafo[i] do begin
+    if style in [2..5] then for i:=0 to 7 do with par_trafo[i] do begin
       c[0]:=0;
       c[1]:=0;
       d   :=1;
     end;
     case style of
-        //TODO: Introduce more parameter reset styles
-        //      2. reduced dynamic range
-        //      3. pure linear IFS
-        //      4. Sierpinski Triangle
-        //      5. Sierpinski Carpet
-        //      6. Barnsley Fern
-        //      ...
+      3: for i:=0 to 7 do with par_trafo[i] do begin
+        a[0]:=0.5;
+        a[1]:=0.5*II;
+        b.re:=system.sin(2*pi*i/3);
+        b.im:=system.cos(2*pi*i/3);
+      end;
       4: for i:=0 to 7 do with par_trafo[i] do begin
-           a[0]:=0.5;
-           a[1]:=0.5*II;
-           b.re:=system.sin(2*pi*i/3);
-           b.im:=system.cos(2*pi*i/3);
-         end;
-      5: for i:=0 to 7 do with par_trafo[i] do begin
-           a[0]:=1/3;
-           a[1]:=1/3*II;
-           case byte(i) of                  //0 1 2
-             2,3,4: b.re:= 0.5;             //7   3
-             1,5  : b.re:= 0  ;             //6 5 4
-             0,6,7: b.re:=-0.5;
-           end;
-           case byte(i) of
-             0,1,2: b.im:= 0.5;
-             7,3  : b.im:= 0  ;
-             4,5,6: b.im:=-0.5;
-           end;
-         end;
-      6: begin
-           with par_trafo[0] do begin
-             a[0]:=0;
-             a[1]:=0.16*II;
-             b:=0;
-           end;
-           for i:=1 to 3 do with par_trafo[i] do begin
-             a[0]:= 0.85-0.04*II;
-             a[1]:= 0.04+0.85*II;
-             b   :=1.6*II;
-           end;
-           for i:=4 to 5 do with par_trafo[i] do begin
-             a[0]:= 0.2 +0.23*II;
-             a[1]:=-0.26+0.22*II;
-             b   :=1.6*II;
-           end;
-           for i:=6 to 7 do with par_trafo[i] do begin
-             a[0]:=-0.15+0.26*II;
-             a[1]:= 0.28+0.24*II;
-             b   :=0.44*II;
-           end;
-         end;
+        a[0]:=1/3;
+        a[1]:=1/3*II;
+        case byte(i) of                  //0 1 2
+          2,3,4: b.re:= 0.5;             //7   3
+          1,5  : b.re:= 0  ;             //6 5 4
+          0,6,7: b.re:=-0.5;
+        end;
+        case byte(i) of
+          0,1,2: b.im:= 0.5;
+          7,3  : b.im:= 0  ;
+          4,5,6: b.im:=-0.5;
+        end;
+      end;
+      5: begin
+        with par_trafo[0] do begin
+          a[0]:=0;
+          a[1]:=0.16*II;
+          b:=0;
+        end;
+        for i:=1 to 3 do with par_trafo[i] do begin
+          a[0]:= 0.85-0.04*II;
+          a[1]:= 0.04+0.85*II;
+          b   :=1.6*II;
+        end;
+        for i:=4 to 5 do with par_trafo[i] do begin
+          a[0]:= 0.2 +0.23*II;
+          a[1]:=-0.26+0.22*II;
+          b   :=1.6*II;
+        end;
+        for i:=6 to 7 do with par_trafo[i] do begin
+          a[0]:=-0.15+0.26*II;
+          a[1]:= 0.28+0.24*II;
+          b   :=0.44*II;
+        end;
+      end;
+      6,7,8,9: begin
+        rotK:=14-style;
+        for i:=1 to rotK-1 do with par_trafo[i] do begin
+          rot.re:=system.cos(2*pi*i/rotK);
+          rot.im:=system.sin(2*pi*i/rotK);
+          a[0]:=par_trafo[0].a[0]*rot;
+          a[1]:=par_trafo[0].a[1]*rot;
+          b   :=par_trafo[0].b   *rot;
+          c   :=par_trafo[0].c;
+          d   :=par_trafo[0].d;
+        end;
+        for i:=rotK to 7 do with par_trafo[i] do begin
+          rot.re:=system.cos(2*pi/rotK);
+          rot.im:=system.sin(2*pi/rotK);
+          a[0]:=exp(1-2*random+II*2*pi*random(rotK)/rotK);
+          a[1]:=a[0]*II;
+          b:=0;
+          d:=0;
+          c[0]:=exp(1-2*random+II*2*pi*random(rotK)/rotK);
+          c[1]:=c[0]*II;
+          if random<0.5
+          then begin a[0]:=0; a[1]:=0; b:=1; end
+          else begin c[0]:=0; c[1]:=0; d:=1; end;
+        end;
+      end;
+      10,11:begin
+        rotk:=14-style;
+        for i:=2 to 2*rotK-1 do with par_trafo[i] do begin
+          j:=i and 1;
+          rot.re:=system.cos(2*pi*(i shr 1)/rotK);
+          rot.im:=system.sin(2*pi*(i shr 1)/rotK);
+          a[0]:=par_trafo[j].a[0]*rot;
+          a[1]:=par_trafo[j].a[1]*rot;
+          b   :=par_trafo[j].b   *rot;
+          c   :=par_trafo[j].c;
+          d   :=par_trafo[j].d;
+        end;
+        for i:=2*rotK to 7 do with par_trafo[i] do begin
+          rot.re:=system.cos(2*pi/rotK);
+          rot.im:=system.sin(2*pi/rotK);
+          a[0]:=exp(1-2*random+II*2*pi*random(rotK)/rotK);
+          a[1]:=a[0]*II;
+          b:=0;
+          d:=0;
+          c[0]:=exp(1-2*random+II*2*pi*random(rotK)/rotK);
+          c[1]:=c[0]*II;
+          if random<0.5
+          then begin a[0]:=0; a[1]:=0; b:=1; end
+          else begin c[0]:=0; c[1]:=0; d:=1; end;
+        end;
+      end;
+      12: for i:=1 to 7 do if odd(i) then with par_trafo[i] do begin
+        a[0]:=par_trafo[i-1].a[0]*-1;
+        a[1]:=par_trafo[i-1].a[1]*-1;
+        b   :=par_trafo[i-1].b   *-1;
+        c   :=par_trafo[i-1].c;
+        d   :=par_trafo[i-1].d;
+      end;
     end;
   end;
 
@@ -341,6 +399,7 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
     end;
 
   VAR x,y,k:longint;
+      farawayCount:longint;
       t,dt:double;
       px:T_Complex;
   begin
@@ -363,6 +422,7 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
       while t<1 do begin
         setColor(t);
         px:=getRandomPoint;
+        farawayCount:=0;
         if par_symmex=8 then begin
           blurAid[0]:=1-0.5*abs(random+random-1);
           blurAid[1]:=1-0.5*abs(random+random-1);
@@ -376,7 +436,11 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
               1,8: colorToAdd:=rgb*par_bright*coverPerSample;
             end;
           end;
-          if (sqrabs(px)>abortRadius) then break else putPixel(px);
+          putPixel(px);
+          if (sqrabs(px)>abortRadius) then begin
+            inc(farawayCount);
+            if farawayCount>4 then break;
+          end else farawayCount:=0;
         end;
         t+=dt;
       end;
