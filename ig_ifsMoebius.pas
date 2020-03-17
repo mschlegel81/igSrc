@@ -63,10 +63,16 @@ FUNCTION T_moebiusIfs.parameterResetStyles: T_arrayOfString;
   begin
     result:='Zero';
     append(result,'Random');
+    append(result,'reduced dynamic range');
+    append(result,'linear IFS');
+    append(result,'Sierpinski Triangle');
+    append(result,'Sierpinski Carpet');
+    append(result,'Barnsley Fern');
   end;
 
 PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
-  VAR i,f:longint;
+  VAR i:longint;
+      f:double=0;
   begin
     inherited resetParameters(style);
     par_depth  :=128;
@@ -74,25 +80,86 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
     par_color  :=0;
     par_bright :=1;
     par_symmex :=0;
-    f:=style; if f>1 then f:=1;
+    case style of
+        1  : f:=2;
+        2  : f:=0.5;
+        3  : f:=sqrt(0.5);
+      else   f:=0;
+    end;
     for i:=0 to 7 do with par_trafo[i] do begin
       if style=0
       then rgb:=rgbColor((i) and 1,
                          (i) shr 1 and 1,
                          (i) shr 2 and 1)
       else rgb:=rgbColor(random,random,random);
-      a[0].re:=f*2*(0.5-random);
-      a[0].im:=f*2*(0.5-random);
-      a[1].re:=f*2*(0.5-random);
-      a[1].im:=f*2*(0.5-random);
+      a[0].re:=f*(0.5-random);
+      a[0].im:=f*(0.5-random);
+      a[1].re:=f*(0.5-random);
+      a[1].im:=f*(0.5-random);
       b   .re:=f*2*(0.5-random);
       b   .im:=f*2*(0.5-random);
-      c[0].re:=f*2*(0.5-random);
-      c[0].im:=f*2*(0.5-random);
-      c[1].re:=f*2*(0.5-random);
-      c[1].im:=f*2*(0.5-random);
-      d   .re:=f*2*(0.5-random);
-      d   .im:=f*2*(0.5-random);
+      c[0].re:=f*(0.5-random);
+      c[0].im:=f*(0.5-random);
+      c[1].re:=f*(0.5-random);
+      c[1].im:=f*(0.5-random);
+      d   .re:=f*(0.5-random);
+      d   .im:=f*(0.5-random);
+    end;
+    if style in [3..6] then for i:=0 to 7 do with par_trafo[i] do begin
+      c[0]:=0;
+      c[1]:=0;
+      d   :=1;
+    end;
+    case style of
+        //TODO: Introduce more parameter reset styles
+        //      2. reduced dynamic range
+        //      3. pure linear IFS
+        //      4. Sierpinski Triangle
+        //      5. Sierpinski Carpet
+        //      6. Barnsley Fern
+        //      ...
+      4: for i:=0 to 7 do with par_trafo[i] do begin
+           a[0]:=0.5;
+           a[1]:=0.5*II;
+           b.re:=system.sin(2*pi*i/3);
+           b.im:=system.cos(2*pi*i/3);
+         end;
+      5: for i:=0 to 7 do with par_trafo[i] do begin
+           a[0]:=1/3;
+           a[1]:=1/3*II;
+           case byte(i) of                  //0 1 2
+             2,3,4: b.re:= 0.5;             //7   3
+             1,5  : b.re:= 0  ;             //6 5 4
+             0,6,7: b.re:=-0.5;
+           end;
+           case byte(i) of
+             0,1,2: b.im:= 0.5;
+             7,3  : b.im:= 0  ;
+             4,5,6: b.im:=-0.5;
+           end;
+         end;
+      6: begin
+           with par_trafo[0] do begin
+             a[0]:=0;
+             a[1]:=0.16*II;
+             b:=0;
+           end;
+           for i:=1 to 3 do with par_trafo[i] do begin
+             a[0]:= 0.85-0.04*II;
+             a[1]:= 0.04+0.85*II;
+             b   :=1.6*II;
+           end;
+           for i:=4 to 5 do with par_trafo[i] do begin
+             a[0]:= 0.2 +0.23*II;
+             a[1]:=-0.26+0.22*II;
+             b   :=1.6*II;
+           end;
+           for i:=6 to 7 do with par_trafo[i] do begin
+             a[0]:=-0.15+0.26*II;
+             a[1]:= 0.28+0.24*II;
+             b   :=0.44*II;
+           end;
+         end;
     end;
   end;
 
@@ -103,7 +170,7 @@ FUNCTION T_moebiusIfs.getAlgorithmName: ansistring;
 
 FUNCTION T_moebiusIfs.numberOfParameters: longint;
   begin
-    result:=inherited numberOfParameters + 44;
+    result:=inherited numberOfParameters + 45;
   end;
 
 PROCEDURE T_moebiusIfs.setParameter(CONST index: byte; CONST value: T_parameterValue);
@@ -296,9 +363,10 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
       while t<1 do begin
         setColor(t);
         px:=getRandomPoint;
-        blurAid[0]:=1-0.5*abs(random+random-1);
-        blurAid[1]:=1-0.5*abs(random+random-1);
-
+        if par_symmex=8 then begin
+          blurAid[0]:=1-0.5*abs(random+random-1);
+          blurAid[1]:=1-0.5*abs(random+random-1);
+        end;
         for k:=1 to par_depth do begin
           with par_trafo[random(8)] do begin
             px:=(a[0]*px.re+a[1]*px.im+b)/
@@ -310,7 +378,7 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
           end;
           if (sqrabs(px)>abortRadius) then break else putPixel(px);
         end;
-        t:=t+dt;
+        t+=dt;
       end;
 
       if not(context^.cancellationRequested) then begin
