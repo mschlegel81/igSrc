@@ -1682,7 +1682,7 @@ FUNCTION T_mandelbrot.parameterResetStyles:T_arrayOfString;
   begin
     result:='Mandelbrot Set';
     append(result,'Julia Set');
-    //TODO: Add random reset style
+    append(result,'random');
   end;
 
 PROCEDURE T_mandelbrot.resetParameters(CONST style:longint);
@@ -1693,6 +1693,11 @@ PROCEDURE T_mandelbrot.resetParameters(CONST style:longint);
            julianess:=1;
            juliaParam.re:=-0.8;
            juliaParam.im:=0.156;
+         end;
+      2: begin
+           julianess:=random;
+           juliaParam.re:=-1.5+2*random;
+           juliaParam.im:=-1  +2*random;
          end;
     end;
   end;

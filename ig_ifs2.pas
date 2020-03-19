@@ -35,6 +35,7 @@ TYPE
     PROCEDURE setParameter(CONST index:byte; CONST value:T_parameterValue); virtual;
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint); virtual;
+    FUNCTION parameterIsGenetic(CONST index:byte):boolean; virtual;
   end;
 
 IMPLEMENTATION
@@ -262,6 +263,11 @@ FUNCTION T_ifs_v2.getParameter(CONST index: byte): T_parameterValue;
         end;
       end;
     end;
+  end;
+
+FUNCTION T_ifs_v2.parameterIsGenetic(CONST index:byte):boolean;
+  begin
+    result:=inherited parameterIsGenetic(index) and (index<>inherited numberOfParameters+3);
   end;
 
 FUNCTION getTrafo(CONST T:T_trafoInTime; CONST time:double; OUT contractionFactor:double):T_elementaryTrafo;

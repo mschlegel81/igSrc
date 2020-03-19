@@ -204,8 +204,11 @@ FUNCTION T_simpleImageOperationMeta.getDefaultOperation: P_imageOperation;
 
 PROCEDURE loadImage_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    //TODO: Handle file access errors
-    context^.image.loadFromFile(parameters.fileName);
+    try
+      context^.image.loadFromFile(parameters.fileName);
+    except
+      context^.cancelWithError('Error trying to load '+parameters.fileName);
+    end;
   end;
 
 PROCEDURE saveImage_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
@@ -214,10 +217,13 @@ PROCEDURE saveImage_impl(CONST parameters:T_parameterValue; CONST context:P_abst
       context^.messageQueue^.Post('No images are saved in editor mode',false,context^.currentStepIndex);
       exit;
     end;
-    //TODO: Handle file access errors
-    if parameters.description^.getType=pt_jpgNameWithSize
-    then context^.image.saveJpgWithSizeLimit(parameters.fileName,parameters.i0)
-    else context^.image.saveToFile(parameters.fileName);
+    try
+      if parameters.description^.getType=pt_jpgNameWithSize
+      then context^.image.saveJpgWithSizeLimit(parameters.fileName,parameters.i0)
+      else context^.image.saveToFile(parameters.fileName);
+    except
+      context^.cancelWithError('Error trying to save '+parameters.fileName);
+    end;
   end;
 
 PROCEDURE deleteFile_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);

@@ -33,6 +33,7 @@ TYPE
     PROCEDURE setParameter(CONST index:byte; CONST value:T_parameterValue); virtual;
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint); virtual;
+    FUNCTION parameterIsGenetic(CONST index:byte):boolean; virtual;
   end;
 
 IMPLEMENTATION
@@ -223,7 +224,8 @@ FUNCTION T_ifs.getParameter(CONST index: byte): T_parameterValue;
     end;
   end;
 
-PROCEDURE T_ifs.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint);
+PROCEDURE T_ifs.prepareSlice(CONST context: P_abstractWorkflow;
+  CONST index: longint);
   CONST abortRadius=1E3;
   FUNCTION trafoOfT(CONST t:double; CONST tt:T_TrafoTriplet):T_Trafo;
     begin
@@ -399,6 +401,11 @@ PROCEDURE T_ifs.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longi
       end;
       temp.destroy;
     end;
+  end;
+
+FUNCTION T_ifs.parameterIsGenetic(CONST index: byte): boolean;
+  begin
+    result:=inherited parameterIsGenetic(index) and (index<>inherited numberOfParameters+3);
   end;
 
 FUNCTION newIfs:P_generalImageGenrationAlgorithm; begin new(P_ifs(result),create); end;

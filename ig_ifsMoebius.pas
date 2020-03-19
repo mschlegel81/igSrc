@@ -31,6 +31,7 @@ TYPE
     PROCEDURE setParameter(CONST index:byte; CONST value:T_parameterValue); virtual;
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint); virtual;
+    FUNCTION parameterIsGenetic(CONST index:byte):boolean; virtual;
   end;
 
 IMPLEMENTATION
@@ -186,7 +187,7 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
         end;
       end;
       10,11:begin
-        rotk:=14-style;
+        rotK:=14-style;
         for i:=2 to 2*rotK-1 do with par_trafo[i] do begin
           j:=i and 1;
           rot.re:=system.cos(2*pi*(i shr 1)/rotK);
@@ -231,7 +232,8 @@ FUNCTION T_moebiusIfs.numberOfParameters: longint;
     result:=inherited numberOfParameters + 45;
   end;
 
-PROCEDURE T_moebiusIfs.setParameter(CONST index: byte; CONST value: T_parameterValue);
+PROCEDURE T_moebiusIfs.setParameter(CONST index: byte;
+  CONST value: T_parameterValue);
   VAR i,k:longint;
   begin
     if index<inherited numberOfParameters then inherited setParameter(index,value)
@@ -281,7 +283,8 @@ FUNCTION T_moebiusIfs.getParameter(CONST index: byte): T_parameterValue;
     end;
   end;
 
-PROCEDURE T_moebiusIfs.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint);
+PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
+  CONST index: longint);
   CONST abortRadius=1E3;
   VAR colorToAdd:T_rgbFloatColor=(0,0,0);
 
@@ -454,6 +457,11 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
       end;
       temp.destroy;
     end;
+  end;
+
+FUNCTION T_moebiusIfs.parameterIsGenetic(CONST index: byte): boolean;
+  begin
+    result:=inherited parameterIsGenetic(index) and (index<>inherited numberOfParameters+3);
   end;
 
 FUNCTION newIfs:P_generalImageGenrationAlgorithm; begin new(P_moebiusIfs(result),create); end;

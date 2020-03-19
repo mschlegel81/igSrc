@@ -40,9 +40,8 @@ TYPE
       FUNCTION alterParameter(CONST newParameterString:string):boolean; virtual;
       //Genetics:
       FUNCTION  parameterIsGenetic  (CONST index:byte):boolean; virtual;
-      PROCEDURE genetics_cross      (CONST parent1,parent2:P_generalImageGenrationAlgorithm; CONST distortion:double);
+      PROCEDURE genetics_cross      (CONST parent1,parent2:P_generalImageGenrationAlgorithm; CONST randomResetStyle:byte; CONST distortion:double);
       PROCEDURE genetics_interpolate(CONST parent1,parent2:P_generalImageGenrationAlgorithm; CONST step:double);
-      PROCEDURE genetics_randomize; virtual;
       PROCEDURE copyParameters          (CONST original:P_generalImageGenrationAlgorithm);
       PROCEDURE copyNonGeneticParameters(CONST original:P_generalImageGenrationAlgorithm);
   end;
@@ -345,8 +344,7 @@ FUNCTION T_pixelThrowerAlgorithm.getParameter(CONST index: byte): T_parameterVal
 
 FUNCTION T_pixelThrowerAlgorithm.parameterIsGenetic(CONST index: byte): boolean;
   begin
-    result:=((index=inherited numberOfParameters) or
-             (index>inherited numberOfParameters+2)) and inherited parameterIsGenetic(index);
+    result:=((index>inherited numberOfParameters+2)) and inherited parameterIsGenetic(index);
   end;
 
 PROCEDURE T_pixelThrowerAlgorithm.execute(CONST context: P_abstractWorkflow);
@@ -495,14 +493,14 @@ FUNCTION T_generalImageGenrationAlgorithm.parameterIsGenetic(CONST index: byte):
     result:=parameterDescription(index)^.getType in REAL_VALUES_PARAMETER_TYPES;
   end;
 
-PROCEDURE T_generalImageGenrationAlgorithm.genetics_cross(CONST parent1, parent2: P_generalImageGenrationAlgorithm; CONST distortion: double);
+PROCEDURE T_generalImageGenrationAlgorithm.genetics_cross(CONST parent1, parent2: P_generalImageGenrationAlgorithm; CONST randomResetStyle:byte; CONST distortion: double);
   VAR k:longint;
       randomInstance:P_generalImageGenrationAlgorithm;
   begin
     assert(parent1^.meta=meta);
     assert(parent2^.meta=meta);
     randomInstance:=P_generalImageGenrationAlgorithm(P_imageOperationMeta(meta)^.getDefaultOperation);
-    randomInstance^.genetics_randomize;
+    randomInstance^.resetParameters(randomResetStyle);
     for k:=0 to numberOfParameters-1 do if parameterIsGenetic(k) then begin
       setParameter(k,parent1^.getParameter(k)     .interpolate(
                      parent2^.getParameter(k),0.5).interpolate(randomInstance^.getParameter(k),distortion));
@@ -518,11 +516,6 @@ PROCEDURE T_generalImageGenrationAlgorithm.genetics_interpolate(CONST parent1, p
     for k:=0 to numberOfParameters-1 do
     if parameterIsGenetic(k) then setParameter(k,parent1^.getParameter(k).interpolate(parent2^.getParameter(k),step))
                              else setParameter(k,parent1^.getParameter(k));
-  end;
-
-PROCEDURE T_generalImageGenrationAlgorithm.genetics_randomize;
-  begin
-    resetParameters(1);
   end;
 
 PROCEDURE T_generalImageGenrationAlgorithm.copyParameters(CONST original: P_generalImageGenrationAlgorithm);
