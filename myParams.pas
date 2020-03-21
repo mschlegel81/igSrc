@@ -368,6 +368,7 @@ FUNCTION T_parameterValue.canParse(CONST stringToParse: ansistring;
       i:longint;
       expectedPrefix:string;
   begin
+    DefaultFormatSettings.DecimalSeparator:='.';
     valid:=false;
     txt:=trim(stringToParse);
     case parameterNameMode of
@@ -546,6 +547,7 @@ FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode)
     end;
 
   begin
+    DefaultFormatSettings.DecimalSeparator:='.';
     if parameterNameMode=tsm_parameterNameOnly then exit(associatedParmeterDescription^.name);
     case parameterNameMode of
       tsm_forSerialization:      result:=associatedParmeterDescription^.shortName;
