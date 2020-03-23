@@ -119,11 +119,20 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
       d   :=1;
     end;
     case style of
-      3: for i:=0 to 7 do with par_trafo[i] do begin
-        a[0]:=0.5;
-        a[1]:=0.5*II;
-        b.re:=system.sin(2*pi*i/3);
-        b.im:=system.cos(2*pi*i/3);
+      3: begin
+        for i:=0 to 7 do with par_trafo[i] do begin
+          a[0]:=0.5;
+          a[1]:=0.5*II;
+          b.re:=system.sin(2*pi*i/3);
+          b.im:=system.cos(2*pi*i/3);
+        end;
+        for i:=6 to 7 do with par_trafo[i] do begin
+          rot.re:=system.cos(2*pi*(i-5)/3);
+          rot.im:=system.sin(2*pi*(i-5)/3);
+          a[0]:=rot;
+          a[1]:=rot*II;
+          b  :=0;
+        end;
       end;
       4: for i:=0 to 7 do with par_trafo[i] do begin
         a[0]:=1/3;
@@ -430,7 +439,7 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
           blurAid[0]:=1-0.5*abs(random+random-1);
           blurAid[1]:=1-0.5*abs(random+random-1);
         end;
-        for k:=1 to par_depth do begin
+        for k:=-(par_depth shr 3) to par_depth do begin
           with par_trafo[random(8)] do begin
             px:=(a[0]*px.re+a[1]*px.im+b)/
                 (c[0]*px.re+c[1]*px.im+d);
@@ -439,7 +448,7 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
               1,8: colorToAdd:=rgb*par_bright*coverPerSample;
             end;
           end;
-          putPixel(px);
+          if k>=0 then putPixel(px);
           if (sqrabs(px)>abortRadius) then begin
             inc(farawayCount);
             if farawayCount>4 then break;
