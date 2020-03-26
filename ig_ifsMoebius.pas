@@ -35,19 +35,26 @@ TYPE
   end;
 
 IMPLEMENTATION
-USES math,darts,sysutils;
+USES darts,sysutils;
 
 CONSTRUCTOR T_moebiusIfs.create;
   CONST seedNames:array[0..3] of string=('Gauss','Circle','Line','Triangle');
-        colorNames:array[0..13] of string=('Normal/b','Crisp/b','Fire/b','Ice/b','Rainbow/b','White/b','Orange/b',
-                                            'Normal/w','Crisp/w','Fire/w','Ice/w','Rainbow/w','Black/w','Orange/w');
+        colorNames:array[0..8] of string=('Normal/b',  //0
+                                           'Crisp/b',   //1
+                                           'White/b',   //2
+                                           'Orange/b',  //3
+                                           'Normal/w',  //4
+                                           'Crisp/w',   //5
+                                           'Black/w',   //6
+                                           'Orange/w',  //7
+                                           'exact_depth'); //8
         postStepNames:array[0..9] of string=('None','Mirror X','Mirror Y','Mirror XY','Mirror Center','Rotate 3','Rotate 4','Rotate 5','Blur','Shift');
   VAR i:longint;
   begin
     inherited create;
     {0}addParameter('depth',pt_integer,1);
     {1}addParameter('seed type',pt_enum,0,2)^.setEnumValues(seedNames);
-    {2}addParameter('coloring',pt_enum,0,10)^.setEnumValues(colorNames);
+    {2}addParameter('coloring',pt_enum,0,8)^.setEnumValues(colorNames);
     {3}addParameter('brightness',pt_float,0);
     {4}addParameter('post-step',pt_enum,0,10)^.setEnumValues(postStepNames);
     for i:=0 to 7 do begin //Trafo index in triplet
@@ -65,16 +72,20 @@ FUNCTION T_moebiusIfs.parameterResetStyles: T_arrayOfString;
     result:='Zero';                       //0
     append(result,'Random');              //1
     append(result,'linear IFS');          //2
-    append(result,'Sierpinski Triangle'); //3
-    append(result,'Sierpinski Carpet');   //4
-    append(result,'Barnsley Fern');       //5
-    append(result,'8-symmetric random');  //6
-    append(result,'7-symmetric random');  //7
-    append(result,'6-symmetric random');  //8
-    append(result,'5-symmetric random');  //9
-    append(result,'4-symmetric random');  //10
-    append(result,'3-symmetric random');  //11
-    append(result,'2-symmetric random');  //12
+    append(result,'8-symmetric random');  //3
+    append(result,'7-symmetric random');  //4
+    append(result,'6-symmetric random');  //5
+    append(result,'5-symmetric random');  //6
+    append(result,'4-symmetric random');  //7
+    append(result,'3-symmetric random');  //8
+    append(result,'2-symmetric random');  //9
+    append(result,'Sierpinski Triangle'); //10
+    append(result,'Sierpinski Carpet');   //11
+    append(result,'Barnsley Fern');       //12
+    append(result,'Snowflake');           //13
+    append(result,'Moebius A');           //14
+    append(result,'Moebius B');           //15
+
   end;
 
 PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
@@ -113,28 +124,28 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
       d   .re:=f*(0.5-random);
       d   .im:=f*(0.5-random);
     end;
-    if style in [2..5] then for i:=0 to 7 do with par_trafo[i] do begin
+    if style in [2,10..20] then for i:=0 to 7 do with par_trafo[i] do begin
       c[0]:=0;
       c[1]:=0;
       d   :=1;
     end;
     case style of
-      3: begin
+     10: begin
         for i:=0 to 7 do with par_trafo[i] do begin
           a[0]:=0.5;
           a[1]:=0.5*II;
-          b.re:=system.sin(2*pi*i/3);
-          b.im:=system.cos(2*pi*i/3);
+          b.re:=system.sin(2*pi*i/3)*0.5;
+          b.im:=system.cos(2*pi*i/3)*0.5;
         end;
-        for i:=6 to 7 do with par_trafo[i] do begin
-          rot.re:=system.cos(2*pi*(i-5)/3);
-          rot.im:=system.sin(2*pi*(i-5)/3);
-          a[0]:=rot;
-          a[1]:=rot*II;
-          b  :=0;
-        end;
+        //for i:=6 to 7 do with par_trafo[i] do begin
+        //  rot.re:=system.cos(2*pi*(i-5)/3);
+        //  rot.im:=system.sin(2*pi*(i-5)/3);
+        //  a[0]:=rot;
+        //  a[1]:=rot*II;
+        //  b  :=0;
+        //end;
       end;
-      4: for i:=0 to 7 do with par_trafo[i] do begin
+     11: for i:=0 to 7 do with par_trafo[i] do begin
         a[0]:=1/3;
         a[1]:=1/3*II;
         case byte(i) of                  //0 1 2
@@ -148,7 +159,7 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
           4,5,6: b.im:=-0.5;
         end;
       end;
-      5: begin
+     12: begin
         with par_trafo[0] do begin
           a[0]:=0;
           a[1]:=0.16*II;
@@ -157,21 +168,21 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
         for i:=1 to 3 do with par_trafo[i] do begin
           a[0]:= 0.85-0.04*II;
           a[1]:= 0.04+0.85*II;
-          b   :=1.6*II;
+          b   :=0.16*II;
         end;
         for i:=4 to 5 do with par_trafo[i] do begin
           a[0]:= 0.2 +0.23*II;
           a[1]:=-0.26+0.22*II;
-          b   :=1.6*II;
+          b   :=0.16*II;
         end;
         for i:=6 to 7 do with par_trafo[i] do begin
           a[0]:=-0.15+0.26*II;
           a[1]:= 0.28+0.24*II;
-          b   :=0.44*II;
+          b   :=0.044*II;
         end;
       end;
-      6,7,8,9: begin
-        rotK:=14-style;
+      3..6: begin
+        rotK:=11-style;
         for i:=1 to rotK-1 do with par_trafo[i] do begin
           rot.re:=system.cos(2*pi*i/rotK);
           rot.im:=system.sin(2*pi*i/rotK);
@@ -195,8 +206,8 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
           else begin c[0]:=0; c[1]:=0; d:=1; end;
         end;
       end;
-      10,11:begin
-        rotK:=14-style;
+      7,8:begin
+        rotK:=11-style;
         for i:=2 to 2*rotK-1 do with par_trafo[i] do begin
           j:=i and 1;
           rot.re:=system.cos(2*pi*(i shr 1)/rotK);
@@ -221,13 +232,55 @@ PROCEDURE T_moebiusIfs.resetParameters(CONST style: longint);
           else begin c[0]:=0; c[1]:=0; d:=1; end;
         end;
       end;
-      12: for i:=1 to 7 do if odd(i) then with par_trafo[i] do begin
+      9: for i:=1 to 7 do if odd(i) then with par_trafo[i] do begin
         a[0]:=par_trafo[i-1].a[0]*-1;
         a[1]:=par_trafo[i-1].a[1]*-1;
         b   :=par_trafo[i-1].b   *-1;
         c   :=par_trafo[i-1].c;
         d   :=par_trafo[i-1].d;
       end;
+      13: begin
+        for i:=0 to 6 do with par_trafo[i] do begin
+          a[0]:=1/3;
+          a[1]:=II/3;
+          b:=system.cos(2*pi/6*i)+II*system.sin(2*pi/6*i);
+        end;
+        par_trafo[6].b:=0;
+        with par_trafo[7] do begin
+          a[0]:=1;
+          a[1]:=II;
+          b   :=0;
+        end;
+      end;
+      14: begin
+        for i:=0 to 3 do with par_trafo[i] do begin
+          a[0]:=system.cos(2*pi/4*i)+II*system.sin(2*pi/4*i);
+          a[1]:=a[0]*II;
+          b:=0;
+          c[0]:=1;
+          c[1]:=II;
+          d:=0.5;
+        end;
+        for i:=4 to 7 do with par_trafo[i] do begin
+          a[0]:=system.cos(2*pi/4*i)+II*system.sin(2*pi/4*i);
+          a[1]:=a[0]*II;
+          b:=1;
+          c[0]:=1;
+          c[1]:=II;
+          d:=0;
+        end;
+      end;
+      15: begin
+        for i:=0 to 7 do with par_trafo[i] do begin
+          a[0]:=system.cos(2*pi/8*i)+II*system.sin(2*pi/8*i);
+          a[1]:=a[0]*II;
+          b:=0;
+          c[0]:=1;
+          c[1]:=II;
+          d:=0.3;
+        end;
+      end;
+
     end;
   end;
 
@@ -297,19 +350,12 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
   CONST abortRadius=1E3;
   VAR colorToAdd:T_rgbFloatColor=(0,0,0);
 
-  PROCEDURE setColor(CONST t:double);
+  PROCEDURE setColor;
     begin
       with renderTempData do case par_color of
-        2,9:  colorToAdd:=rgbColor(max(0,(0.5+t*0.5)*3  ),
-                                   max(0,(0.5+t*0.5)*3-1),
-                                   max(0,(0.5+t*0.5)*3-2))*par_bright*coverPerSample;
-        3,10: colorToAdd:=rgbColor(min(1,max(0,(0.5-t*0.5)*2-1)),
-                                   min(1,max(0,(0.5-t*0.5)*2-1)),
-                                   min(1,max(0,(0.5-t*0.5)*2  )))*par_bright*coverPerSample;
-        4,11: colorToAdd:=hsvColor(0.5+t*0.5,1,par_bright*coverPerSample);
-        5:    colorToAdd:=WHITE*par_bright*coverPerSample;
-        12:   colorToAdd:=BLACK;
-        6,13: colorToAdd:=rgbColor(1,0.5,0)*par_bright*coverPerSample;
+        2,8:  colorToAdd:=WHITE*par_bright*coverPerSample;
+        6:    colorToAdd:=BLACK;
+        3,7:  colorToAdd:=rgbColor(1,0.5,0)*par_bright*coverPerSample;
         else  colorToAdd:=GREY*par_bright*coverPerSample;
       end;
     end;
@@ -421,18 +467,37 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
         then temp.create(backgroundImage^)
         else begin
           temp.create(xRes,yRes);
-          if par_color in [0..6]
+          if par_color in [0..3,8]
           then for y:=0 to yRes-1 do for x:=0 to xRes-1 do temp[x,y]:=BLACK
           else for y:=0 to yRes-1 do for x:=0 to xRes-1 do temp[x,y]:=WHITE;
         end;
         system.enterCriticalSection(flushCs);
-        dt:=  2*par_depth/timesteps;
+        if par_color=8
+        then dt:=2          /timesteps
+        else dt:=2*par_depth/timesteps;
         t:=-1+dt*samplesFlushed/aaSamples;
         system.leaveCriticalSection(flushCs);
       end;
-
-      while t<1 do begin
-        setColor(t);
+      setColor;
+      if par_color=8 then while t<1 do begin
+        px:=getRandomPoint;
+        farawayCount:=0;
+        if par_symmex=8 then begin
+          blurAid[0]:=1-0.5*abs(random+random-1);
+          blurAid[1]:=1-0.5*abs(random+random-1);
+        end;
+        for k:=1 to par_depth do begin
+          with par_trafo[random(8)] do
+            px:=(a[0]*px.re+a[1]*px.im+b)/
+                (c[0]*px.re+c[1]*px.im+d);
+          if (sqrabs(px)>abortRadius) then begin
+            inc(farawayCount);
+            if farawayCount>4 then break;
+          end else farawayCount:=0;
+        end;
+        if farawayCount<4 then putPixel(px);
+        t+=dt;
+      end else while t<1 do begin
         px:=getRandomPoint;
         farawayCount:=0;
         if par_symmex=8 then begin
@@ -444,8 +509,8 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
             px:=(a[0]*px.re+a[1]*px.im+b)/
                 (c[0]*px.re+c[1]*px.im+d);
             case par_color of
-              0,7: colorToAdd:=(colorToAdd*0.5)+(rgb*par_bright*coverPerSample);
-              1,8: colorToAdd:=rgb*par_bright*coverPerSample;
+              0,4: colorToAdd:=(colorToAdd*0.5)+(rgb*par_bright*coverPerSample);
+              1,5: colorToAdd:=rgb*par_bright*coverPerSample;
             end;
           end;
           if k>=0 then putPixel(px);
