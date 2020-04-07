@@ -19,6 +19,14 @@ TYPE
                  res_fit,
                  res_fitExpand,
                  res_fitRotate,
+
+                 res_exactPixelate,
+                 res_cropToFillPixelate,
+                 res_cropRotatePixelate,
+                 res_fitPixelate,
+                 res_fitExpandPixelate,
+                 res_fitRotatePixelate,
+
                  res_dataResize);
 
   T_structuredHitColor=record
@@ -552,33 +560,6 @@ PROCEDURE T_rawImage.saveJpgWithSizeLimit(CONST fileName:ansistring; CONST sizeL
       stream.free;
     end;
 
-//FUNCTION resize(CONST dim:T_imageDimensions; CONST newWidth,newHeight:longint; CONST resizeStyle:T_resizeStyle):T_imageDimensions;
-//  VAR destRect:TRect;
-//  begin
-//    case resizeStyle of
-//      res_exact,res_dataResize,res_cropToFill,res_fitExpand,res_cropRotate: begin
-//        result.width :=newWidth;
-//        result.height:=newHeight;
-//      end;
-//      res_fit: begin
-//        destRect:=getFittingRectangle(newWidth,newHeight,dim.width/dim.height);
-//        result.width:=destRect.Right;
-//        result.height:=destRect.Bottom;
-//      end;
-//      res_fitRotate: begin
-//        //Pic the option resulting in the larger resolution
-//        destRect:=getFittingRectangle(newWidth,newHeight,dim.width/dim.height);
-//        result.width:=destRect.Right;
-//        result.height:=destRect.Bottom;
-//        destRect:=getFittingRectangle(newWidth,newHeight,dim.height/dim.width);
-//        if destRect.Right*destRect.Bottom>result.width*result.height then begin
-//          result.width:=destRect.Right;
-//          result.height:=destRect.Bottom;
-//        end;
-//      end;
-//    end;
-//  end;
-
 PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T_resizeStyle);
   VAR srcRect,destRect:TRect;
       dx,dy:longint;
@@ -592,8 +573,19 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
       copyToImage(srcRect,srcImage);
       destImage:=TImage.create(nil);
       destImage.SetInitialBounds(destRect.Left,destRect.top,destRect.Right,destRect.Bottom);
-      destImage.AntialiasingMode:=amOn;
-      destImage.Canvas.AntialiasingMode:=amOn;
+      if resizeStyle in [res_exactPixelate,
+                         res_cropToFillPixelate,
+                         res_cropRotatePixelate,
+                         res_fitPixelate,
+                         res_fitExpandPixelate,
+                         res_fitRotatePixelate]
+      then begin
+        destImage.AntialiasingMode       :=amOff;
+        destImage.Canvas.AntialiasingMode:=amOff;
+      end else begin
+        destImage.AntialiasingMode       :=amOn;
+        destImage.Canvas.AntialiasingMode:=amOn;
+      end;
       destImage.Canvas.StretchDraw(destRect,srcImage.picture.Graphic);
       srcImage.free;
       copyFromImage(destImage);
@@ -602,16 +594,16 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
 
   begin
     case resizeStyle of
-      res_exact,res_dataResize: begin
+      res_exact,res_exactPixelate,res_dataResize: begin
         if tgtDim=dim then exit;
         srcRect:=dim.toRect;
         destRect:=tgtDim.toRect;
       end;
-      res_fit,res_fitExpand: begin
+      res_fit,res_fitExpand,res_fitPixelate,res_fitExpandPixelate: begin
         srcRect:=dim.toRect;
         destRect:=tgtDim.getFittingRectangle(dim.width/dim.height).toRect;
       end;
-      res_fitRotate, res_cropRotate: begin
+      res_fitRotate, res_cropRotate, res_fitRotatePixelate, res_cropRotatePixelate: begin
         destRect:=tgtDim.getFittingRectangle(dim.width/dim.height).toRect;
         srcRect :=tgtDim.getFittingRectangle(dim.height/dim.width).toRect;
         if srcRect.Right*srcRect.Bottom>destRect.Right*destRect.Bottom then begin
@@ -619,7 +611,7 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
           destRect:=srcRect;
           srcRect:=rect(0,0,dim.height,dim.width);
         end else srcRect:=dim.toRect;
-        if resizeStyle=res_cropRotate then begin
+        if resizeStyle in [res_cropRotate,res_cropRotatePixelate] then begin
           destRect:=tgtDim.toRect;
           if doRotate then begin
             dx:=round(dim.height-dim.width*tgtDim.width/tgtDim.height); if dx<0 then dx:=0;
@@ -632,7 +624,7 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
           end;
         end;
       end;
-      res_cropToFill: begin
+      res_cropToFill,res_cropToFillPixelate: begin
         destRect:=tgtDim.toRect;
         //(xRes-dx)/(dim.height-dy)=newWidth/newHeight
         //dy=0 => dx=xRes-dim.height*newWidth/newHeight
@@ -647,7 +639,7 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
       destDim:=tgtDim;
       inherited resize(destDim);
     end else resizeViaTImage;
-    if resizeStyle=res_fitExpand then begin
+    if resizeStyle in [res_fitExpand,res_fitExpandPixelate] then begin
       destDim.width :=tgtDim.width -dim.width ; dx:=-(destDim.width  shr 1); inc(destDim.width ,dx+dim.width );
       destDim.height:=tgtDim.height-dim.height; dy:=-(destDim.height shr 1); inc(destDim.height,dy+dim.height);
       cropAbsolute(dx,destDim.width,dy,destDim.height);

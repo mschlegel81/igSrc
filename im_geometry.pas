@@ -35,23 +35,18 @@ FUNCTION targetDimensions(CONST parameters:T_parameterValue; CONST context:P_abs
     result:=context^.limitedDimensionsForResizeStep(imageDimensions(parameters.i0,parameters.i1));
   end;
 
-PROCEDURE resize_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.resize(targetDimensions(parameters,context),res_exact); end;
-
-PROCEDURE fit_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.resize(targetDimensions(parameters,context),res_fit); end;
-
-PROCEDURE fill_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.resize(targetDimensions(parameters,context),res_cropToFill); end;
-
-PROCEDURE fitExpand_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.resize(targetDimensions(parameters,context),res_fitExpand); end;
-
-PROCEDURE fitRotate_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.resize(targetDimensions(parameters,context),res_fitRotate); end;
-
-PROCEDURE fillRotate_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  begin context^.image.resize(targetDimensions(parameters,context),res_cropRotate); end;
+PROCEDURE resize_impl       (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_exact); end;
+PROCEDURE fit_impl          (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_fit); end;
+PROCEDURE fill_impl         (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_cropToFill); end;
+PROCEDURE fitExpand_impl    (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_fitExpand); end;
+PROCEDURE fitRotate_impl    (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_fitRotate); end;
+PROCEDURE fillRotate_impl   (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_cropRotate); end;
+PROCEDURE resizePxl_impl    (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_exactPixelate); end;
+PROCEDURE fitPxl_impl       (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_fitPixelate); end;
+PROCEDURE fillPxl_impl      (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_cropToFillPixelate); end;
+PROCEDURE fitExpandPxl_impl (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_fitExpandPixelate); end;
+PROCEDURE fitRotatePxl_impl (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_fitRotatePixelate); end;
+PROCEDURE fillRotatePxl_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_cropRotatePixelate); end;
 
 PROCEDURE crop_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
@@ -138,6 +133,30 @@ INITIALIZATION
   registerSimpleOperation(imc_geometry,
                           resizeParameters('fillRotate'),
                           @fillRotate_impl,
+                          sok_inputDependent);
+  registerSimpleOperation(imc_geometry,
+                          resizeParameters('resizePixelate'),
+                          @resizePxl_impl,
+                          sok_inputDependent)^.getSimpleParameterDescription;
+  registerSimpleOperation(imc_geometry,
+                          resizeParameters('fitPixelate'),
+                          @fitPxl_impl,
+                          sok_inputDependent);
+  registerSimpleOperation(imc_geometry,
+                          resizeParameters('fillPixelate'),
+                          @fillPxl_impl,
+                          sok_inputDependent);
+  registerSimpleOperation(imc_geometry,
+                          resizeParameters('fitExpandPixelate'),
+                          @fitExpandPxl_impl,
+                          sok_inputDependent);
+  registerSimpleOperation(imc_geometry,
+                          resizeParameters('fitRotatePixelate'),
+                          @fitRotatePxl_impl,
+                          sok_inputDependent);
+  registerSimpleOperation(imc_geometry,
+                          resizeParameters('fillRotatePixelate'),
+                          @fillRotatePxl_impl,
                           sok_inputDependent);
   registerSimpleOperation(imc_geometry,
                           newParameterDescription('zoom', pt_float)^.setDefaultValue('0.5'),
