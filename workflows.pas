@@ -471,11 +471,20 @@ PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWi
       saveStep:P_simpleImageOperation;
       counter:longint=0;
   begin
-    temporaryWorkflow:=config.getFirstTodoStep;
+    //Fixate initial state if not fixed yet:
+    if workflowType in [wft_fixated,wft_halfFix]
+    then temporaryWorkflow:=C_EMPTY_STRING_ARRAY
+    else temporaryWorkflow:=config.getFirstTodoStep;
+
+    //Append workflow
     append(temporaryWorkflow,workflowText);
+
+    //Append save step
     saveStep:=getSaveStatement(savingToFile,savingWithSizeLimit);
     append(temporaryWorkflow,saveStep^.toString(tsm_withNiceParameterName));
     dispose(saveStep,destroy);
+
+    //Find appropriate todo-name and save
     todoBase:=ExtractFileNameWithoutExt(savingToFile);
     todoName:=todoBase+lowercase(C_todoExtension);
     while fileExists(todoName) do begin
