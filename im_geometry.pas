@@ -14,7 +14,7 @@ VAR cropMeta:^T_cropMeta;
 FUNCTION canParseResolution(CONST s:string; OUT dim:T_imageDimensions):boolean;
 FUNCTION isResizeOperation(CONST op:P_imageOperation):boolean;
 IMPLEMENTATION
-USES myParams,mypics;
+USES myParams,mypics,sysutils;
 VAR pd_resize:P_parameterDescription=nil;
 
 FUNCTION canParseResolution(CONST s: string; OUT dim: T_imageDimensions): boolean;
@@ -51,7 +51,7 @@ PROCEDURE fillRotatePxl_impl(CONST parameters:T_parameterValue; CONST context:P_
 PROCEDURE crop_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
     context^.image.crop(parameters.f0,parameters.f1,parameters.f2,parameters.f3);
-    context^.limitImageSize;
+    if not(context^.limitImageSize) then context^.messageQueue^.Post('Dimensions after cropping are '+intToStr(context^.image.dimensions.width)+'x'+intToStr(context^.image.dimensions.height),false,context^.currentStepIndex);
   end;
 
 PROCEDURE zoom_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);

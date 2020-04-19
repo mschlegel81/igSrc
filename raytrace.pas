@@ -227,6 +227,7 @@ VAR
   globalRenderTolerance:double=1;
 
 IMPLEMENTATION
+USES pixMaps,mySys;
 VAR renderThreadID:array[0..15] of TThreadID;
     chunkToPrepare:array[0..15] of longint;
 
@@ -1447,7 +1448,7 @@ PROCEDURE calculateImage(CONST xRes,yRes:longint; CONST repairMode:boolean; CONS
       renderImage.create(dumpName);
       if (renderImage.dimensions.width<>xRes) or (renderImage.dimensions.height<>yRes) then begin
         writeln('AND REJECTED DUE TO WRONG RESOLUTION');
-        renderImage.resize(xRes,yRes,res_dataResize);
+        renderImage.resize(imageDimensions(xRes,yRes),res_dataResize);
         markChunksAsPending(renderImage);
       end else write('AND ACCEPTED. RESUMING CALCULATION ');
     end else begin
@@ -2143,4 +2144,5 @@ FUNCTION T_tube.getSamplingPoint: T_Vec3;
 INITIALIZATION
   samplingStatistics:=zeroSamplingStatistics;
   currentSamplingStatistics:=zeroSamplingStatistics;
+  numberOfCPUs:=getNumberOfCPUs;
 end.
