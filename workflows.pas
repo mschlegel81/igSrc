@@ -453,6 +453,7 @@ FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string): boolean;
       result:=false;
     end else begin
       result:=parseWorkflow(readFile(fileName));
+      result:=result and (length(steps)>0);
       if result then config.workflowFilename:=fileName;
     end;
   end;
@@ -514,6 +515,7 @@ FUNCTION T_simpleWorkflow.executeAsTodo: boolean;
   VAR i:longint;
       todoDir:string;
   begin
+    if stepCount<1 then exit(false);
     todoDir:=ExtractFileDir(config.workflowFilename);
     for i:=0 to stepCount-1 do
     if (step[i]^.operation^.readsFile<>'') or (step[i]^.operation^.writesFile<>'') then begin
