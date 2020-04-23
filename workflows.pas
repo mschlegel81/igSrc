@@ -81,6 +81,7 @@ TYPE
       FUNCTION isValid: boolean; virtual;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual;
       FUNCTION limitImageSize:boolean; virtual;
+      FUNCTION stepCount:longint; virtual;
   end;
 
   T_standaloneWorkflow=object(T_simpleWorkflow)
@@ -243,6 +244,9 @@ FUNCTION T_generateImageWorkflow.limitImageSize: boolean;
   begin
     result:=relatedEditor^.config.limitImageSize(image);
   end;
+
+FUNCTION T_generateImageWorkflow.stepCount:longint;
+  begin result:=1; end;
 
 PROCEDURE T_simpleWorkflow.headlessWorkflowExecution;
   VAR stepStarted:double;
