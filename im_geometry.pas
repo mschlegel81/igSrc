@@ -51,7 +51,7 @@ PROCEDURE fillRotatePxl_impl(CONST parameters:T_parameterValue; CONST context:P_
 PROCEDURE crop_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
     context^.image.crop(parameters.f0,parameters.f1,parameters.f2,parameters.f3);
-    if not(context^.limitImageSize) then context^.messageQueue^.Post('Dimensions after cropping are '+intToStr(context^.image.dimensions.width)+'x'+intToStr(context^.image.dimensions.height),false,context^.currentStepIndex);
+    if not(context^.limitImageSize) then context^.messageQueue^.Post('Dimensions after cropping are '+intToStr(context^.image.dimensions.width)+'x'+intToStr(context^.image.dimensions.height),false,context^.currentStepIndex,context^.stepCount);
   end;
 
 PROCEDURE zoom_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);

@@ -64,7 +64,7 @@ DESTRUCTOR T_workflowStep.destroy;
 PROCEDURE T_workflowStep.execute(CONST context: P_abstractWorkflow);
   begin
     if valid then begin
-      context^.messageQueue^.Post(specification,false,context^.currentStepIndex);
+      context^.messageQueue^.Post(specification,false,context^.currentStepIndex,context^.stepCount);
       operation_^.execute(context);
     end else begin
       context^.cancelWithError('Invalid step: '+specification);

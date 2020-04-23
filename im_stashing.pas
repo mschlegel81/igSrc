@@ -92,7 +92,7 @@ PROCEDURE blurWithStash_impl(CONST parameters:T_parameterValue; CONST context:P_
     fromStash:=context^.stash.getStashedImage(parameters.fileName);
     if fromStash=nil then exit;
     if fromStash^.dimensions<>context^.image.dimensions then begin
-      context^.messageQueue^.Post('Stash has wrong resolution');
+      context^.messageQueue^.Post('Stash has wrong resolution',true,context^.currentStepIndex,context^.stepCount);
       exit;
     end;
     //TODO: It might be more elegant to process the blurring in bulk

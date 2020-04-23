@@ -214,7 +214,7 @@ PROCEDURE loadImage_impl(CONST parameters:T_parameterValue; CONST context:P_abst
 PROCEDURE saveImage_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
     if context^.isEditorWorkflow then begin
-      context^.messageQueue^.Post('No images are saved in editor mode',false,context^.currentStepIndex);
+      context^.messageQueue^.Post('No images are saved in editor mode',false,context^.currentStepIndex,context^.stepCount);
       exit;
     end;
     try

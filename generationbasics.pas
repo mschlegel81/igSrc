@@ -49,10 +49,11 @@ TYPE
       fMessageCreatedAtTime:double;
       fIndicatesError:boolean;
       fStepIndex:longint;
+      fTotalSteps:longint;
       fMessageText:string;
       nextMessage:P_structuredMessage;
     public
-      CONSTRUCTOR create(CONST message:string; CONST isError:boolean=false; CONST relatesToStep:longint=-1);
+      CONSTRUCTOR create(CONST message:string; CONST isError:boolean=false; CONST relatesToStep:longint=-1; CONST numberOfSteps:longint=0);
       DESTRUCTOR destroy;
       FUNCTION toString(CONST messageStringLengthLimit:longint):string;
       PROPERTY messageText:string read fMessageText;
@@ -72,7 +73,7 @@ TYPE
       DESTRUCTOR destroy;
       FUNCTION get:P_structuredMessage;
       PROCEDURE postSeparator;
-      PROCEDURE Post(CONST message:string; CONST isError:boolean=true; CONST relatesToStep:longint=-1);
+      PROCEDURE Post(CONST message:string; CONST isError:boolean; CONST relatesToStep,totalStepsInWorkflow:longint);
       PROCEDURE clear;
       FUNCTION getText:T_arrayOfString;
   end;
@@ -145,15 +146,15 @@ CONST C_SEPERATOR_MESSAGE_TEXT='''';
 
 PROCEDURE T_structuredMessageQueue.postSeparator;
   begin
-    Post(C_SEPERATOR_MESSAGE_TEXT,false);
+    Post(C_SEPERATOR_MESSAGE_TEXT,false,-1,0);
   end;
 
-PROCEDURE T_structuredMessageQueue.Post(CONST message: string; CONST isError: boolean; CONST relatesToStep: longint);
+PROCEDURE T_structuredMessageQueue.Post(CONST message:string; CONST isError:boolean; CONST relatesToStep,totalStepsInWorkflow:longint);
   VAR m:P_structuredMessage;
   begin
     enterCriticalSection(queueCs);
     try
-      new(m,create(message,isError,relatesToStep));
+      new(m,create(message,isError,relatesToStep,totalStepsInWorkflow));
       if first=nil
       then first:=m
       else last^.nextMessage:=m;
@@ -166,12 +167,13 @@ PROCEDURE T_structuredMessageQueue.Post(CONST message: string; CONST isError: bo
     end;
   end;
 
-CONSTRUCTOR T_structuredMessage.create(CONST message: string; CONST isError: boolean; CONST relatesToStep: longint);
+CONSTRUCTOR T_structuredMessage.create(CONST message: string; CONST isError: boolean; CONST relatesToStep: longint; CONST numberOfSteps:longint);
   begin
     fMessageCreatedAtTime:=now;
     fMessageText:=message;
     fIndicatesError:=isError;
     fStepIndex:=relatesToStep;
+    fTotalSteps:=numberOfSteps;
     nextMessage:=nil;
   end;
 
@@ -183,7 +185,7 @@ FUNCTION T_structuredMessage.toString(CONST messageStringLengthLimit:longint): s
   begin
     if fMessageText=C_SEPERATOR_MESSAGE_TEXT then exit('');
     result:=FormatDateTime('hh:mm:ss',fMessageCreatedAtTime)+' ';
-    if (fStepIndex>=0) then result+='('+intToStr(fStepIndex)+') ';
+    if (fStepIndex>=0) then result+='('+intToStr(fStepIndex+1)+'/'+intToStr(fTotalSteps)+') ';
     if fIndicatesError then result+='ERROR: ';
     result:=stringEllipse(result+fMessageText,messageStringLengthLimit);
   end;
@@ -195,8 +197,7 @@ PROCEDURE T_imageWorkflowConfiguration.clearImage;
     cachedInitialImageWasScaled:=false;
   end;
 
-CONSTRUCTOR T_imageWorkflowConfiguration.create(
-  CONST step0Changed: F_simpleCallback);
+CONSTRUCTOR T_imageWorkflowConfiguration.create(CONST step0Changed: F_simpleCallback);
   begin
     onStep0Changed:=step0Changed;
     cachedInitialImage:=nil;

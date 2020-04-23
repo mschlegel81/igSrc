@@ -120,6 +120,7 @@ TYPE
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual; abstract;
       FUNCTION limitImageSize:boolean; virtual; abstract;
       FUNCTION isEditorWorkflow:boolean; virtual;
+      FUNCTION stepCount:longint; virtual; abstract;
   end;
 
 VAR maxImageManipulationThreads:longint=1;
@@ -249,7 +250,7 @@ PROCEDURE T_abstractWorkflow.logParallelStepDone;
         // (endTime-queue.queueStarted)                          = queue.stepsTotal/queue.stepsDone*(now-queue.queueStarted)
         //  endTime                                              = queue.stepsTotal/queue.stepsDone*(now-queue.queueStarted)+queue.queueStarted
         messageQueue^.Post(intToStr(round(100.0*queue.stepsDone/queue.stepsTotal))+'% ('+intToStr(queue.stepsDone)+'/'+intToStr(queue.stepsTotal)+') rem: '
-          +myTimeToStr(queue.stepsTotal/queue.stepsDone*(now-queue.queueStarted)+queue.queueStarted-now),false);
+          +myTimeToStr(queue.stepsTotal/queue.stepsDone*(now-queue.queueStarted)+queue.queueStarted-now),false,currentExecution.currentStepIndex,stepCount);
         queue.lastQueueLog:=now;
       end;
     finally
@@ -428,7 +429,7 @@ PROCEDURE T_abstractWorkflow.ensureStop;
     enterCriticalSection(contextCS);
     if currentExecution.workflowState=ts_evaluating then begin
       currentExecution.workflowState:=ts_stopRequested;
-      messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex);
+      messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex,stepCount);
     end;
     while not(currentExecution.workflowState in [ts_cancelled,ts_ready]) do begin
       leaveCriticalSection(contextCS);
@@ -443,7 +444,7 @@ PROCEDURE T_abstractWorkflow.postStop;
     enterCriticalSection(contextCS);
     if currentExecution.workflowState=ts_evaluating then begin
       currentExecution.workflowState:=ts_stopRequested;
-      messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex);
+      messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex,stepCount);
     end;
     leaveCriticalSection(contextCS);
   end;
@@ -474,7 +475,7 @@ PROCEDURE T_abstractWorkflow.cancelWithError(CONST errorMessage: string);
     enterCriticalSection(contextCS);
     if currentExecution.workflowState=ts_evaluating then begin
       currentExecution.workflowState:=ts_stopRequested;
-      messageQueue^.Post(errorMessage,true,currentExecution.currentStepIndex);
+      messageQueue^.Post(errorMessage,true,currentExecution.currentStepIndex,stepCount);
     end;
     leaveCriticalSection(contextCS);
   end;

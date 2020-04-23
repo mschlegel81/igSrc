@@ -26,7 +26,7 @@ TYPE
       DESTRUCTOR destroy; virtual;
       PROCEDURE clear;
       PROPERTY step[index:longint]: P_workflowStep read getStep;
-      FUNCTION stepCount:longint;
+      FUNCTION stepCount:longint; virtual;
       FUNCTION parseWorkflow(CONST data:T_arrayOfString):boolean;
       FUNCTION workflowText:T_arrayOfString;
       FUNCTION readFromFile(CONST fileName:string):boolean;
@@ -137,7 +137,7 @@ PROCEDURE T_generateImageWorkflow.beforeAll;
     enterCriticalSection(relatedEditor^.contextCS);
     try
       messageQueue^.postSeparator;
-      messageQueue^.Post('Starting preview calculation',false);
+      messageQueue^.Post('Starting preview calculation',false,-1,0);
       image.resize(relatedEditor^.config.initialResolution,res_dataResize);
       if (editingStep>0) and (editingStep-1<relatedEditor^.stepCount) and (relatedEditor^.step[editingStep-1]^.outputImage<>nil) then begin
         image.copyFromPixMap(relatedEditor^.step[editingStep-1]^.outputImage^);
@@ -164,10 +164,10 @@ PROCEDURE T_generateImageWorkflow.headlessWorkflowExecution;
     try
       if currentExecution.workflowState=ts_evaluating
       then begin
-        messageQueue^.Post('Done '+myTimeToStr(now-stepStarted),false,-1);
+        messageQueue^.Post('Done '+myTimeToStr(now-stepStarted),false,-1,0);
         currentExecution.workflowState:=ts_ready;
       end else begin
-        messageQueue^.Post('Cancelled '+myTimeToStr(now-stepStarted),false,-1);
+        messageQueue^.Post('Cancelled '+myTimeToStr(now-stepStarted),false,-1,0);
         currentExecution.workflowState:=ts_cancelled;
       end;
     finally
@@ -267,7 +267,7 @@ PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint;
       thereIsALaterAccess:boolean=false;
       i:longint;
   begin
-    if elapsed>reportStepTimeIfLargerThan then messageQueue^.Post('Finished step after '+myTimeToStr(elapsed),false,currentStepIndex);
+    if elapsed>reportStepTimeIfLargerThan then messageQueue^.Post('Finished step after '+myTimeToStr(elapsed),false,currentStepIndex,stepCount);
     begin
       accessedStash                         :=steps[stepIndex]^.operation^.readsStash;
       if accessedStash='' then accessedStash:=steps[stepIndex]^.operation^.writesStash;
@@ -283,7 +283,7 @@ PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint;
 PROCEDURE T_editorWorkflow.afterStep(CONST stepIndex: longint;
   CONST elapsed: double);
   begin
-    if elapsed>reportStepTimeIfLargerThan then messageQueue^.Post('Finished step after '+myTimeToStr(elapsed),false,currentStepIndex);
+    if elapsed>reportStepTimeIfLargerThan then messageQueue^.Post('Finished step after '+myTimeToStr(elapsed),false,currentStepIndex,stepCount);
     step[stepIndex]^.saveOutputImage(image);
   end;
 
@@ -296,8 +296,8 @@ PROCEDURE T_simpleWorkflow.afterAll;
       if currentExecution.workflowState in [ts_pending,ts_evaluating] then currentExecution.workflowState:=ts_ready;
       if currentExecution.workflowState in [ts_stopRequested        ] then currentExecution.workflowState:=ts_cancelled;
       case currentExecution.workflowState of
-        ts_ready: messageQueue^.Post('Workflow done '+myTimeToStr(now-startedAt),false);
-        ts_cancelled: messageQueue^.Post('Workflow cancelled '+myTimeToStr(now-startedAt),false,currentExecution.currentStepIndex);
+        ts_ready: messageQueue^.Post('Workflow done '+myTimeToStr(now-startedAt),false,-1,0);
+        ts_cancelled: messageQueue^.Post('Workflow cancelled '+myTimeToStr(now-startedAt),false,currentExecution.currentStepIndex,stepCount);
       end;
     finally
       leaveCriticalSection(contextCS);
@@ -363,7 +363,7 @@ PROCEDURE T_simpleWorkflow.beforeAll;
       currentExecution.workflowState:=ts_evaluating;
       currentExecution.currentStepIndex:=0;
       config.prepareImageForWorkflow(image);
-      messageQueue^.Post('Starting workflow',false)
+      messageQueue^.Post('Starting workflow',false,-1,0)
     finally
       leaveCriticalSection(contextCS);
     end;
@@ -389,13 +389,13 @@ PROCEDURE T_editorWorkflow.beforeAll;
       else config.prepareImageForWorkflow(image);
       messageQueue^.postSeparator;
       if currentExecution.currentStepIndex=0
-      then messageQueue^.Post('Starting workflow',false)
-      else messageQueue^.Post('Resuming workflow',false,currentExecution.currentStepIndex);
+      then messageQueue^.Post('Starting workflow',false,-1,0)
+      else messageQueue^.Post('Resuming workflow',false,currentExecution.currentStepIndex,stepCount);
 
       //clear stash and restore it from output images:
       stash.clear;
       for i:=0 to currentExecution.currentStepIndex-1 do if (steps[i]^.isValid) and (steps[i]^.outputImage<>nil) and (steps[i]^.operation^.writesStash<>'') then begin
-        {$ifdef debugMode}messageQueue^.Post('Restoring stash "'+steps[i]^.operation^.writesStash+'" from output',false,i); {$endif}
+        {$ifdef debugMode}messageQueue^.Post('Restoring stash "'+steps[i]^.operation^.writesStash+'" from output',false,i,stepCount); {$endif}
         stash.stashImage(steps[i]^.operation^.writesStash,
                          steps[i]^.outputImage^);
       end;
@@ -415,7 +415,7 @@ FUNCTION T_simpleWorkflow.parseWorkflow(CONST data: T_arrayOfString): boolean;
       new(newSteps[i],create(data[i]));
       if not(newSteps[i]^.isValid) then begin
         result:=false;
-        messageQueue^.Post('Invalid step: '+data[i],true,i);
+        messageQueue^.Post('Invalid step: '+data[i],true,i,stepCount);
       end;
     end;
     if not(result) then begin
@@ -447,9 +447,9 @@ FUNCTION T_simpleWorkflow.workflowText: T_arrayOfString;
 
 FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string): boolean;
   begin
-    messageQueue^.Post('Trying to parse workflow from file: '+fileName,false);
+    messageQueue^.Post('Trying to parse workflow from file: '+fileName,false,-1,0);
     if not(fileExists(fileName)) then begin
-      messageQueue^.Post('File "'+fileName+'" does not exist');
+      messageQueue^.Post('File "'+fileName+'" does not exist',true,-1,0);
       result:=false;
     end else begin
       result:=parseWorkflow(readFile(fileName));
@@ -460,7 +460,7 @@ FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string): boolean;
 
 PROCEDURE T_simpleWorkflow.saveToFile(CONST fileName: string);
   begin
-    messageQueue^.Post('Writing workflow to file: '+fileName,false);
+    messageQueue^.Post('Writing workflow to file: '+fileName,false,-1,0);
     writeFile(fileName,workflowText);
     config.workflowFilename:=fileName;
   end;
@@ -492,7 +492,7 @@ PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWi
       inc(counter);
       todoName:=todoBase+'_'+intToStr(counter)+lowercase(C_todoExtension);
     end;
-    messageQueue^.Post('Writing todo to file: '+todoName,false);
+    messageQueue^.Post('Writing todo to file: '+todoName,false,-1,0);
     writeFile(todoName,temporaryWorkflow);
   end;
 
@@ -525,7 +525,7 @@ FUNCTION T_simpleWorkflow.executeAsTodo: boolean;
     end;
     if not(isValid) then exit(false);
     if step[stepCount-1]^.operation^.writesFile='' then begin
-      messageQueue^.Post('Invalid todo workflow. The last operation must be a save statement.');
+      messageQueue^.Post('Invalid todo workflow. The last operation must be a save statement.',true,stepCount-1,stepCount);
       exit(false);
     end;
     addStep(deleteOp.getOperationToDeleteFile(config.workflowFilename));
@@ -557,7 +557,7 @@ FUNCTION T_simpleWorkflow.addStep(CONST specification: string): boolean;
         steps[length(steps)-1]:=newStep;
         result:=true;
       end else begin
-        messageQueue^.Post('Invalid step was rejected: '+specification,true);
+        messageQueue^.Post('Invalid step was rejected: '+specification,true,-1,0);
         dispose(newStep,destroy);
         result:=false;
       end;
@@ -672,21 +672,21 @@ FUNCTION T_simpleWorkflow.isValid: boolean;
         writtenBeforeRead:=false;
         for j:=0 to i-1 do writtenBeforeRead:=writtenBeforeRead or (steps[j]^.operation^.writesStash=stashId);
         if not(writtenBeforeRead) then begin
-          messageQueue^.Post('Stash "'+stashId+'" is read before it is written',true,i);
+          messageQueue^.Post('Stash "'+stashId+'" is read before it is written',true,i,stepCount);
           result:=false;
         end;
       end;
 
       fileName:=steps[i]^.operation^.readsFile;
       if (fileName<>'') and not(fileExists(fileName)) then begin
-        messageQueue^.Post('File "'+fileName+'" does not exist so it cannot be loaded',true,i);
+        messageQueue^.Post('File "'+fileName+'" does not exist so it cannot be loaded',true,i,stepCount);
         result:=false;
       end;
 
       if not(isEditorWorkflow) then begin
         fileName:=steps[i]^.operation^.writesFile;
         if  (fileName<>'') and fileExists(fileName) then begin
-          messageQueue^.Post('File "'+fileName+'" already exists. The workflow will not be exeuted to prevent overwriting.',true,i);
+          messageQueue^.Post('File "'+fileName+'" already exists. The workflow will not be exeuted to prevent overwriting.',true,i,stepCount);
           result:=false;
         end;
       end;
