@@ -585,8 +585,7 @@ FUNCTION T_generalImageGenrationAlgorithm.parValue(CONST index: byte;
     result.createFromValue(parameterDescriptors[index],color);
   end;
 
-FUNCTION T_generalImageGenrationAlgorithm.parValue(CONST index: byte;
-  CONST txt: ansistring; CONST sizeLimit: longint): T_parameterValue;
+FUNCTION T_generalImageGenrationAlgorithm.parValue(CONST index: byte; CONST txt: ansistring; CONST sizeLimit: longint): T_parameterValue;
   begin
     result.createFromValue(parameterDescriptors[index],txt,sizeLimit);
   end;

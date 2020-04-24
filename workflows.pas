@@ -349,6 +349,7 @@ FUNCTION T_simpleWorkflow.stepCount: longint;
 PROCEDURE T_simpleWorkflow.clear;
   VAR i:longint;
   begin
+    ensureStop;
     enterCriticalSection(contextCS);
     try
       inherited clear;
@@ -458,7 +459,10 @@ FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string): boolean;
     end else begin
       result:=parseWorkflow(readFile(fileName));
       result:=result and (length(steps)>0);
-      if result then config.workflowFilename:=fileName;
+      if result then begin
+        config.workflowFilename:=fileName;
+        messageQueue^.Post(fileName+' loaded',false,-1,0);
+      end;
     end;
   end;
 

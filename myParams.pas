@@ -66,15 +66,15 @@ TYPE
       PROCEDURE validate;
     public
       CONSTRUCTOR createCopy     (CONST other:P_parameterValue);
-      CONSTRUCTOR createToParse  (CONST parameterDescription:P_parameterDescription; CONST stringToParse:ansistring; CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName);
+      CONSTRUCTOR createToParse  (CONST parameterDescription:P_parameterDescription; CONST stringToParse:string; CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName);
       CONSTRUCTOR createFromValue(CONST parameterDescription:P_parameterDescription; CONST i0:longint; CONST i1:longint=0; CONST i2:longint=0; CONST i3:longint=0);
       CONSTRUCTOR createFromValue(CONST parameterDescription:P_parameterDescription; CONST f0:double; CONST f1:double=0; CONST f2:double=0; CONST f3:double=0);
       CONSTRUCTOR createFromValue(CONST parameterDescription:P_parameterDescription; CONST color:T_rgbFloatColor);
-      CONSTRUCTOR createFromValue(CONST parameterDescription:P_parameterDescription; CONST txt:ansistring; CONST sizeLimit:longint=-1);
+      CONSTRUCTOR createFromValue(CONST parameterDescription:P_parameterDescription; CONST txt:string; CONST sizeLimit:longint=-1);
       DESTRUCTOR destroy;
-      FUNCTION canParse(CONST stringToParse:ansistring; CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName):boolean;
+      FUNCTION canParse(CONST stringToParse:string; CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName):boolean;
       PROPERTY isValid:boolean read valid;
-      FUNCTION toString(CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName):ansistring;
+      FUNCTION toString(CONST parameterNameMode:T_parameterNameMode=tsm_withoutParameterName):string;
 
       PROPERTY fileName:string read fileNameValue write setFileName;
       PROPERTY i0:longint read intValue[0];
@@ -354,14 +354,14 @@ CONSTRUCTOR T_parameterValue.createCopy(CONST other: P_parameterValue);
     copyFrom(other^,true);
   end;
 
-CONSTRUCTOR T_parameterValue.createToParse(CONST parameterDescription: P_parameterDescription; CONST stringToParse: ansistring; CONST parameterNameMode: T_parameterNameMode);
+CONSTRUCTOR T_parameterValue.createToParse(CONST parameterDescription: P_parameterDescription; CONST stringToParse: string; CONST parameterNameMode: T_parameterNameMode);
   begin
     setDefaults;
     associatedParmeterDescription:=parameterDescription;
     canParse(stringToParse,parameterNameMode);
   end;
 
-FUNCTION T_parameterValue.canParse(CONST stringToParse: ansistring;
+FUNCTION T_parameterValue.canParse(CONST stringToParse: string;
   CONST parameterNameMode: T_parameterNameMode): boolean;
   VAR txt:string;
       part:T_arrayOfString;
@@ -525,7 +525,7 @@ CONSTRUCTOR T_parameterValue.createFromValue(
     floatValue[2]:=color[cc_blue];
   end;
 
-CONSTRUCTOR T_parameterValue.createFromValue(CONST parameterDescription: P_parameterDescription; CONST txt: ansistring; CONST sizeLimit: longint);
+CONSTRUCTOR T_parameterValue.createFromValue(CONST parameterDescription: P_parameterDescription; CONST txt: string; CONST sizeLimit: longint);
   begin
     setDefaults;
     associatedParmeterDescription:=parameterDescription;
@@ -538,7 +538,7 @@ DESTRUCTOR T_parameterValue.destroy;
     fileNameValue:='';
   end;
 
-FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode): ansistring;
+FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode): string;
   FUNCTION sizeString(CONST sizeInBytes:longint):string;
     begin
       if sizeInBytes=(sizeInBytes shr 20) shl 20 then exit(intToStr(sizeInBytes shr 20)+'M');
