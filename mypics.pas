@@ -91,7 +91,6 @@ TYPE
       //-------------------------------------------------:Geometry manipulations
       //Statistic accessors:----------------------------------------------------
       FUNCTION histogram:T_compoundHistogram;
-      FUNCTION histogram(CONST x,y:longint; CONST smoothingKernel:T_arrayOfDouble):T_compoundHistogram;
       FUNCTION histogramHSV:T_compoundHistogram;
       //----------------------------------------------------:Statistic accessors
       PROCEDURE quantize(CONST numberOfColors:longint);
@@ -678,18 +677,6 @@ FUNCTION T_rawImage.histogram: T_compoundHistogram;
     for i:=0 to pixelCount-1 do result.putSample(data[i]);
   end;
 
-FUNCTION T_rawImage.histogram(CONST x, y: longint; CONST smoothingKernel: T_arrayOfDouble): T_compoundHistogram;
-  VAR dx,dy:longint;
-      wy:double;
-  begin
-    result.create;
-    for dy:=max(-y,1-length(smoothingKernel)) to min(dim.height-y,length(smoothingKernel))-1 do begin
-      wy:=smoothingKernel[abs(dy)];
-      for dx:=max(-x,1-length(smoothingKernel)) to min(dim.width-x,length(smoothingKernel))-1 do
-        result.putSampleSmooth(pixel[x+dx,y+dy],smoothingKernel[abs(dx)]*wy);
-    end;
-  end;
-
 FUNCTION T_rawImage.histogramHSV: T_compoundHistogram;
   VAR i:longint;
       hsv:T_hsvColor;
@@ -945,19 +932,79 @@ PROCEDURE T_rawImage.variance(CONST relativeSigma:double);
   end;
 
 PROCEDURE T_rawImage.medianFilter(CONST relativeSigma:double);
-  VAR output:T_rawImage;
+  TYPE T_samplingWeight=record dx,dy,w:longint; end;
+
+  VAR tempCopy:T_rawImage;
       x,y:longint;
-      kernel:T_arrayOfDouble;
-      hist:T_compoundHistogram;
-  begin
-    output.create(dim.width,dim.height);
-    kernel:=getSmoothingKernel(relativeSigma/100*diagonal);
-    for y:=0 to dim.height-1 do for x:=0 to dim.width-1 do begin
-      hist:=histogram(x,y,kernel);
-      output[x,y]:=rgbColor(hist.R.median,hist.G.median,hist.B.median);
+      sampling:array of T_samplingWeight;
+      s:T_samplingWeight;
+      hist:array[cc_red..cc_blue] of array[0..255] of longint;
+      byteCol:T_rgbColor;
+
+  PROCEDURE clearHistogram;
+    VAR channel:T_colorChannel;
+        k:longint;
+    begin
+      for channel in RGB_CHANNELS do for k:=0 to 255 do hist[channel,k]:=0;
     end;
-    copyFromPixMap(output);
-    output.destroy;
+
+  FUNCTION histogramMedian:T_rgbColor;
+    VAR channel:T_colorChannel;
+        k:longint;
+        count,medCount:longint;
+    begin
+      result:=WHITE;
+      for channel in RGB_CHANNELS do begin
+        count:=0;
+        for k:=0 to 255 do count+=hist[channel,k];
+        medCount:=count shr 1;
+        count:=0;
+        for k:=0 to 255 do begin
+          count+=hist[channel,k];
+          if count>=medCount then begin
+            result[channel]:=k;
+            break;
+          end;
+        end;
+      end;
+    end;
+
+  PROCEDURE initSampling;
+    VAR radius:double;
+        ix,iy:longint;
+        weight:longint;
+    begin
+      radius:=relativeSigma/100*diagonal+0.5;
+      for iy:=-floor(radius) to ceil(radius) do
+      for ix:=-floor(radius) to ceil(radius) do begin
+        weight:=round(4*min(1,radius-sqrt(ix*ix+iy*iy)));
+        if weight>0 then begin
+          setLength(sampling,length(sampling)+1);
+          with sampling[length(sampling)-1] do begin
+            dx:=ix;
+            dy:=iy;
+            w :=weight;
+          end;
+        end;
+      end;
+    end;
+
+  begin
+    tempCopy.create(self);
+    setLength(sampling,0);
+    initSampling;
+    for y:=0 to dim.height-1 do for x:=0 to dim.width-1 do begin
+      clearHistogram;
+      for s in sampling do with s do if (x+dx>=0) and (x+dx<dim.width) and (y+dy>=0) and (y+dy<dim.height) then begin
+        byteCol:=tempCopy[x+dx,y+dy];
+        hist[cc_red  ,byteCol[cc_red  ]]+=w;
+        hist[cc_green,byteCol[cc_green]]+=w;
+        hist[cc_blue ,byteCol[cc_blue ]]+=w;
+      end;
+      pixel[x,y]:=histogramMedian;
+    end;
+    setLength(sampling,0);
+    tempCopy.destroy;
   end;
 
 PROCEDURE T_rawImage.modalFilter(CONST relativeSigma:double);
@@ -965,14 +1012,28 @@ PROCEDURE T_rawImage.modalFilter(CONST relativeSigma:double);
       x,y:longint;
       kernel:T_arrayOfDouble;
       hist:T_compoundHistogram;
+
+  PROCEDURE scan; inline;
+    VAR dx,dy:longint;
+        wy:double;
+    begin
+      hist.clear;
+      for dy:=max(-y,1-length(kernel)) to min(dim.height-y,length(kernel))-1 do begin
+        wy:=kernel[abs(dy)];
+        for dx:=max(-x,1-length(kernel)) to min(dim.width-x,length(kernel))-1 do
+          hist.putSampleSmooth(pixel[x+dx,y+dy],kernel[abs(dx)]*wy);
+      end;
+    end;
   begin
+    hist.create;
     output.create(dim.width,dim.height);
     kernel:=getSmoothingKernel(relativeSigma/100*diagonal);
     for y:=0 to dim.height-1 do for x:=0 to dim.width-1 do begin
-      hist:=histogram(x,y,kernel);
+      scan;
       output[x,y]:=rgbColor(hist.R.mode,hist.G.mode,hist.B.mode);
     end;
     copyFromPixMap(output);
+    hist.destroy;
     output.destroy;
   end;
 
