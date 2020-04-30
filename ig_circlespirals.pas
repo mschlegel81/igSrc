@@ -465,10 +465,10 @@ PROCEDURE T_circleSpiralAlgorithm.execute(CONST context:P_abstractWorkflow);
           n:longint=0;
       begin
         result:=BLACK;
-        for iy:=max(0          ,round(c.center.im-c.radius)) to
-                min(picHeight-1,round(c.center.im+c.radius)) do
-        for ix:=max(0          ,round(c.center.re-c.radius)) to
-                min(picWidth-1 ,round(c.center.re+c.radius)) do
+        for iy:=max(0                 ,round(c.center.im-c.radius)) to
+                min(int64(picHeight)-1,round(c.center.im+c.radius)) do
+        for ix:=max(0                 ,round(c.center.re-c.radius)) to
+                min(int64(picWidth)-1 ,round(c.center.re+c.radius)) do
         if (system.sqr(ix-c.center.re)+system.sqr(iy-c.center.im))<system.sqr(c.radius+1) then begin
           result+=context^.image.pixel[ix,iy];
           n+=1;
