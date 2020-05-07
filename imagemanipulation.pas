@@ -206,6 +206,7 @@ PROCEDURE loadImage_impl(CONST parameters:T_parameterValue; CONST context:P_abst
   begin
     try
       context^.image.loadFromFile(parameters.fileName);
+      context^.limitImageSize;
     except
       context^.cancelWithError('Error trying to load '+parameters.fileName);
     end;
