@@ -141,7 +141,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
         f:=max(box.x0*box.x0,box.x1*box.x1)+
            max(box.y0*box.y0,box.y1*box.y1);
         if      f<17.0      then result:=17
-        else if (f>1004180.0) or IsNan(f) or IsInfinite(f) then result:=1004180
+        else if (f>1004180.0) or isNan(f) or isInfinite(f) then result:=1004180
         else result:=ceil(f);
       end;
 
