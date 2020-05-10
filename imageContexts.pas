@@ -10,9 +10,9 @@ USES sysutils,
      pixMaps;
 
 TYPE
-  T_workflowType=(wft_generative,wft_manipulative,wft_fixated,wft_halfFix,wft_empty_or_unknown);
+  T_workflowType=(wft_generative,wft_manipulative,wft_fixated,wft_halfFix,wft_generativeWithSave,wft_manipulativeWithSave,wft_empty_or_unknown);
 CONST
-  C_workflowTypeString:array[T_workflowType] of string=('generative','manipulative','fix','half-fix','empty or unknown');
+  C_workflowTypeString:array[T_workflowType] of string=('generative','manipulative','fix','half-fix','generative, save fixed','manipulative, save fixed','empty or unknown');
 TYPE
   P_abstractWorkflow=^T_abstractWorkflow;
 

@@ -345,7 +345,7 @@ CONSTRUCTOR T_tileBuilder.create(CONST workflow: P_abstractWorkflow;
     BorderWidth:=relativeBorderWidth/1000*context^.image.diagonal;
     borderUpFraction    :=system.cos(borderAngleInDegrees*0.017453292519943295);
     borderAcrossFraction:=system.sin(borderAngleInDegrees*0.017453292519943295);
-    flat:=(BorderWidth<0.2) or (borderAcrossFraction<0.05);
+    flat:=(BorderWidth<0.01) or (borderAcrossFraction<0.01);
     imageBoundingBox.x0:=0;
     imageBoundingBox.y0:=0;
     imageBoundingBox.x1:=context^.image.dimensions.width;

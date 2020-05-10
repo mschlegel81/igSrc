@@ -491,8 +491,8 @@ PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWi
     append(temporaryWorkflow,workflowText);
 
     //Append save step (if not ending with a save step)
-    if myType<>wft_fixated then begin
-      saveStep:=getSaveStatement(savingToFile,savingWithSizeLimit);
+    if not(myType in [wft_fixated,wft_generativeWithSave,wft_manipulativeWithSave]) then begin
+      saveStep:=getSaveStatement(extractFileName(savingToFile),savingWithSizeLimit);
       append(temporaryWorkflow,saveStep^.toString(tsm_withNiceParameterName));
       dispose(saveStep,destroy);
     end;
@@ -638,15 +638,22 @@ FUNCTION T_simpleWorkflow.workflowType: T_workflowType;
   begin
     if (length(steps)<=0) or not(isValid) then exit(wft_empty_or_unknown);
     startFixed:=(steps[0]^.operation^.readsFile<>'') or isResizeOperation(steps[0]^.operation);
+    endFixed  :=(steps[stepCount-1]^.operation^.writesFile<>'');
     if startFixed then begin
-      endFixed  :=(steps[stepCount-1]^.operation^.writesFile<>'');
       if endFixed
       then result:=wft_fixated
       else result:=wft_halfFix;
     end else begin
       if step[0]^.operation^.dependsOnImageBefore
-      then result:=wft_manipulative
-      else result:=wft_generative;
+      then begin
+        if endFixed
+        then result:=wft_manipulativeWithSave
+        else result:=wft_manipulative
+      end else begin
+        if endFixed
+        then result:=wft_generativeWithSave
+        else result:=wft_generative;
+      end;
     end;
   end;
 
@@ -654,6 +661,10 @@ FUNCTION T_simpleWorkflow.proposedImageFileName(CONST resString: ansistring): st
   VAR i:longint;
       newExt:ansistring;
   begin
+    if (length(steps)>1) then begin
+      result:=steps[length(steps)-1]^.operation^.writesFile;
+      if result<>'' then exit(result);
+    end;
     if (workflowType<>wft_generative) or (resString='')
     then newExt:=''
     else newExt:='_'+resString;
