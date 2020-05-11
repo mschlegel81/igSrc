@@ -141,7 +141,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
         f:=max(box.x0*box.x0,box.x1*box.x1)+
            max(box.y0*box.y0,box.y1*box.y1);
         if      f<17.0      then result:=17
-        else if (f>1004180.0) or isNan(f) or isInfinite(f) then result:=1004180
+        else if (f>5000000.0) or isNan(f) or isInfinite(f) then result:=5000000
         else result:=ceil(f);
       end;
 
@@ -157,7 +157,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
       addFibQuad(2, 5, 8,3);
       addFibQuad(1, 3,11,6);
       addFibQuad(1, 6,14,9);
-
+      context^.messageQueue^.Post('iMax='+intToStr(imax),false,context^.currentStepIndex,context^.stepCount);
       for i:=     1+1 to      1+   8 do addFibTriangle(i,i+   5,i+  13);
       for i:=     1+1 to     18      do addFibQuad    (i,i+  13,i+  21,i+   8);
       if imax<   18 then exit;
@@ -181,7 +181,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
       if imax< 9530 then exit;
       for i:=  9530+1 to   9530+ 233 do addFibTriangle(i,i+ 377,i+ 144);
       for i:=  9530+1 to  25080      do addFibQuad    (i,i+ 233,i+ 610,i+ 377);
-      if imax<1825080 then exit;
+      if imax<25080 then exit;
       for i:= 25080+1 to  25080+ 377 do addFibTriangle(i,i+ 233,i+ 610);
       for i:= 25080+1 to  65871      do addFibQuad    (i,i+ 610,i+ 987,i+ 377);
       if imax<65871 then exit;
@@ -195,6 +195,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
       for i:=452929+1 to 997415      do addFibQuad    (i,i+1597,i+4181,i+2584);
       if imax<997415 then exit;
       for i:=997415+1 to 997415+2584 do addFibTriangle(i,i+1597,i+4181);
+      for i:=997415+1 to imax        do addFibQuad    (i,i+4181,i+6765,i+2584);
     end;
 
   PROCEDURE initConwayGeometry;

@@ -587,7 +587,6 @@ PROCEDURE T_tileBuilder.execute(CONST doClear:boolean; CONST clearColor:T_rgbFlo
       k:longint=256;
   begin
     setLength(drawable,drawableCount);
-    {$ifdef debugMode} writeln('Rendering ',drawableCount,' tiles'); {$endif}
     if doClear then context^.image.clearWithColor(clearColor);
     if drawableCount>0 then begin
       context^.clearQueue;
@@ -629,9 +628,6 @@ CONSTRUCTOR T_trianglesTodo.create(CONST allCircles: T_quadList; CONST chunkInde
       quadsInRange[i]:=c;
       inc(i);
     end;
-    {$ifdef debugMode}
-    writeln('DEBUG: T_trianglesTodo.create: ',i);
-    {$endif}
     if i=0 then begin
       quadsInRange[0]:=allCircles[0];
       i:=1;
