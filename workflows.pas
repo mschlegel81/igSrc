@@ -31,6 +31,7 @@ TYPE
       FUNCTION workflowText:T_arrayOfString;
       FUNCTION readFromFile(CONST fileName:string):boolean;
       PROCEDURE saveToFile(CONST fileName:string);
+      FUNCTION todoLines(CONST savingToFile:string; CONST savingWithSizeLimit:longint):T_arrayOfString;
       PROCEDURE saveAsTodo(CONST savingToFile:string; CONST savingWithSizeLimit:longint);
       PROCEDURE appendSaveStep(CONST savingToFile:string; CONST savingWithSizeLimit:longint);
       FUNCTION executeAsTodo:boolean;
@@ -413,19 +414,19 @@ PROCEDURE T_editorWorkflow.beforeAll;
 FUNCTION T_simpleWorkflow.parseWorkflow(CONST data: T_arrayOfString): boolean;
   VAR newSteps:array of P_workflowStep;
       i:longint;
+      stepIndex:longint=0;
   begin
     setLength(newSteps,length(data));
-    result:=true;
-    for i:=0 to length(newSteps)-1 do begin
-      new(newSteps[i],create(data[i]));
-      if not(newSteps[i]^.isValid) then begin
-        result:=false;
-        messageQueue^.Post('Invalid step: '+data[i],true,i,stepCount);
-      end;
+    for i:=0 to length(data)-1 do begin
+      new(newSteps[stepIndex],create(data[i]));
+      if not(newSteps[stepIndex]^.isValid) then begin
+        messageQueue^.Post('Invalid step: '+data[i],true,i,length(data));
+        dispose(newSteps[stepIndex],destroy);
+      end else inc(stepIndex);
     end;
-    if not(result) then begin
-      for i:=0 to length(newSteps)-1 do dispose(newSteps[i],destroy);
-    end else begin
+    result:=stepIndex>0;
+    setLength(newSteps,stepIndex);
+    if result then begin
       clear;
       enterCriticalSection(contextCS);
       try
@@ -473,29 +474,34 @@ PROCEDURE T_simpleWorkflow.saveToFile(CONST fileName: string);
     config.workflowFilename:=fileName;
   end;
 
-PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWithSizeLimit: longint);
-  VAR todoBase,
-      todoName:string;
-      temporaryWorkflow:T_arrayOfString;
-      saveStep:P_simpleImageOperation;
-      counter:longint=0;
+FUNCTION T_simpleWorkflow.todoLines(CONST savingToFile:string; CONST savingWithSizeLimit:longint):T_arrayOfString;
+  VAR saveStep:P_simpleImageOperation;
       myType:T_workflowType;
   begin
     myType:=workflowType;
     //Fixate initial state if not fixed yet:
     if myType in [wft_fixated,wft_halfFix]
-    then temporaryWorkflow:=C_EMPTY_STRING_ARRAY
-    else temporaryWorkflow:=config.getFirstTodoStep;
+    then result:=C_EMPTY_STRING_ARRAY
+    else result:=config.getFirstTodoStep;
 
     //Append workflow
-    append(temporaryWorkflow,workflowText);
+    append(result,workflowText);
 
     //Append save step (if not ending with a save step)
     if not(myType in [wft_fixated,wft_generativeWithSave,wft_manipulativeWithSave]) then begin
       saveStep:=getSaveStatement(extractFileName(savingToFile),savingWithSizeLimit);
-      append(temporaryWorkflow,saveStep^.toString(tsm_withNiceParameterName));
+      append(result,saveStep^.toString(tsm_withNiceParameterName));
       dispose(saveStep,destroy);
     end;
+  end;
+
+PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWithSizeLimit: longint);
+  VAR todoBase,
+      todoName:string;
+      temporaryWorkflow:T_arrayOfString;
+      counter:longint=0;
+  begin
+    temporaryWorkflow:=todoLines(savingToFile,savingWithSizeLimit);
 
     //Find appropriate todo-name and save
     todoBase:=ExtractFileNameWithoutExt(savingToFile);
