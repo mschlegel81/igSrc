@@ -826,8 +826,8 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
   begin
     imgBB.x0:=0;
     imgBB.y0:=0;
-    imgBB.x1:=context^.image.dimensions.width;
-    imgBB.y1:=context^.image.dimensions.height;
+    imgBB.x1:=context^.image.dimensions.width-1;
+    imgBB.y1:=context^.image.dimensions.height-1;
     initialize(tri);
     initTriangles;
     while (length(tri)<count) and not(context^.cancellationRequested) do splitTriangles;
