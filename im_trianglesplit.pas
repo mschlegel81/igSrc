@@ -585,9 +585,17 @@ PROCEDURE T_tileBuilder.execute(CONST doClear:boolean; CONST clearColor:T_rgbFlo
       chunkCount:longint;
       i:longint;
       k:longint=256;
+      baseFraction :double=1;
+      whiteFraction:double=0;
+      Pixels:P_floatColor;
   begin
+    if not(flat) then averageIllumination(borderAcrossFraction,borderUpFraction,baseFraction,whiteFraction);
     setLength(drawable,drawableCount);
-    if doClear then context^.image.clearWithColor(clearColor);
+    if doClear then context^.image.clearWithColor(clearColor*baseFraction+WHITE*whiteFraction)
+    else if not(flat) then begin
+      Pixels:=context^.image.rawData;
+      for i:=0 to context^.image.pixelCount-1 do Pixels[i]:=Pixels[i]*baseFraction+WHITE*whiteFraction;
+    end;
     if drawableCount>0 then begin
       context^.clearQueue;
       chunkCount:=context^.image.chunksInMap;
