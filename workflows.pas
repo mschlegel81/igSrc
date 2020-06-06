@@ -516,17 +516,21 @@ PROCEDURE T_simpleWorkflow.saveAsTodo(CONST savingToFile: string; CONST savingWi
 
 PROCEDURE T_simpleWorkflow.appendSaveStep(CONST savingToFile: string;
   CONST savingWithSizeLimit: longint);
-  VAR k:longint;
+  VAR stepsBefore,k:longint;
+      errorOcurred:boolean=false;
   begin
     enterCriticalSection(contextCS);
+    stepsBefore:=length(steps);
     try
       k:=length(steps);
       setLength(steps,k+1);
       new(steps[k],create(getSaveStatement(savingToFile,savingWithSizeLimit)));
-    finally
-      leaveCriticalSection(contextCS);
+    except
+      errorOcurred:=true;
+      setLength(steps,stepsBefore);
     end;
-    if not(steps[k]^.isValid) then raise Exception.create('The automatically generated save step is invalid');
+    leaveCriticalSection(contextCS);
+    if errorOcurred then raise Exception.create('The automatically generated save step is invalid');
   end;
 
 FUNCTION T_simpleWorkflow.executeAsTodo: boolean;
