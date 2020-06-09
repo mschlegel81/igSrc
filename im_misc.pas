@@ -329,6 +329,43 @@ PROCEDURE slope_impl(CONST parameters:T_parameterValue; CONST context:P_abstract
     temp.destroy;
   end;
 
+PROCEDURE zebra_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
+  VAR ix,iy,y0,y1,y2:longint;
+      pixelsTotal  :T_rgbFloatColor;
+      dy:double;
+      y :double;
+  FUNCTION partOfTotal:T_rgbFloatColor;
+    begin
+      result:=rgbMin(WHITE,pixelsTotal);
+      pixelsTotal-=result;
+    end;
+
+  begin
+    dy:=parameters.f0/100*context^.image.diagonal;
+    y:=context^.image.dimensions.height/2;
+    while y>0 do y-=dy;
+    y2:=max(0,round(y-dy*0.5))-1;
+    while y2<context^.image.dimensions.height-1 do begin
+      y0:=max(0,y2+1);
+      y1:=min(floor(y)       ,context^.image.dimensions.height-1);
+      y2:=min(round(y+dy*0.5),context^.image.dimensions.height-1);
+      //writeln(y0,' - ',y1,' | ',y1+1,' - ',y2,' / ',context^.image.dimensions.height);
+      if (y0<y1) then for ix:=0 to context^.image.dimensions.width-1 do begin
+        pixelsTotal:=BLACK;
+        for iy:=y0 to     y1 do pixelsTotal+=context^.image[ix,iy];
+        for iy:=y1 downto y0 do             context^.image[ix,iy]:=partOfTotal;
+      end;
+      y1+=1;
+      if y1<0 then y1:=0;
+      if (y1<y2) then for ix:=0 to context^.image.dimensions.width-1 do begin
+        pixelsTotal:=BLACK;
+        for iy:=y1 to y2 do pixelsTotal+=context^.image[ix,iy];
+        for iy:=y1 to y2 do              context^.image[ix,iy]:=partOfTotal;
+      end;
+      y+=dy;
+    end;
+  end;
+
 INITIALIZATION
 registerSimpleOperation(imc_misc,
   newParameterDescription('sketch',pt_4floats)^
@@ -387,6 +424,10 @@ registerSimpleOperation(imc_misc,
     .addChildParameterDescription(spa_f0,'nx',pt_float)^
     .addChildParameterDescription(spa_f1,'ny',pt_float),
     @slope_impl);
+registerSimpleOperation(imc_misc,
+  newParameterDescription('zebra',pt_float,0.0001)^
+    .setDefaultValue('1.0'),
+    @zebra_impl);
 
 end.
 
