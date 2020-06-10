@@ -342,6 +342,7 @@ PROCEDURE zebra_impl(CONST parameters:T_parameterValue; CONST context:P_abstract
 
   begin
     dy:=parameters.f0/100*context^.image.diagonal;
+    if dy<1 then dy:=1;
     y:=context^.image.dimensions.height/2;
     while y>0 do y-=dy;
     y2:=max(0,round(y-dy*0.5))-1;
@@ -349,7 +350,6 @@ PROCEDURE zebra_impl(CONST parameters:T_parameterValue; CONST context:P_abstract
       y0:=max(0,y2+1);
       y1:=min(floor(y)       ,context^.image.dimensions.height-1);
       y2:=min(round(y+dy*0.5),context^.image.dimensions.height-1);
-      //writeln(y0,' - ',y1,' | ',y1+1,' - ',y2,' / ',context^.image.dimensions.height);
       if (y0<y1) then for ix:=0 to context^.image.dimensions.width-1 do begin
         pixelsTotal:=BLACK;
         for iy:=y0 to     y1 do pixelsTotal+=context^.image[ix,iy];
