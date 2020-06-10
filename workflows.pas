@@ -27,9 +27,9 @@ TYPE
       PROCEDURE clear;
       PROPERTY step[index:longint]: P_workflowStep read getStep;
       FUNCTION stepCount:longint; virtual;
-      FUNCTION parseWorkflow(CONST data:T_arrayOfString):boolean;
+      FUNCTION parseWorkflow(data:T_arrayOfString; CONST tolerantParsing:boolean):boolean;
       FUNCTION workflowText:T_arrayOfString;
-      FUNCTION readFromFile(CONST fileName:string):boolean;
+      FUNCTION readFromFile(CONST fileName:string; CONST tolerantParsing:boolean):boolean;
       PROCEDURE saveToFile(CONST fileName:string);
       FUNCTION todoLines(CONST savingToFile:string; CONST savingWithSizeLimit:longint):T_arrayOfString;
       PROCEDURE saveAsTodo(CONST savingToFile:string; CONST savingWithSizeLimit:longint);
@@ -411,12 +411,14 @@ PROCEDURE T_editorWorkflow.beforeAll;
     end;
   end;
 
-FUNCTION T_simpleWorkflow.parseWorkflow(CONST data: T_arrayOfString): boolean;
+FUNCTION T_simpleWorkflow.parseWorkflow(data: T_arrayOfString; CONST tolerantParsing:boolean): boolean;
   VAR newSteps:array of P_workflowStep;
       i:longint;
       stepIndex:longint=0;
   begin
     setLength(newSteps,length(data));
+    for i:=0 to length(data)-1 do data[i]:=trim(data[i]);
+    dropValues(data,'');
     for i:=0 to length(data)-1 do begin
       new(newSteps[stepIndex],create(data[i]));
       if not(newSteps[stepIndex]^.isValid) then begin
@@ -424,8 +426,9 @@ FUNCTION T_simpleWorkflow.parseWorkflow(CONST data: T_arrayOfString): boolean;
         dispose(newSteps[stepIndex],destroy);
       end else inc(stepIndex);
     end;
-    result:=stepIndex>0;
     setLength(newSteps,stepIndex);
+    //if parsing is not tolerant, then every input line must relate to one step
+    result:=(stepIndex>0) and (tolerantParsing or (stepIndex=length(data)));
     if result then begin
       clear;
       enterCriticalSection(contextCS);
@@ -436,6 +439,8 @@ FUNCTION T_simpleWorkflow.parseWorkflow(CONST data: T_arrayOfString): boolean;
       finally
         leaveCriticalSection(contextCS);
       end;
+    end else begin
+      for i:=0 to length(newSteps)-1 do dispose(newSteps[i],destroy);
     end;
   end;
 
@@ -451,15 +456,15 @@ FUNCTION T_simpleWorkflow.workflowText: T_arrayOfString;
     end;
   end;
 
-FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string): boolean;
+FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string; CONST tolerantParsing:boolean): boolean;
   begin
     messageQueue^.Post('Trying to parse workflow from file: '+fileName,false,-1,0);
     if not(fileExists(fileName)) then begin
       messageQueue^.Post('File "'+fileName+'" does not exist',true,-1,0);
       result:=false;
     end else begin
-      result:=parseWorkflow(readFile(fileName));
-      result:=result and (length(steps)>0);
+      result:=parseWorkflow(readFile(fileName),tolerantParsing);
+      result:=result and (length(steps)>0) and isValid;
       if result then begin
         config.workflowFilename:=fileName;
         messageQueue^.Post(fileName+' loaded',false,-1,0);
