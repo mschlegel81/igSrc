@@ -330,40 +330,81 @@ PROCEDURE slope_impl(CONST parameters:T_parameterValue; CONST context:P_abstract
   end;
 
 PROCEDURE zebra_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
-  VAR ix,iy,y0,y1,y2:longint;
-      pixelsTotal  :T_rgbFloatColor;
+  VAR ix,iy,iy0,iy1,iy2:longint;
+      y0,y1,y2:double;
+      above,below,central:T_rgbFloatColor;
       dy:double;
-      y :double;
-  FUNCTION partOfTotal:T_rgbFloatColor;
+      wy0,wy1u,wy1l,wy2:double;
+      temp:T_rawImage;
+  FUNCTION partOfTotal(VAR pixelsTotal:T_rgbFloatColor; CONST maxPart:single):T_rgbFloatColor;
     begin
-      result:=rgbMin(WHITE,pixelsTotal);
+      result:=rgbMin(WHITE*maxPart,pixelsTotal);
       pixelsTotal-=result;
     end;
 
   begin
     dy:=parameters.f0/100*context^.image.diagonal;
-    if dy<1 then dy:=1;
-    y:=context^.image.dimensions.height/2;
-    while y>0 do y-=dy;
-    y2:=max(0,round(y-dy*0.5))-1;
-    while y2<context^.image.dimensions.height-1 do begin
-      y0:=max(0,y2+1);
-      y1:=min(floor(y)       ,context^.image.dimensions.height-1);
-      y2:=min(round(y+dy*0.5),context^.image.dimensions.height-1);
-      if (y0<y1) then for ix:=0 to context^.image.dimensions.width-1 do begin
-        pixelsTotal:=BLACK;
-        for iy:=y0 to     y1 do pixelsTotal+=context^.image[ix,iy];
-        for iy:=y1 downto y0 do             context^.image[ix,iy]:=partOfTotal;
+    if dy<1 then exit;
+    y1:=context^.image.dimensions.height/2;
+    while y1>0 do y1-=dy;
+    temp.create(context^.image);
+
+    context^.image.clearWithColor(BLACK);
+    y2:=0;
+    while y2<context^.image.dimensions.height do begin
+      y0:=y1-dy*0.5; iy0:=max(0,min(temp.dimensions.height-1,floor(y0)));
+                     iy1:=max(0,min(temp.dimensions.height-1,floor(y1)));
+      y2:=y1+dy*0.5; iy2:=max(0,min(temp.dimensions.height-1,floor(y2)));
+
+      //iy0   wy0=1-(y0-iy0) //the part of pixel iy0 that is below y0
+      //   y0
+      //
+      //iy1   wy1u =   y1-iy1   //the part of pixel iy1 that is above y1
+      //   y1 wy1l =1-(y1-iy1)  //the part of pixel iy1 that is below y1
+      //
+      //iy2   wy2=y2-iy2     //the part of the pixel iy2 that is above y2
+      //   y2
+      wy0 :=max(0,min(1,1-(y0-iy0)));
+      wy1u:=max(0,min(1,   y1-iy1 ));
+      wy1l:=1-wy1u;
+      wy2 :=max(0,min(1,   y2-iy2 ));
+      if iy0=iy1 then begin
+        //same pixel, avoid double weighting
+        //iy0=iy1---------------------------------------------
+        //   y0---\
+        //         weight between
+        //   y1---/
+        //iy0+1=iy1+1-----------------------------------------
+        wy1u:=y1-y0;
+        wy0 :=0;
       end;
-      y1+=1;
-      if y1<0 then y1:=0;
-      if (y1<y2) then for ix:=0 to context^.image.dimensions.width-1 do begin
-        pixelsTotal:=BLACK;
-        for iy:=y1 to y2 do pixelsTotal+=context^.image[ix,iy];
-        for iy:=y1 to y2 do              context^.image[ix,iy]:=partOfTotal;
+      if iy1=iy2 then begin
+        //same pixel, avoid double weighting
+        //iy1=iy2---------------------------------------------
+        //   y1---\
+        //         weight between
+        //   y2---/
+        //iy1+1=iy2+1-----------------------------------------
+        wy1l:=y2-y1;
+        wy2 :=0;
       end;
-      y+=dy;
+
+      for ix:=0 to context^.image.dimensions.width-1 do begin
+        central:=temp[ix,iy1];
+        above  :=temp[ix,iy0]*wy0+central*wy1u;
+        below  :=temp[ix,iy2]*wy2+central*wy1l;
+        for iy:=iy0+1 to iy1-1 do above  +=temp[ix,iy];
+        for iy:=iy1+1 to iy2-1 do below  +=temp[ix,iy];
+        context^.image[ix,iy1]                              :=context^.image[ix,iy1]+partOfTotal(above,wy1u)
+                                                                                    +partOfTotal(below,wy1l);
+        for iy:=iy1-1 downto iy0+1 do context^.image[ix,iy ]:=                       partOfTotal(above,1);
+                                      context^.image[ix,iy0]:=context^.image[ix,iy0]+partOfTotal(above,wy0);
+        for iy:=iy1+1 to     iy2-1 do context^.image[ix,iy ]:=                       partOfTotal(below,1);
+                                      context^.image[ix,iy2]:=context^.image[ix,iy2]+partOfTotal(below,wy2);
+      end;
+      y1+=dy;
     end;
+    temp.destroy;
   end;
 
 INITIALIZATION
