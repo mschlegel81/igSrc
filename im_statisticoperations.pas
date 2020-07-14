@@ -387,7 +387,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         inc(i0);
       end;
       if i0=length(list.sample) then dec(i0);
-
+      initialize(halfList);
       setLength(halfList.sample,length(list.sample)-i0);
       for i:=0 to length(halfList.sample)-1 do halfList.sample[i]:=list.sample[i+i0];
       updateSpreads(halfList);
@@ -445,7 +445,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       VAR raw:P_floatColor;
           i,j:longint;
           tmp:T_rgbColor;
-          arr:T_arrayOfLongint;
+          arr:T_arrayOfLongint=();
       PROCEDURE prepareColorList; inline;
         begin
           sort(arr);
@@ -536,7 +536,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     VAR k:longint;
         i:longint=0;
         buckets:T_colorLists;
-        allSamples:array of T_sample;
+        allSamples:array of T_sample=();
         sample:T_sample;
     PROCEDURE collectAveragePerBucket;
       VAR k:longint;
@@ -598,7 +598,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE kMeansColorTable;
-    VAR allSamples:array of T_sample;
+    VAR allSamples:array of T_sample=();
         buckets:T_colorLists;
         nextDefaultColor:longint;
     FUNCTION redistributeSamples:boolean;
@@ -608,7 +608,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           tmp,
           bestDist:double;
           bestIdx :longint;
-          previousBucketSizes:T_arrayOfLongint;
+          previousBucketSizes:T_arrayOfLongint=();
       begin
         setLength(previousBucketSizes,length(buckets));
         for i:=0 to length(buckets)-1 do begin

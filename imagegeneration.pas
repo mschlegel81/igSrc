@@ -158,6 +158,7 @@ TYPE
       FUNCTION getSimpleParameterDescription: P_parameterDescription; virtual;
       PROPERTY index:longint read fIndex;
       FUNCTION getDefaultOperation:P_imageOperation; virtual;
+      FUNCTION getDefaultParameterString:string; virtual;
   end;
 
 VAR defaultGenerationStep:string;
@@ -264,6 +265,11 @@ FUNCTION T_algorithmMeta.getDefaultOperation: P_imageOperation;
     result:=constructorHelper();
     result^.meta:=@self;
     P_generalImageGenrationAlgorithm(result)^.resetParameters(0);
+  end;
+
+FUNCTION T_algorithmMeta.getDefaultParameterString:string;
+  begin
+    result:=getName+'[]';
   end;
 
 CONSTRUCTOR T_pixelThrowerTodo.create(CONST algorithm_: P_pixelThrowerAlgorithm; CONST index: longint; CONST target_: P_rawImage);
@@ -465,7 +471,7 @@ FUNCTION T_generalImageGenrationAlgorithm.toFullString(): ansistring;
 FUNCTION T_generalImageGenrationAlgorithm.toString(nameMode: T_parameterNameMode): string;
   VAR i:longint;
       def:P_generalImageGenrationAlgorithm;
-      p:array of array[0..1] of T_parameterValue;
+      p:array of array[0..1] of T_parameterValue=();
   begin
     setLength(p,numberOfParameters);
     for i:=0 to numberOfParameters-1 do p[i,1]:=     getParameter(i);
@@ -533,9 +539,9 @@ PROCEDURE T_generalImageGenrationAlgorithm.copyNonGeneticParameters(CONST origin
   end;
 
 FUNCTION T_generalImageGenrationAlgorithm.canParseParametersFromString(CONST s: ansistring; CONST doParse: boolean): boolean;
-  VAR parsedParameters:array of T_parameterValue;
+  VAR parsedParameters:array of T_parameterValue=();
       paramRest:ansistring;
-      stringParts:T_arrayOfString;
+      stringParts:T_arrayOfString=();
       i,j:longint;
       match:boolean=false;
   begin

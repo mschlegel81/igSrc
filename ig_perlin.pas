@@ -68,7 +68,7 @@ FUNCTION T_perlinNoiseAlgorithm.getParameter(CONST index: byte): T_parameterValu
 
 PROCEDURE T_perlinNoiseAlgorithm.execute(CONST context: P_abstractWorkflow);
   VAR perlinTable:array[0..31,0..31] of single;
-      perlinLine :array of array[0..31] of single;
+      perlinLine :array of array[0..31] of single=();
 
   PROCEDURE initPerlinTable;
     VAR i,j:longint;
@@ -122,8 +122,8 @@ PROCEDURE T_perlinNoiseAlgorithm.execute(CONST context: P_abstractWorkflow);
 
   VAR xRes,yRes:longint;
       x,y,l,lMax:longint;
-      scale:array of double;
-      amplitude:array of double;
+      scale:array of double=();
+      amplitude:array of double=();
       aid:double;
       absShiftX,absShiftY:double;
   begin with context^ do begin

@@ -89,7 +89,7 @@ FUNCTION T_epicycle.getParameter(CONST index: byte): T_parameterValue;
 PROCEDURE T_epicycle.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint);
   VAR i,k:longint;
       a,b,fa,fb,x,y:double;
-      tempMap:array of word;
+      tempMap:array of word=();
       flushFactor:double=0;
 
   PROCEDURE putSample(CONST x,y:double); inline;

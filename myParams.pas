@@ -212,7 +212,7 @@ FUNCTION T_parameterDescription.addEnumChildDescription(
                    CONST value7:string='';
                    CONST value8:string='';
                    CONST value9:string=''):P_parameterDescription;
-  VAR subEnumValues:T_arrayOfString;
+  VAR subEnumValues:T_arrayOfString=();
   begin
     assert(association_ in [spa_i0..spa_i3]);
     setLength(subEnumValues,2);

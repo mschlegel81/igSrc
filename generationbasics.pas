@@ -132,6 +132,7 @@ FUNCTION T_structuredMessageQueue.get: P_structuredMessage;
 FUNCTION T_structuredMessageQueue.getText:T_arrayOfString;
   VAR m:P_structuredMessage;
   begin
+    initialize(result);
     setLength(result,0);
     enterCriticalSection(queueCs);
     while first<>nil do begin

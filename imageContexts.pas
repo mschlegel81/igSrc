@@ -32,7 +32,7 @@ TYPE
       FUNCTION parse(CONST specification:ansistring):P_imageOperation; virtual; abstract;
       FUNCTION getSimpleParameterDescription:P_parameterDescription; virtual; abstract;
       FUNCTION getDefaultOperation:P_imageOperation; virtual; abstract;
-      FUNCTION getDefaultParameterString:string;
+      FUNCTION getDefaultParameterString:string; virtual;
   end;
 
   T_imageOperation=object
@@ -163,12 +163,14 @@ PROCEDURE registerOperation(CONST meta: P_imageOperationMeta);
     end;
     operationMap.put(key,value);
     {$ifdef debugMode}
-    writeln(stdErr,'Registering opereration ',meta^.getName);
-    writeln(stdErr,'Default operation is ',meta^.getDefaultParameterString);
-    parsedDefault:=meta^.parse(meta^.getDefaultParameterString);
-    if parsedDefault=nil
-    then raise Exception.create('CANNOT PARSE DEFAULT STRING! "'+meta^.getDefaultParameterString+'"')
-    else dispose(parsedDefault,destroy);
+    //writeln(stdErr,'Registering opereration ',meta^.getName);
+    //writeln(stdErr,'Default operation is ',meta^.getDefaultParameterString);
+    if meta^.category<>imc_generation then begin
+      parsedDefault:=meta^.parse(meta^.getDefaultParameterString);
+      if parsedDefault=nil
+      then raise Exception.create('CANNOT PARSE DEFAULT STRING! "'+meta^.getDefaultParameterString+'"')
+      else dispose(parsedDefault,destroy);
+    end;
     {$endif}
   end;
 

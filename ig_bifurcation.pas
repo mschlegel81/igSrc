@@ -75,7 +75,7 @@ FUNCTION T_bifurcation.getParameter(CONST index: byte): T_parameterValue;
   end;
 
 PROCEDURE T_bifurcation.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint);
-  VAR tempMap:array of word;
+  VAR tempMap:array of word=();
       x,y:longint;
       a0,a1,da:double;
 

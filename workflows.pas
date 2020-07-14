@@ -412,7 +412,7 @@ PROCEDURE T_editorWorkflow.beforeAll;
   end;
 
 FUNCTION T_simpleWorkflow.parseWorkflow(data: T_arrayOfString; CONST tolerantParsing:boolean): boolean;
-  VAR newSteps:array of P_workflowStep;
+  VAR newSteps:array of P_workflowStep=();
       i:longint;
       stepIndex:longint=0;
   begin
@@ -449,6 +449,7 @@ FUNCTION T_simpleWorkflow.workflowText: T_arrayOfString;
   begin
     enterCriticalSection(contextCS);
     try
+      initialize(result);
       setLength(result,length(steps));
       for i:=0 to length(steps)-1 do result[i]:=steps[i]^.specification;
     finally

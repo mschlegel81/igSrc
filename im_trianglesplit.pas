@@ -107,6 +107,7 @@ FUNCTION getPixelCoordinates(CONST q:T_quad; CONST box:T_boundingBox; CONST delt
     ja0:=round(a[1].im); jb0:=round(b[1].im);
     ja1:=round(a[2].im); jb1:=round(b[2].im);
     if ja1<jb1 then jboth:=ja1 else jboth:=jb1;
+    initialize(result);
     setLength(result,100);
     xa0:=a[0].re; dxa0:=(a[1].re-a[0].re)/(a[1].im-a[0].im);
     xa1:=a[0].re; dxa1:=(a[2].re-a[0].re)/(a[2].im-a[0].im);
@@ -839,6 +840,7 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
     initialize(tri);
     initTriangles;
     while (length(tri)<count) and not(context^.cancellationRequested) do splitTriangles;
+    initialize(result);
     setLength(result,length(tri));
     for i:=0 to length(result)-1 do result[i]:=tri[i].base;
     setLength(tri,0);
@@ -880,7 +882,7 @@ PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstra
 
   CONST TODO_MODE:array[0..4] of T_sphereTodoMode=(stm_overlappingCircles,stm_overlappingMatteSpheres,stm_overlappingShinySpheres,stm_overlappingMatteSpheres,stm_overlappingBorderedCircles);
   VAR rawTriangles:T_quadList;
-      circles:T_circles;
+      circles:T_circles=();
       i,j:longint;
       tmp:T_circle;
       todo:P_spheresTodo;

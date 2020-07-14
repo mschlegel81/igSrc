@@ -1480,7 +1480,7 @@ PROCEDURE T_Graph.updateMeetingFaces(VAR e:T_edgeDef);
   end;
 
 PROCEDURE T_Graph.updateMeetingFaces();
-  VAR fatn:array of array of longint;
+  VAR fatn:array of array of longint=();
 
   PROCEDURE addFaceAtNode(CONST nodeIndex:longint; CONST faceIndex:longint);
     VAR k:longint;

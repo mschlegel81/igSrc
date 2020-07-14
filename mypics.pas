@@ -320,7 +320,7 @@ PROCEDURE T_rawImage.markChunksAsPending;
 FUNCTION T_rawImage.getPendingList: T_arrayOfLongint;
   VAR xChunks,yChunks:longint;
       x,y,cx,cy,i:longint;
-      isPending:array of array of boolean;
+      isPending:array of array of boolean=();
   begin
     randomize;
     xChunks:=dim.width  div CHUNK_BLOCK_SIZE; if xChunks*CHUNK_BLOCK_SIZE<dim.width  then inc(xChunks);
@@ -342,6 +342,7 @@ FUNCTION T_rawImage.getPendingList: T_arrayOfLongint;
     end;
     //-----------------------------------------------------:scan
     //transform boolean mask to int array:----------------------
+    initialize(result);
     setLength(result,0);
     for cy:=0 to length(isPending[0])-1 do
     for cx:=length(isPending)-1 downto 0 do if isPending[cx,cy] then begin

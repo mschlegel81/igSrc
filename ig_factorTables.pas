@@ -76,7 +76,7 @@ FUNCTION T_factorTable.getParameter(CONST index: byte): T_parameterValue;
   end;
 
 PROCEDURE T_factorTable.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint);
-  VAR tempMap:array of word;
+  VAR tempMap:array of word=();
       flushFactor:double=0;
       offsetTab:array[0..498] of T_Complex; //499 is a prime.
       offsetIdx:longint=0;
