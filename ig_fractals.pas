@@ -722,7 +722,7 @@ CONSTRUCTOR T_functionPerPixelViaRawDataAlgorithm.create;
     addParameter('source',pt_enum,0,9)^.setEnumValues(sourceNames);
     addParameter('style',pt_enum,0,9)^.setEnumValues(styleNames);
     addParameter('variant',pt_enum,0,3)^.setEnumValues(variantNames);
-    addParameter('gamma',pt_float,1E-3,1E3);
+    addParameter('gamma',pt_float,1E-8,1E8);
     addParameter('light normal',pt_3floats,-1,1);
     resetParameters(0);
   end;
