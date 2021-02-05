@@ -299,10 +299,11 @@ P_trianglesTodo=^T_trianglesTodo;
 T_trianglesTodo=object(T_parallelTask)
   chunkIndex:longint;
   quadsInRange:T_quadList;
+  box:T_boundingBox;
 
-  CONSTRUCTOR create(CONST allCircles:T_quadList;
-                     CONST chunkIndex_:longint;
+  CONSTRUCTOR create(CONST chunkIndex_:longint;
                      CONST target_:P_rawImage);
+  PROCEDURE addQuad(CONST quad:T_quad);
   DESTRUCTOR destroy; virtual;
   PROCEDURE execute; virtual;
 end;
@@ -582,10 +583,15 @@ PROCEDURE T_tileBuilder.addHexagon(CONST a, b, c, d, e, f: T_Complex;
   end;
 
 PROCEDURE T_tileBuilder.execute(CONST doClear:boolean; CONST clearColor:T_rgbFloatColor);
-  VAR todo:P_trianglesTodo;
-      chunkCount:longint;
-      i:longint;
-      k:longint=256;
+  VAR
+      todos:array of P_trianglesTodo;
+      quad:T_quad;
+      quadBB:T_boundingBox;
+      i,j:longint;
+      i0,i1,j0,j1:longint;
+      xChunkCount:longint;
+      yChunkCount:longint;
+
       baseFraction :double=1;
       whiteFraction:double=0;
       Pixels:P_floatColor;
@@ -599,22 +605,25 @@ PROCEDURE T_tileBuilder.execute(CONST doClear:boolean; CONST clearColor:T_rgbFlo
     end;
     if drawableCount>0 then begin
       context^.clearQueue;
-      chunkCount:=context^.image.chunksInMap;
-      i:=0;
-      while (i<chunkCount) and not(context^.cancellationRequested) do begin new(todo,create(drawable,i,@(context^.image))); context^.enqueue(todo); i+=k; end;
-      while k>1 do begin
-        i:=k shr 1;
-        while (i<chunkCount) and not(context^.cancellationRequested) do begin new(todo,create(drawable,i,@(context^.image))); context^.enqueue(todo); i+=k; end;
-        k:=k shr 1;
+      xChunkCount:=context^.image.dimensions.width  div CHUNK_BLOCK_SIZE; if xChunkCount*CHUNK_BLOCK_SIZE<context^.image.dimensions.width  then inc(xChunkCount);
+      yChunkCount:=context^.image.dimensions.height div CHUNK_BLOCK_SIZE; if yChunkCount*CHUNK_BLOCK_SIZE<context^.image.dimensions.height then inc(yChunkCount);
+      setLength(todos,context^.image.chunksInMap);
+      for i:=0 to length(todos)-1 do new(todos[i],create(i,@(context^.image)));
+      for quad in drawable do begin
+        quadBB:=getBoundingBox(quad);
+        i0:=max(0            ,floor(quadBB.x0/CHUNK_BLOCK_SIZE));
+        i1:=min(xChunkCount-1,ceil (quadBB.x1/CHUNK_BLOCK_SIZE));
+        j0:=max(0            ,floor(quadBB.y0/CHUNK_BLOCK_SIZE));
+        j1:=min(yChunkCount-1,ceil (quadBB.y1/CHUNK_BLOCK_SIZE));
+        for j:=j0 to j1 do for i:=i0 to i1 do todos[i+j*xChunkCount]^.addQuad(quad);
       end;
+      for i:=0 to length(todos)-1 do context^.enqueue(todos[i]);
       context^.waitForFinishOfParallelTasks;
     end;
   end;
 
-CONSTRUCTOR T_trianglesTodo.create(CONST allCircles: T_quadList; CONST chunkIndex_: longint; CONST target_: P_rawImage);
-  VAR box:T_boundingBox;
-      i:longint;
-      c:T_quad;
+CONSTRUCTOR T_trianglesTodo.create(CONST chunkIndex_: longint; CONST target_: P_rawImage);
+  VAR i:longint;
   begin
     box.x0:=0;
     box.y0:=0;
@@ -630,18 +639,14 @@ CONSTRUCTOR T_trianglesTodo.create(CONST allCircles: T_quadList; CONST chunkInde
     box.y1:=box.y0+CHUNK_BLOCK_SIZE+1;
     box.x0-=1;
     box.y0-=1;
-    setLength(quadsInRange,1);
-    i:=0;
-    for c in allCircles do if quadIsInBoundingBox(c,box) then begin
-      if i>=length(quadsInRange) then setLength(quadsInRange,i*2);
-      quadsInRange[i]:=c;
-      inc(i);
+  end;
+
+PROCEDURE T_trianglesTodo.addQuad(CONST quad:T_quad);
+  begin
+    if quadIsInBoundingBox(quad,box) then begin
+      setLength(quadsInRange,length(quadsInRange)+1);
+      quadsInRange[length(quadsInRange)-1]:=quad;
     end;
-    if i=0 then begin
-      quadsInRange[0]:=allCircles[0];
-      i:=1;
-    end;
-    setLength(quadsInRange,i);
   end;
 
 DESTRUCTOR T_trianglesTodo.destroy;
