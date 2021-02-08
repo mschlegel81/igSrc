@@ -661,6 +661,10 @@ PROCEDURE T_trianglesTodo.execute;
   FUNCTION getColorAt(CONST i,j:longint; CONST x,y:double):T_rgbFloatColor; {$ifndef debugMode} inline; {$endif}
     VAR k:longint;
     begin
+      if length(quadsInRange)=0 then begin
+        prevHit[i,j]:=-1;
+        exit(background.col[i,j].rest);
+      end;
       k:=prevHit[i,j];
       if isInside(x,y,quadsInRange[k]) then exit(quadsInRange[k].color);
       for k:=0 to length(quadsInRange)-1 do if isInside(x,y,quadsInRange[k]) then begin
@@ -679,7 +683,7 @@ PROCEDURE T_trianglesTodo.execute;
     for i:=0 to CHUNK_BLOCK_SIZE-1 do for j:=0 to CHUNK_BLOCK_SIZE-1 do prevHit[i,j]:=0;
     for i:=0 to chunk.width-1 do for j:=0 to chunk.height-1 do with chunk.col[i,j] do rest:=getColorAt(i,j,chunk.getPicX(i),chunk.getPicY(j));
 
-    if not(containedIn^.previewQuality) and not(containedIn^.cancellationRequested) then begin
+    if not(containedIn^.previewQuality) and not(containedIn^.cancellationRequested) and (length(quadsInRange)>0) then begin
       for i:=1 to chunk.width-1 do for j:=0 to chunk.height-1 do if prevHit[i-1,j]<>prevHit[i,j] then begin
         chunk.col[i-1,j].antialiasingMask:=chunk.col[i-1,j].antialiasingMask or 1;
         chunk.col[i  ,j].antialiasingMask:=chunk.col[  i,j].antialiasingMask or 1;
