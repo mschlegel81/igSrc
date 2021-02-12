@@ -30,7 +30,7 @@ IMPLEMENTATION
 USES ig_circlespirals,im_triangleSplit,math,sysutils;
 
 CONSTRUCTOR T_tilesAlgorithm.create;
-  CONST geometryNames:array[0..10] of string=({ 0} 'squares',
+  CONST geometryNames:array[0..14] of string=({ 0} 'squares',
                                               { 1} 'triangles',
                                               { 2} 'hexagons',
                                               { 3} 'archimedic',
@@ -40,18 +40,22 @@ CONSTRUCTOR T_tilesAlgorithm.create;
                                               { 7} 'spiral_hexagons',
                                               { 8} 'sunflower',
                                               { 9} 'fishbone',
-                                              {10} 'Conway');
+                                              {10} 'Conway',
+                                              {11} 'Split_2',
+                                              {12} 'Split_4',
+                                              {13} 'Split_a1',
+                                              {14} 'Split_a2');
         colorSourceNames:array[0..1] of string=('fixed',
                                                 'by_input');
 
   begin
     inherited create;
-    addParameter('geometry',pt_enum,0,12)^.setEnumValues(geometryNames);
+    addParameter('geometry',pt_enum,0,14)^.setEnumValues(geometryNames);
     addParameter('coloring',pt_enum,0,1)^.setEnumValues(colorSourceNames);
     addParameter('color'   ,pt_color);
     addParameter('border_width',pt_float,0);
     addParameter('border_angle',pt_float,0,90);
-    addParameter('spiral_parameter',pt_integer,2,100);
+    addParameter('spiral_parameter',pt_integer,2,10000);
     addParameter('mt_a',pt_2floats);
     addParameter('mt_b',pt_2floats);
     addParameter('mt_c',pt_2floats);
@@ -240,6 +244,8 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
         p0,p1,p2,p3,p4,p5:T_Complex;
         i0,i1,j0,j1,i,j:longint;
         world:T_boundingBox;
+        quad:T_quad;
+        triCol:T_rgbFloatColor;
     begin
       world:=scaler.getWorldBoundingBox;
       case geometryKind of
@@ -557,6 +563,17 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
           end;
         end;
         10: initConwayGeometry;
+        11..14: begin
+          for quad in findApproximatingTriangles(context,spiralParameter,geometryKind-11,scaler)
+          do begin
+            if scanColor then triCol:=quad.color
+                         else triCol:=color;
+            tileBuilder.addTriangle(quad.p0,
+                                    quad.p1,
+                                    quad.p2,
+                                    triCol);
+          end;
+        end;
       end;
 
     end;

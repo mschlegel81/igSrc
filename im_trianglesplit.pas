@@ -41,6 +41,7 @@ TYPE
   end;
 
 FUNCTION crossProduct(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
+FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST count:longint; CONST style:byte; CONST scaler:T_scaler):T_quadList;
 IMPLEMENTATION
 USES imageManipulation,myParams,mypics,math,pixMaps,darts,ig_circlespirals,sysutils;
 TYPE T_pixelCoordinate=record ix,iy:longint; end;
@@ -48,10 +49,10 @@ TYPE T_pixelCoordinate=record ix,iy:longint; end;
 
 FUNCTION getBoundingBox(CONST q:T_quad):T_boundingBox;
   begin
-    result.x0:=floor(min(q.p0.re,min(q.p1.re,min(q.p2.re,q.p3.re))));
-    result.y0:=floor(min(q.p0.im,min(q.p1.im,min(q.p2.im,q.p3.im))));
-    result.x1:=ceil (max(q.p0.re,max(q.p1.re,max(q.p2.re,q.p3.re))))+1;
-    result.y1:=ceil (max(q.p0.im,max(q.p1.im,max(q.p2.im,q.p3.im))))+1;
+    result.x0:=min(q.p0.re,min(q.p1.re,min(q.p2.re,q.p3.re)));
+    result.y0:=min(q.p0.im,min(q.p1.im,min(q.p2.im,q.p3.im)));
+    result.x1:=max(q.p0.re,max(q.p1.re,max(q.p2.re,q.p3.re)));
+    result.y1:=max(q.p0.im,max(q.p1.im,max(q.p2.im,q.p3.im)));
   end;
 
 FUNCTION crossProduct(CONST a,b:T_Complex; CONST x2,y2:double):double; inline;
@@ -400,8 +401,10 @@ FUNCTION scanTriangle(VAR triangleInfo:T_triangleInfo; CONST imgBB:T_boundingBox
     box:=bbIntersect(imgBB,getBoundingBox(triangleInfo.base));
     s :=BLACK;
     ss:=BLACK;
+    if (box.x1>=box.x0) and (box.y1>box.y0) then
     for y:=floor(box.y0) to ceil(box.y1)-1 do
-    for x:=floor(box.x0) to ceil(box.x1)-1 do if isInside(x,y,triangleInfo.base) then begin
+    for x:=floor(box.x0) to ceil(box.x1)-1 do
+    if isInside(x,y,triangleInfo.base) then begin
       c:=image[x,y];
       k +=1;
       s +=c;
@@ -409,7 +412,7 @@ FUNCTION scanTriangle(VAR triangleInfo:T_triangleInfo; CONST imgBB:T_boundingBox
     end;
     ss-=s*s*(1/k);
     if k=0 then begin
-      triangleInfo.variance:=-1;
+      triangleInfo.variance:=0;
       x:=round(max(imgBB.x0,min(imgBB.x1, (triangleInfo.base.p0.re+triangleInfo.base.p1.re+triangleInfo.base.p2.re)/3)));
       y:=round(max(imgBB.y0,min(imgBB.y1, (triangleInfo.base.p0.im+triangleInfo.base.p1.im+triangleInfo.base.p2.im)/3)));
       triangleInfo.base.color:=image.pixel[x,y];
@@ -704,31 +707,100 @@ PROCEDURE T_trianglesTodo.execute;
     background.destroy;
   end;
 
-FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST count:longint; CONST style:byte):T_quadList;
+FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST count:longint; CONST style:byte; CONST scaler:T_scaler):T_quadList;
   VAR imgBB:T_boundingBox;
   VAR tri:array of T_triangleInfo;
+  PROCEDURE addTriangleIfInBounds(CONST triangle:T_triangleInfo);
+    begin
+      if quadIsInBoundingBox(triangle.base,imgBB) then begin
+        setLength(tri,length(tri)+1);
+        tri[length(tri)-1]:=triangle;
+      end;
+    end;
+
   PROCEDURE initTriangles;
     CONST c=0.5;
           s=0.8660254037844388;
-    VAR a:double;
-        p0,p1,p2:T_Complex;
+    FUNCTION area(CONST q:T_quad):double;
+      begin
+        result:=crossProduct(q.p0,q.p1,q.p2.re,q.p2.im);
+      end;
+
+    VAR p0,p1,p2:T_Complex;
+    VAR toSplit:longint=0;
+        i:longint;
+        edgeToSplit:byte=0;
+        l,l2:double;
+        a0,a1,b0,b1:T_triangleInfo;
     begin
-      a:=max(context^.image.dimensions.width/2/s*1.5+context^.image.dimensions.height/2,context^.image.dimensions.height);
-      p0.re:=context^.image.dimensions.width /2;
-      p0.im:=context^.image.dimensions.height/2;
-      p1:=a*( s+II*c)+p0;
-      p2:=a*(-s+II*c)+p0;
-      p0-=a*II;
+      p1:= 5*(-s+II*c);;
+      p2:= 5*( s+II*c);;
+      p0:=-5*II;
       setLength(tri,1);
       with tri[0] do begin
-        base.p0:=p0;
-        base.p1:=p1;
-        base.p2:=p2;
-        base.p3:=p0;
+        base.p0:=scaler.mrofsnart(p0.re,p0.im);
+        base.p1:=scaler.mrofsnart(p1.re,p1.im);
+        base.p2:=scaler.mrofsnart(p2.re,p2.im);
+        base.p3:=base.p0;
         base.isTriangle:=true;
         base.color:=BLACK;
         variance:=1;
       end;
+      while (length(tri)<4) or (length(tri)<count shr 3) do begin
+        {$ifdef DEBUGMODE}
+        writeln(stderr,'INIT TRIANGLES: ',length(tri));
+        {$endif}
+        for i:=1 to length(tri)-1 do if area(tri[i].base)>area(tri[toSplit].base) then toSplit:=i;
+        edgeToSplit:=0;
+        with tri[toSplit] do begin
+          l:= sqrabs(base.p1-base.p0);
+          l2:=sqrabs(base.p2-base.p1);
+          if l2>l then begin l:=l2; edgeToSplit:=1; end;
+          l2:=sqrabs(base.p0-base.p2);
+          if l2>l then              edgeToSplit:=2;
+        end;
+
+        a0:=tri[toSplit];
+        a1:=tri[toSplit];
+        b0:=tri[toSplit];
+        b1:=tri[toSplit];
+
+        tri[toSplit]:=tri[length(tri)-1];
+        setLength(tri,length(tri)-1);
+        case style of
+          1: begin
+            b1.base.p0:=(a0.base.p0+a0.base.p1)*0.5;
+            b1.base.p1:=(a0.base.p1+a0.base.p2)*0.5;
+            b1.base.p2:=(a0.base.p2+a0.base.p0)*0.5; b1.base.p0:=b1.base.p0;
+            a1.base.p1:=b1.base.p0;
+            a1.base.p2:=b1.base.p2;
+            b0.base.p0:=b1.base.p0;
+            b0.base.p2:=b1.base.p1;
+            a0.base.p0:=b1.base.p2;
+            a0.base.p1:=b1.base.p1;
+            addTriangleIfInBounds(a0);
+            addTriangleIfInBounds(a1);
+            addTriangleIfInBounds(b0);
+            addTriangleIfInBounds(b1);
+          end;
+          else begin
+            case edgeToSplit of
+              0: begin
+                a0.base.p1:=a0.base.p0*0.5 +a0.base.p1*0.5 ; a1.base.p0:=a0.base.p1;
+              end;
+              1: begin
+                a0.base.p2:=a0.base.p1*0.5 +a0.base.p2*0.5 ; a1.base.p1:=a0.base.p2;
+              end;
+              2: begin
+                a0.base.p2:=a0.base.p2*0.5 +a0.base.p0*0.5 ; a1.base.p0:=a0.base.p2;
+              end;
+            end;
+            addTriangleIfInBounds(a0);
+            addTriangleIfInBounds(a1);
+          end;
+        end;
+      end;
+      for i:=0 to length(tri)-1 do scanTriangle(tri[i],imgBB,context^.image);
     end;
 
   PROCEDURE splitTriangles;
@@ -738,6 +810,10 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
         l,l2:double;
         a0,a1,b0,b1,c0,c1:T_triangleInfo;
     begin
+      {$ifdef DEBUGMODE}
+      writeln(stderr,'ADD TRIANGLES: ',length(tri));
+      {$endif}
+
       for i:=1 to length(tri)-1 do if tri[i].variance>tri[toSplit].variance then toSplit:=i;
       with tri[toSplit] do begin
         l:= sqrabs(base.p1-base.p0);
@@ -746,12 +822,16 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
         l2:=sqrabs(base.p0-base.p2);
         if l2>l then              edgeToSplit:=2;
       end;
+
       a0:=tri[toSplit];
       a1:=tri[toSplit];
       b0:=tri[toSplit];
       b1:=tri[toSplit];
       c0:=tri[toSplit];
       c1:=tri[toSplit];
+
+      tri[toSplit]:=tri[length(tri)-1];
+      setLength(tri,length(tri)-1);
       case style of
         1: begin
           b1.base.p0:=(a0.base.p0+a0.base.p1)*0.5;
@@ -763,16 +843,10 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
           b0.base.p2:=b1.base.p1;
           a0.base.p0:=b1.base.p2;
           a0.base.p1:=b1.base.p1;
-          scanTriangle(a0,imgBB,context^.image);
-          scanTriangle(a1,imgBB,context^.image);
-          scanTriangle(b0,imgBB,context^.image);
-          scanTriangle(b1,imgBB,context^.image);
-          i:=length(tri);
-          setLength(tri,i+3);
-          tri[toSplit]:=a0;
-          tri[i  ]:=a1;
-          tri[i+1]:=b0;
-          tri[i+2]:=b1;
+          if scanTriangle(a0,imgBB,context^.image)>0 then addTriangleIfInBounds(a0);
+          if scanTriangle(a1,imgBB,context^.image)>0 then addTriangleIfInBounds(a1);
+          if scanTriangle(b0,imgBB,context^.image)>0 then addTriangleIfInBounds(b0);
+          if scanTriangle(b1,imgBB,context^.image)>0 then addTriangleIfInBounds(b1);
         end;
         2: begin
           case edgeToSplit of
@@ -797,10 +871,8 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
           scanTriangle(c0,imgBB,context^.image); scanTriangle(c1,imgBB,context^.image);
           if b0.variance+b1.variance<a0.variance+a1.variance then begin a0:=b0; a1:=b1; end;
           if c0.variance+c1.variance<a0.variance+a1.variance then begin a0:=c0; a1:=c1; end;
-          i:=length(tri);
-          setLength(tri,i+1);
-          tri[toSplit]:=a0;
-          tri[i      ]:=a1;
+          addTriangleIfInBounds(a0);
+          addTriangleIfInBounds(a1);
         end;
         3: begin
           a0.base.p1:=a0.base.p0*0.5+a0.base.p1*0.5; a1.base.p0:=a0.base.p1;                         //a0.p0,a1.p1
@@ -814,10 +886,8 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
           if l*(b0.variance+b1.variance)<l2*(a0.variance+a1.variance) then begin a0:=b0; a1:=b1; l:=l2; end;
           l2:=abs(c0.base.p0-c1.base.p2);
           if l*(c0.variance+c1.variance)<l2*(a0.variance+a1.variance) then begin a0:=c0; a1:=c1; end;
-          i:=length(tri);
-          setLength(tri,i+1);
-          tri[toSplit]:=a0;
-          tri[i      ]:=a1;
+          addTriangleIfInBounds(a0);
+          addTriangleIfInBounds(a1);
         end
         else begin
           case edgeToSplit of
@@ -831,11 +901,8 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
               a0.base.p2:=a0.base.p2*0.5 +a0.base.p0*0.5 ; a1.base.p0:=a0.base.p2;
             end;
           end;
-          scanTriangle(a0,imgBB,context^.image); scanTriangle(a1,imgBB,context^.image);
-          i:=length(tri);
-          setLength(tri,i+1);
-          tri[toSplit]:=a0;
-          tri[i      ]:=a1;
+          if scanTriangle(a0,imgBB,context^.image)>0 then addTriangleIfInBounds(a0);
+          if scanTriangle(a1,imgBB,context^.image)>0 then addTriangleIfInBounds(a1);
         end;
       end;
     end;
@@ -858,9 +925,14 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
 PROCEDURE triangleSplit(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   VAR rawTriangles:T_quadList;
       builder:T_tileBuilder;
+      scaler:T_scaler;
       i:longint;
   begin
-    rawTriangles:=findApproximatingTriangles(context,parameters.i0,parameters.i1);
+    scaler.create(context^.image.dimensions.width,
+                  context^.image.dimensions.height,
+                  0,0,0.25,0);
+
+    rawTriangles:=findApproximatingTriangles(context,parameters.i0,parameters.i1,scaler);
     builder.create(context,parameters.f2,parameters.f3);
     for i:=0 to length(rawTriangles)-1 do builder.addTriangle(rawTriangles[i]);
     setLength(rawTriangles,0);
@@ -895,9 +967,12 @@ PROCEDURE spheres_impl(CONST parameters:T_parameterValue; CONST context:P_abstra
       i,j:longint;
       tmp:T_circle;
       todo:P_spheresTodo;
-
+      scaler:T_scaler;
   begin
-    rawTriangles:=findApproximatingTriangles(context,parameters.i0,2);
+    scaler.create(context^.image.dimensions.width,
+                  context^.image.dimensions.height,
+                  0,0,0.25,0);
+    rawTriangles:=findApproximatingTriangles(context,parameters.i0,2,scaler);
     if parameters.i1=3 then //White matte spheres
       for i:=0 to length(rawTriangles)-1 do rawTriangles[i].color:=WHITE;
     setLength(circles,length(rawTriangles));

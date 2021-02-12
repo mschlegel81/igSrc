@@ -103,13 +103,13 @@ CONSTRUCTOR T_spiralCircleProvider.create(CONST shiftParameter: longint; CONST m
     //                 x  = -d/c
     infPoint:=-1*d/c;
     if not(isValid(infPoint)) then infPoint:=0;
-
-    p0:=param[shiftParameter,0];
-    p1:=param[shiftParameter,1];
+    shiftK:=shiftParameter;
+    if shiftK>100 then shiftK:=100 else if shiftK<2 then shiftK:=2;
+    p0:=param[shiftK,0];
+    p1:=param[shiftK,1];
     r0:=complex.abs(p0*system.cos(p1)-1+
                     p0*system.sin(p1)*II)/(1+p0);
     p0:=system.ln(p0);
-    shiftK:=shiftParameter;
   end;
 
 DESTRUCTOR T_spiralCircleProvider.destroy;
