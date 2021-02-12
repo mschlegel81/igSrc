@@ -747,8 +747,8 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
         variance:=1;
       end;
       while (length(tri)<4) or (length(tri)<count shr 3) do begin
-        {$ifdef DEBUGMODE}
-        writeln(stderr,'INIT TRIANGLES: ',length(tri));
+        {$ifdef debugMode}
+        writeln(stdErr,'INIT TRIANGLES: ',length(tri));
         {$endif}
         for i:=1 to length(tri)-1 do if area(tri[i].base)>area(tri[toSplit].base) then toSplit:=i;
         edgeToSplit:=0;
@@ -810,8 +810,8 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
         l,l2:double;
         a0,a1,b0,b1,c0,c1:T_triangleInfo;
     begin
-      {$ifdef DEBUGMODE}
-      writeln(stderr,'ADD TRIANGLES: ',length(tri));
+      {$ifdef debugMode}
+      writeln(stdErr,'ADD TRIANGLES: ',length(tri));
       {$endif}
 
       for i:=1 to length(tri)-1 do if tri[i].variance>tri[toSplit].variance then toSplit:=i;
