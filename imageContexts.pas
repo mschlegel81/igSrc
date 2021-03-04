@@ -92,6 +92,7 @@ TYPE
       PROCEDURE notifyWorkerStopped;
       PROCEDURE logParallelStepDone;
       PROCEDURE ensureWorkers;
+      PROCEDURE executeQueueTasks;
     public
       previewQuality:boolean;
       messageQueue:P_structuredMessageQueue;
@@ -104,7 +105,6 @@ TYPE
       PROCEDURE clearQueue;
       PROCEDURE enqueueAll(CONST task:P_parallelTask);
       PROCEDURE enqueue   (CONST task:P_parallelTask);
-      FUNCTION  dequeue              :P_parallelTask;
       PROCEDURE waitForFinishOfParallelTasks;
       //General workflow control
       PROCEDURE ensureStop;
@@ -132,6 +132,16 @@ FUNCTION parseOperation(CONST specification:string):P_imageOperation;
 IMPLEMENTATION
 USES myGenerics,myStringUtil;
 TYPE T_opList=array of P_imageOperationMeta;
+
+T_imagePreparationWorkerThread=class(T_basicThread)
+  protected
+    workflow:P_abstractWorkflow;
+    executeMainWorkflow:boolean;
+    PROCEDURE execute; override;
+  public
+    CONSTRUCTOR create(CONST workflow_:P_abstractWorkflow; CONST executeMain:boolean);
+    DESTRUCTOR destroy; override;
+end;
 VAR globalWorkersRunning:longint=0;
     operationMap:specialize G_stringKeyMap<T_opList>;
 
@@ -188,6 +198,30 @@ FUNCTION parseOperation(CONST specification:string):P_imageOperation;
     end
   end;
 
+PROCEDURE T_imagePreparationWorkerThread.execute;
+  begin
+    if executeMainWorkflow
+    then workflow^.headlessWorkflowExecution
+    else begin
+      workflow^.executeQueueTasks;
+      workflow^.notifyWorkerStopped;
+    end;
+  end;
+
+CONSTRUCTOR T_imagePreparationWorkerThread.create(CONST workflow_: P_abstractWorkflow; CONST executeMain: boolean);
+  begin
+    workflow:=workflow_;
+    interLockedIncrement(globalWorkersRunning);
+    executeMainWorkflow:=executeMain;
+    inherited create();
+  end;
+
+DESTRUCTOR T_imagePreparationWorkerThread.destroy;
+begin
+  inherited destroy;
+  interlockedDecrement(globalWorkersRunning);
+end;
+
 DESTRUCTOR T_imageOperation.destroy; begin end;
 
 PROCEDURE T_imageOperation.assignMetaOnce(CONST newMeta: P_imageOperationMeta);
@@ -236,7 +270,6 @@ PROCEDURE T_abstractWorkflow.notifyWorkerStopped;
     enterCriticalSection(contextCS);
     try
       dec(queue.workerCount);
-      interlockedDecrement(globalWorkersRunning);
     finally
       leaveCriticalSection(contextCS);
     end;
@@ -260,38 +293,46 @@ PROCEDURE T_abstractWorkflow.logParallelStepDone;
     end;
   end;
 
-FUNCTION worker(p:pointer):ptrint; register;
-  VAR task:P_parallelTask;
-  begin
-    result:=0;
-    with P_abstractWorkflow(p)^ do begin
-      task:=dequeue;
-      while (task<>nil) do begin
-        task^.state:=ts_evaluating;
-        if currentExecution.workflowState in [ts_cancelled,ts_stopRequested]
-        then result:=-1
-        else begin
-          task^.execute;
-          logParallelStepDone;
-        end;
-        dispose(task,destroy);
-        task:=dequeue;
-      end;
-      notifyWorkerStopped;
-    end;
-  end;
-
 PROCEDURE T_abstractWorkflow.ensureWorkers;
   begin
     enterCriticalSection(contextCS);
     try
-      while (queue.workerCount<=0) or (globalWorkersRunning<maxImageManipulationThreads) do begin
+      while (globalWorkersRunning<maxImageManipulationThreads) and (getGlobalRunningThreads<maxImageManipulationThreads) and (getGlobalThreads<GLOBAL_THREAD_LIMIT) do begin
         inc(queue.workerCount);
-        interLockedIncrement(globalWorkersRunning);
-        beginThread(@worker,@self);
+        T_imagePreparationWorkerThread.create(@self,false);
       end;
     finally
       leaveCriticalSection(contextCS);
+    end;
+  end;
+
+PROCEDURE T_abstractWorkflow.executeQueueTasks;
+  FUNCTION dequeue: P_parallelTask;
+    begin
+      enterCriticalSection(contextCS);
+      with queue do try
+        result:=firstTask;
+        if firstTask<>nil then begin
+          firstTask:=firstTask^.nextTask;
+          dec(queuedCount);
+        end;
+      finally
+        leaveCriticalSection(contextCS);
+      end;
+    end;
+
+  VAR task:P_parallelTask;
+  begin
+    task:=dequeue;
+    while (task<>nil) do begin
+      task^.state:=ts_evaluating;
+      if not(currentExecution.workflowState in [ts_cancelled,ts_stopRequested])
+      then begin
+        task^.execute;
+        logParallelStepDone;
+      end;
+      dispose(task,destroy);
+      task:=dequeue;
     end;
   end;
 
@@ -393,29 +434,15 @@ PROCEDURE T_abstractWorkflow.enqueue(CONST task: P_parallelTask);
     end;
   end;
 
-FUNCTION T_abstractWorkflow.dequeue: P_parallelTask;
-  begin
-    enterCriticalSection(contextCS);
-    with queue do try
-      result:=firstTask;
-      if firstTask<>nil then begin
-        firstTask:=firstTask^.nextTask;
-        dec(queuedCount);
-      end;
-    finally
-      leaveCriticalSection(contextCS);
-    end;
-  end;
-
 PROCEDURE T_abstractWorkflow.waitForFinishOfParallelTasks;
   begin
     with queue do if (workerCount>=0) then begin
       enterCriticalSection(contextCS);
       //The current thread will execute one worker
-      interLockedIncrement(globalWorkersRunning);
-      inc(workerCount);
       leaveCriticalSection(contextCS);
-      worker(@self);
+
+      executeQueueTasks;
+
       enterCriticalSection(contextCS);
       while workerCount<>0 do begin
         leaveCriticalSection(contextCS);
@@ -493,12 +520,6 @@ PROCEDURE T_abstractWorkflow.clear;
     end;
   end;
 
-FUNCTION runWorkflow(p:pointer):ptrint; register;
-  begin
-    P_abstractWorkflow(p)^.headlessWorkflowExecution;
-    result:=0;
-  end;
-
 PROCEDURE T_abstractWorkflow.executeWorkflowInBackground(CONST preview: boolean);
   begin
     if not(isValid) then exit;
@@ -507,7 +528,7 @@ PROCEDURE T_abstractWorkflow.executeWorkflowInBackground(CONST preview: boolean)
     currentExecution.workflowState:=ts_evaluating;
     previewQuality:=preview;
     beforeAll;
-    beginThread(@runWorkflow,@self);
+    T_imagePreparationWorkerThread.create(@self,true);
   end;
 
 FUNCTION T_abstractWorkflow.isEditorWorkflow: boolean;
