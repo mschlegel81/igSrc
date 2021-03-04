@@ -746,7 +746,7 @@ FUNCTION findApproximatingTriangles(CONST context:P_abstractWorkflow; CONST coun
         base.color:=BLACK;
         variance:=1;
       end;
-      while (length(tri)<4) or (length(tri)<count shr 3) do begin
+      while (length(tri)<6) and (length(tri)<count shr 3) do begin
         {$ifdef debugMode}
         writeln(stdErr,'INIT TRIANGLES: ',length(tri));
         {$endif}
