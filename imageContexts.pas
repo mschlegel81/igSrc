@@ -297,7 +297,7 @@ PROCEDURE T_abstractWorkflow.ensureWorkers;
   begin
     enterCriticalSection(contextCS);
     try
-      while (globalWorkersRunning<maxImageManipulationThreads) and (getGlobalRunningThreads<maxImageManipulationThreads) and (getGlobalThreads<GLOBAL_THREAD_LIMIT) do begin
+      while (globalWorkersRunning<maxImageManipulationThreads) and (getGlobalThreads<GLOBAL_THREAD_LIMIT) do begin
         inc(queue.workerCount);
         T_imagePreparationWorkerThread.create(@self,false);
       end;
