@@ -83,6 +83,7 @@ TYPE
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual;
       FUNCTION limitImageSize:boolean; virtual;
       FUNCTION stepCount:longint; virtual;
+      PROPERTY getRelatedEditor:P_editorWorkflow read relatedEditor;
   end;
 
   T_standaloneWorkflow=object(T_simpleWorkflow)
