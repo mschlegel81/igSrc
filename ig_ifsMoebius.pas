@@ -35,7 +35,7 @@ TYPE
   end;
 
 IMPLEMENTATION
-USES darts,sysutils;
+USES darts,sysutils,mySys;
 
 CONSTRUCTOR T_moebiusIfs.create;
   CONST seedNames:array[0..3] of string=('Gauss','Circle','Line','Triangle');
@@ -349,7 +349,7 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
   CONST index: longint);
   CONST abortRadius=1E3;
   VAR colorToAdd:T_rgbFloatColor=(0,0,0);
-
+      XOS:T_xosPrng;
   PROCEDURE setColor;
     begin
       with renderTempData do case par_color of
@@ -371,28 +371,28 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
       case par_seed of
         0: begin
           repeat
-            result.re:=2*random-1;
-            result.im:=2*random-1;
+            result.re:=2*XOS.realRandom-1;
+            result.im:=2*XOS.realRandom-1;
             xx:=sqrabs(result);
           until (xx<1) and (xx<>0);
           result:=result*system.sqrt(-2*system.ln(xx)/xx);
         end;
         1: begin
           repeat
-            result.re:=2*random-1;
-            result.im:=2*random-1;
+            result.re:=2*XOS.realRandom-1;
+            result.im:=2*XOS.realRandom-1;
             xx:=sqrabs(result);
           until (xx<1) and (xx<>0);
           result:=result*0.5E-2;
         end;
         2: begin
-          xx:=2*pi*random;
+          xx:=2*pi*XOS.realRandom;
           result.re:=0.5*system.cos(xx);
           result.im:=0.5*system.sin(xx);
         end;
         3: begin
-          xx:=random;
-          case random(3) of
+          xx:=XOS.realRandom;
+          case XOS.intRandom(3) of
             0: result:=ctp[0]+(ctp[1]-ctp[0])*xx;
             1: result:=ctp[1]+(ctp[2]-ctp[1])*xx;
             2: result:=ctp[2]+(ctp[0]-ctp[2])*xx;
@@ -462,6 +462,8 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
       px:T_Complex;
   begin
     with renderTempData do if index<aaSamples then begin
+      XOS.create;
+      XOS.randomize;
       with renderTempData do begin
         if hasBackground and (backgroundImage<>nil)
         then temp.create(backgroundImage^)
@@ -483,11 +485,11 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
         px:=getRandomPoint;
         farawayCount:=0;
         if par_symmex=8 then begin
-          blurAid[0]:=1-0.5*abs(random+random-1);
-          blurAid[1]:=1-0.5*abs(random+random-1);
+          blurAid[0]:=1-0.5*abs(XOS.realRandom+XOS.realRandom-1);
+          blurAid[1]:=1-0.5*abs(XOS.realRandom+XOS.realRandom-1);
         end;
         for k:=1 to par_depth do begin
-          with par_trafo[random(8)] do
+          with par_trafo[XOS.intRandom(8)] do
             px:=(a[0]*px.re+a[1]*px.im+b)/
                 (c[0]*px.re+c[1]*px.im+d);
           if (sqrabs(px)>abortRadius) then begin
@@ -501,11 +503,11 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
         px:=getRandomPoint;
         farawayCount:=0;
         if par_symmex=8 then begin
-          blurAid[0]:=1-0.5*abs(random+random-1);
-          blurAid[1]:=1-0.5*abs(random+random-1);
+          blurAid[0]:=1-0.5*abs(XOS.realRandom+XOS.realRandom-1);
+          blurAid[1]:=1-0.5*abs(XOS.realRandom+XOS.realRandom-1);
         end;
         for k:=-(par_depth shr 3) to par_depth do begin
-          with par_trafo[random(8)] do begin
+          with par_trafo[XOS.intRandom(8)] do begin
             px:=(a[0]*px.re+a[1]*px.im+b)/
                 (c[0]*px.re+c[1]*px.im+d);
             case par_color of
@@ -530,6 +532,7 @@ PROCEDURE T_moebiusIfs.prepareSlice(CONST context: P_abstractWorkflow;
         system.leaveCriticalSection(flushCs);
       end;
       temp.destroy;
+      XOS.destroy;
     end;
   end;
 

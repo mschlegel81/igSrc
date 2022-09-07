@@ -27,7 +27,7 @@ TYPE
   end;
 
 IMPLEMENTATION
-USES math,darts;
+USES math,darts,mySys;
 CONSTRUCTOR T_epicycle.create;
   begin
     inherited create;
@@ -91,6 +91,7 @@ PROCEDURE T_epicycle.prepareSlice(CONST context:P_abstractWorkflow; CONST index:
       a,b,fa,fb,x,y:double;
       tempMap:array of word=();
       flushFactor:double=0;
+      XOS:T_xosPrng;
 
   PROCEDURE putSample(CONST x,y:double); inline;
     VAR c:T_Complex;
@@ -117,14 +118,15 @@ PROCEDURE T_epicycle.prepareSlice(CONST context:P_abstractWorkflow; CONST index:
 
   begin
     with renderTempData do if index<aaSamples then begin
-      randomize;
+      XOS.create;
+      XOS.randomize;
       setLength(tempMap,xRes*yRes);
       for i:=0 to length(tempMap)-1 do tempMap[i]:=0;
       for i:=0 to timesteps-1 do begin
-        a:=par_a+random*(par_a2-par_a);
-        b:=par_b+random*(par_b2-par_b);
+        a:=par_a+XOS.realRandom*(par_a2-par_a);
+        b:=par_b+XOS.realRandom*(par_b2-par_b);
         if abs(a)>=1 then fa:=1 else fa:=1-abs(a);
-        fb:=par_t0+(par_t1-par_t0)*random;
+        fb:=par_t0+(par_t1-par_t0)*XOS.realRandom;
         x:=fa*system.sin(fb);
         y:=fa*system.cos(fb);
         for k:=1 to par_depth do begin
@@ -145,6 +147,7 @@ PROCEDURE T_epicycle.prepareSlice(CONST context:P_abstractWorkflow; CONST index:
         system.leaveCriticalSection(flushCs);
       end;
       setLength(tempMap,0);
+      XOS.destroy;
     end;
   end;
 

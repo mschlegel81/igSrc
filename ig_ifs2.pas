@@ -39,7 +39,7 @@ TYPE
   end;
 
 IMPLEMENTATION
-USES math,darts,sysutils;
+USES math,darts,sysutils,mySys;
 
 CONSTRUCTOR T_ifs_v2.create;
   CONST seedNames:array[0..3] of string=('Gauss','Circle','Line','Triangle');
@@ -288,6 +288,7 @@ FUNCTION getTrafo(CONST T:T_trafoInTime; CONST time:double; OUT contractionFacto
 
 PROCEDURE T_ifs_v2.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint);
   VAR colorToAdd:T_rgbFloatColor=(0,0,0);
+      XOS:T_xosPrng;
 
   PROCEDURE setColor(CONST t:double);
     begin
@@ -317,28 +318,28 @@ PROCEDURE T_ifs_v2.prepareSlice(CONST context:P_abstractWorkflow; CONST index:lo
       case par_seed of
         0: begin
           repeat
-            result.re:=2*random-1;
-            result.im:=2*random-1;
+            result.re:=2*XOS.realRandom-1;
+            result.im:=2*XOS.realRandom-1;
             xx:=sqrabs(result);
           until (xx<1) and (xx<>0);
           result:=result*system.sqrt(-2*system.ln(xx)/xx);
         end;
         1: begin
           repeat
-            result.re:=2*random-1;
-            result.im:=2*random-1;
+            result.re:=2*XOS.realRandom-1;
+            result.im:=2*XOS.realRandom-1;
             xx:=sqrabs(result);
           until (xx<1) and (xx<>0);
           result:=result*0.5E-2;
         end;
         2: begin
-          xx:=2*pi*random;
+          xx:=2*pi*XOS.realRandom;
           result.re:=0.5*system.cos(xx);
           result.im:=0.5*system.sin(xx);
         end;
         3: begin
-          xx:=random;
-          case random(3) of
+          xx:=XOS.realRandom;
+          case XOS.intRandom(3) of
             0: result:=ctp[0]+(ctp[1]-ctp[0])*xx;
             1: result:=ctp[1]+(ctp[2]-ctp[1])*xx;
             2: result:=ctp[2]+(ctp[0]-ctp[2])*xx;
@@ -417,11 +418,13 @@ PROCEDURE T_ifs_v2.prepareSlice(CONST context:P_abstractWorkflow; CONST index:lo
 
   FUNCTION pickTrafo:longint;
     begin
-      repeat result:=random(length(cTrafo)) until random<cTrafo[result].contraction;
+      repeat result:=XOS.intRandom(length(cTrafo)) until XOS.realRandom<cTrafo[result].contraction;
     end;
 
   begin
     with renderTempData do if index<aaSamples then begin
+      XOS.create;
+      XOS.randomize;
       with renderTempData do begin
         if hasBackground and (backgroundImage<>nil)
         then temp.create(backgroundImage^)
@@ -454,8 +457,8 @@ PROCEDURE T_ifs_v2.prepareSlice(CONST context:P_abstractWorkflow; CONST index:lo
         setColor(t);
         px:=getRandomPoint;
         missedBefore:=0;
-        blurAid[0]:=1-0.5*abs(random+random-1);
-        blurAid[1]:=1-0.5*abs(random+random-1);
+        blurAid[0]:=1-0.5*abs(XOS.realRandom+XOS.realRandom-1);
+        blurAid[1]:=1-0.5*abs(XOS.realRandom+XOS.realRandom-1);
 
         for k:=1 to par_depth do begin
           with cTrafo[pickTrafo].trafo do begin
@@ -484,6 +487,7 @@ PROCEDURE T_ifs_v2.prepareSlice(CONST context:P_abstractWorkflow; CONST index:lo
         system.leaveCriticalSection(flushCs);
       end;
       temp.destroy;
+      XOS.destroy;
     end;
   end;
 

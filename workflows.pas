@@ -116,6 +116,7 @@ USES imageManipulation,
      im_triangleSplit,
      ig_circlespirals,
      ig_tesselation,
+     ig_buddhaBrot,
      myStringUtil,
      LazFileUtils;
 

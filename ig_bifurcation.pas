@@ -24,7 +24,7 @@ TYPE
   end;
 
 IMPLEMENTATION
-USES sysutils,math,darts;
+USES sysutils,math,darts,mySys;
 CONSTRUCTOR T_bifurcation.create;
   CONST eqName:array[0..6] of string=('Feigenbaum','Feigenbaum Trf.1','Feigenbaum Trf.2','Cosine','Sinc','Cosc','XX');
         colName:array[0..2] of string=('White on black','Harsh','Fiery');
@@ -75,7 +75,8 @@ FUNCTION T_bifurcation.getParameter(CONST index: byte): T_parameterValue;
   end;
 
 PROCEDURE T_bifurcation.prepareSlice(CONST context:P_abstractWorkflow; CONST index:longint);
-  VAR tempMap:array of word=();
+  VAR XOS:T_xosPrng;
+      tempMap:array of word=();
       x,y:longint;
       a0,a1,da:double;
 
@@ -98,7 +99,7 @@ PROCEDURE T_bifurcation.prepareSlice(CONST context:P_abstractWorkflow; CONST ind
     VAR x,a:double;
         k:longint;
     begin
-      x:=random;
+      x:=XOS.realRandom;
       case equation of
         1: begin a:=0.25-a_IN; if a<0 then a:=5 else a:=2*sqrt(a)+1;  end;
         2: a:=4+(1/a_IN);
@@ -141,6 +142,8 @@ PROCEDURE T_bifurcation.prepareSlice(CONST context:P_abstractWorkflow; CONST ind
 
   begin
     with renderTempData do if index<aaSamples then begin
+      XOS.create;
+      XOS.randomize;
       with renderTempData do begin
         setLength(tempMap,xRes*yRes);
         for x:=0 to length(tempMap)-1 do tempMap[x]:=0;
@@ -149,7 +152,7 @@ PROCEDURE T_bifurcation.prepareSlice(CONST context:P_abstractWorkflow; CONST ind
         a1:=max(max(scaler.transform(     0,0).re,scaler.transform(     0,yRes-1).re),
                 max(scaler.transform(xRes-1,0).re,scaler.transform(xRes-1,yRes-1).re));
         da:=(a1-a0)/timesteps*(maxDepth-preIt+1);
-        a0:=a0+da*random;
+        a0:=a0+da*XOS.realRandom;
       end;
       while a0<a1 do begin
         iterate(a0);
@@ -165,6 +168,7 @@ PROCEDURE T_bifurcation.prepareSlice(CONST context:P_abstractWorkflow; CONST ind
         system.leaveCriticalSection(flushCs);
       end;
       setLength(tempMap,0);
+      XOS.destroy;
     end;
   end;
 
