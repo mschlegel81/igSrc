@@ -675,7 +675,7 @@ FUNCTION newLyapunov         :P_generalImageGenrationAlgorithm; begin new(P_lyap
 
 CONSTRUCTOR T_rawDataWorkerThreadTodo.create(CONST algorithm_: P_functionPerPixelViaRawDataAlgorithm; CONST y_: longint);
   begin
-    inherited create;
+    inherited create(y_);
     algorithm:=algorithm_;
     y:=y_;
   end;

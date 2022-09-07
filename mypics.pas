@@ -69,7 +69,7 @@ TYPE
       //Chunk access:-----------------------------------------------------------
       FUNCTION chunksInMap:longint;
       PROCEDURE markChunksAsPending;
-      FUNCTION getPendingList:T_arrayOfLongint;
+      FUNCTION getPendingList(CONST allArePending:boolean):T_arrayOfLongint;
       PROCEDURE copyFromChunk(VAR chunk:T_colChunk);
       FUNCTION getChunkCopy(CONST chunkIndex:longint):T_colChunk;
       //-----------------------------------------------------------:Chunk access
@@ -317,7 +317,7 @@ PROCEDURE T_rawImage.markChunksAsPending;
       else pixel[x,y]:=BLACK;
   end;
 
-FUNCTION T_rawImage.getPendingList: T_arrayOfLongint;
+FUNCTION T_rawImage.getPendingList(CONST allArePending:boolean): T_arrayOfLongint;
   VAR xChunks,yChunks:longint;
       x,y,cx,cy,i:longint;
       isPending:array of array of boolean=();
@@ -325,39 +325,47 @@ FUNCTION T_rawImage.getPendingList: T_arrayOfLongint;
     randomize;
     xChunks:=dim.width  div CHUNK_BLOCK_SIZE; if xChunks*CHUNK_BLOCK_SIZE<dim.width  then inc(xChunks);
     yChunks:=dim.height div CHUNK_BLOCK_SIZE; if yChunks*CHUNK_BLOCK_SIZE<dim.height then inc(yChunks);
-    setLength(isPending,xChunks);
-    for cx:=0 to length(isPending)-1 do begin
-      setLength(isPending[cx],yChunks);
-      for cy:=0 to length(isPending[cx])-1 do isPending[cx,cy]:=true;
-    end;
-    //scan:-----------------------------------------------------
-    for y:=dim.height-1 downto 0 do begin
-      cy:=y div CHUNK_BLOCK_SIZE;
-      for x:=0 to dim.width-1 do begin
-        cx:=x div CHUNK_BLOCK_SIZE;
-        if ((x and 63) in [0,63]) or ((y and 63) in [0,63]) or (odd(x) xor odd(y)) and (((x and 63) in [21,42]) or ((y and 63) in [21,42]))
-        then isPending[cx,cy]:=isPending[cx,cy] and (pixel[x,y]=WHITE)
-        else isPending[cx,cy]:=isPending[cx,cy] and (pixel[x,y]=BLACK);
+
+    if allArePending then begin
+      setLength(result,xChunks*yChunks);
+      for i:=0 to length(result)-1 do result[i]:=i;
+    end else begin
+      setLength(isPending,xChunks);
+      for cx:=0 to length(isPending)-1 do begin
+        setLength(isPending[cx],yChunks);
+        for cy:=0 to length(isPending[cx])-1 do isPending[cx,cy]:=true;
       end;
+      //scan:-----------------------------------------------------
+      for y:=dim.height-1 downto 0 do begin
+        cy:=y div CHUNK_BLOCK_SIZE;
+        for x:=0 to dim.width-1 do begin
+          cx:=x div CHUNK_BLOCK_SIZE;
+          if ((x and 63) in [0,63]) or ((y and 63) in [0,63]) or (odd(x) xor odd(y)) and (((x and 63) in [21,42]) or ((y and 63) in [21,42]))
+          then isPending[cx,cy]:=isPending[cx,cy] and (pixel[x,y]=WHITE)
+          else isPending[cx,cy]:=isPending[cx,cy] and (pixel[x,y]=BLACK);
+        end;
+      end;
+      //-----------------------------------------------------:scan
+      //transform boolean mask to int array:----------------------
+      initialize(result);
+      setLength(result,0);
+      for cy:=0 to length(isPending[0])-1 do
+      for cx:=length(isPending)-1 downto 0 do if isPending[cx,cy] then begin
+        setLength(result,length(result)+1);
+        result[length(result)-1]:=cx+xChunks*cy;
+      end;
+      for cx:=0 to length(isPending)-1 do setLength(isPending[cx],0);
+      setLength(isPending,0);
+      //----------------------:transform boolean mask to int array
     end;
-    //-----------------------------------------------------:scan
-    //transform boolean mask to int array:----------------------
-    initialize(result);
-    setLength(result,0);
-    for cy:=0 to length(isPending[0])-1 do
-    for cx:=length(isPending)-1 downto 0 do if isPending[cx,cy] then begin
-      setLength(result,length(result)+1);
-      result[length(result)-1]:=cx+xChunks*cy;
-    end;
-    for cx:=0 to length(isPending)-1 do setLength(isPending[cx],0);
-    setLength(isPending,0);
-    //----------------------:transform boolean mask to int array
     //scramble result:------------------------------------------
-    for i:=0 to length(result)-1 do begin
+    {$ifndef debugMode}
+    for i:=0 to length(result) shr 2-1 do begin
       cx:=random(length(result));
       repeat cy:=random(length(result)) until cx<>cy;
       x:=result[cx]; result[cx]:=result[cy]; result[cy]:=x;
     end;
+    {$endif}
   end;
 
 PROCEDURE T_rawImage.copyFromChunk(VAR chunk: T_colChunk);

@@ -62,10 +62,11 @@ TYPE
                ts_stopRequested);
   P_parallelTask=^T_parallelTask;
   T_parallelTask=object
+    id:longint;
     containedIn:P_abstractWorkflow;
     nextTask   :P_parallelTask;
     state:T_taskState;
-    CONSTRUCTOR create;
+    CONSTRUCTOR create(CONST id_:longint);
     DESTRUCTOR destroy; virtual;
     PROCEDURE execute; virtual; abstract;
   end;
@@ -254,8 +255,9 @@ FUNCTION T_imageOperationMeta.getDefaultParameterString: string;
     dispose(temporaryOperation,destroy);
   end;
 
-CONSTRUCTOR T_parallelTask.create;
+CONSTRUCTOR T_parallelTask.create(CONST id_:longint);
   begin
+    id:=id_;
     containedIn:=nil;
     nextTask   :=nil;
     state      :=ts_pending;
@@ -446,6 +448,9 @@ PROCEDURE T_abstractWorkflow.waitForFinishOfParallelTasks;
       enterCriticalSection(contextCS);
       while workerCount<>0 do begin
         leaveCriticalSection(contextCS);
+        {$ifdef debugMode}
+        writeln('I am still waiting for workers to finish (',workerCount,') ',FormatDateTime('hh:nn:ss.zzz',now));
+        {$endif}
         sleep(random(10));
         enterCriticalSection(contextCS);
       end;

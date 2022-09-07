@@ -397,7 +397,7 @@ FUNCTION T_pixelThrowerAlgorithm.dependsOnImageBefore: boolean;
 
 CONSTRUCTOR T_workerThreadTodo.create(CONST algorithm_: P_functionPerPixelAlgorithm; CONST chunkIndex_: longint);
   begin
-    inherited create;
+    inherited create(chunkIndex_);
     algorithm:=algorithm_;
     chunkIndex:=chunkIndex_;
   end;
@@ -409,11 +409,17 @@ DESTRUCTOR T_workerThreadTodo.destroy;
 PROCEDURE T_workerThreadTodo.execute;
   VAR chunk:T_colChunk;
   begin
+    {$ifdef debugMode}
+    writeln('Task #',id,' started');
+    {$endif}
     chunk.create;
     chunk.initForChunk(containedIn^.image.dimensions.width,containedIn^.image.dimensions.height,chunkIndex);
     algorithm^.prepareChunk(containedIn,chunk);
     containedIn^.image.copyFromChunk(chunk);
     chunk.destroy;
+    {$ifdef debugMode}
+    writeln('Task #',id,' finished');
+    {$endif}
   end;
 
 CONSTRUCTOR T_generalImageGenrationAlgorithm.create;
@@ -730,11 +736,19 @@ PROCEDURE T_functionPerPixelAlgorithm.execute(CONST context:P_abstractWorkflow);
     begin new(result,create(@self,index)); end;
 
   begin with context^ do begin
+    {$ifdef debugMode}
+    writeln('Clearing queue...');
+    {$endif}
     clearQueue;
     scaler.rescale(image.dimensions.width,image.dimensions.height);
     scalerChanagedSinceCalculation:=false;
-    image.markChunksAsPending;
-    pendingChunks:=image.getPendingList;
+    {$ifdef debugMode}
+    writeln('Synthesizing chunks...');
+    {$endif}
+    pendingChunks:=image.getPendingList(true);
+    {$ifdef debugMode}
+    writeln('Enqueuing ',length(pendingChunks),' tasks');
+    {$endif}
     for i:=0 to length(pendingChunks)-1 do enqueue(todo(pendingChunks[i]));
     waitForFinishOfParallelTasks;
   end; end;
