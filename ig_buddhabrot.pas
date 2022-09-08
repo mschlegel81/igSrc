@@ -70,6 +70,7 @@ PROCEDURE T_buddhaBrot.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
       x,y:longint;
       path:array of T_Complex;
       hitCount:longint=0;
+      divergeRadius:double=1E2;
 
   PROCEDURE iterate();
     PROCEDURE putPixel(CONST w:T_Complex);
@@ -83,10 +84,8 @@ PROCEDURE T_buddhaBrot.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
            (c.im>-0.5) and (c.im<renderTempData.maxPixelY) then begin
           j:=round(c.re)+
              round(c.im)*renderTempData.xRes;
-          if tempMap[j]<65535 then begin
-            inc(tempMap[j]);
-            inc(hitCount);
-          end;
+          if tempMap[j]<65535 then inc(tempMap[j]);
+          inc(hitCount);
         end;
       end;
 
@@ -101,14 +100,13 @@ PROCEDURE T_buddhaBrot.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
       until (c.re<1) and (c.re<>0);
       x:=x*system.sqrt(-2*system.ln(c.re)/c.re);
       x.re-=0.5;
-
       c:=x;
-      while isValid(x) and (k<length(path)) do begin
+      while isValid(x) and (sqrabs(x)<divergeRadius) and (k<length(path)) do begin
         path[k]:=x; inc(k);
         x:=sqr(x)+c;
       end;
-      if   not(isValid(x))    then for i:=0 to k-2 do putPixel(path[i])
-      else if (sqrabs(x)>1E6) then for i:=0 to k-1 do putPixel(path[i]);
+      if   not(isValid(x))               then for i:=0 to k-2 do putPixel(path[i])
+      else if (sqrabs(x)>=divergeRadius) then for i:=0 to k-1 do putPixel(path[i]);
     end;
 
   VAR flushFactor:double=0;
@@ -132,6 +130,12 @@ PROCEDURE T_buddhaBrot.prepareSlice(CONST context:P_abstractWorkflow; CONST inde
 
   begin
     with renderTempData do if index<aaSamples then begin
+      with scaler.getWorldBoundingBox do begin
+        divergeRadius:=max(divergeRadius,x0*x0+y0*y0);
+        divergeRadius:=max(divergeRadius,x0*x0+y1*y1);
+        divergeRadius:=max(divergeRadius,x1*x1+y0*y0);
+        divergeRadius:=max(divergeRadius,x1*x1+y1*y1);
+      end;
       XOS.create;
       XOS.randomize;
       setLength(path,maxDepth);
