@@ -497,7 +497,7 @@ FUNCTION T_simpleWorkflow.todoLines(CONST savingToFile:string; CONST savingWithS
 
     //Append save step (if not ending with a save step)
     if not(myType in [wft_fixated,wft_generativeWithSave,wft_manipulativeWithSave]) then begin
-      saveStep:=getSaveStatement(extractFileName(savingToFile),savingWithSizeLimit);
+      saveStep:=getSaveStatement(savingToFile,savingWithSizeLimit);
       append(result,saveStep^.toString(tsm_withNiceParameterName));
       dispose(saveStep,destroy);
     end;
