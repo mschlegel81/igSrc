@@ -50,6 +50,7 @@ TYPE
       FUNCTION readsFile:string; virtual;
       FUNCTION writesFile:string; virtual;
       FUNCTION dependsOnImageBefore:boolean; virtual; abstract;
+      FUNCTION modifiesImage:boolean; virtual;
       FUNCTION toString(nameMode:T_parameterNameMode):string; virtual; abstract;
       FUNCTION alterParameter(CONST newParameterString:string):boolean; virtual; abstract;
   end;
@@ -235,6 +236,7 @@ FUNCTION T_imageOperation.readsStash: string; begin result:=''; end;
 FUNCTION T_imageOperation.writesStash: string; begin result:=''; end;
 FUNCTION T_imageOperation.readsFile: string; begin result:=''; end;
 FUNCTION T_imageOperation.writesFile: string; begin result:=''; end;
+FUNCTION T_imageOperation.modifiesImage:boolean; begin result:=true; end;
 
 CONSTRUCTOR T_imageOperationMeta.create(CONST name_: string;
   CONST cat_: T_imageManipulationCategory);

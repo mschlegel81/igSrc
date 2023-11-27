@@ -17,9 +17,9 @@ TYPE
       PROCEDURE beforeAll; virtual;
       PROCEDURE afterAll ;
       PROCEDURE configChanged; virtual;
+      PROCEDURE checkStepIO;
     private
       FUNCTION getStep(index:longint):P_workflowStep;
-
     public
       config:T_imageWorkflowConfiguration;
       CONSTRUCTOR createSimpleWorkflow(CONST messageQueue_:P_structuredMessageQueue);
@@ -38,8 +38,9 @@ TYPE
 
       FUNCTION workflowType:T_workflowType;
       FUNCTION proposedImageFileName(CONST resString:ansistring):string;
-      FUNCTION addStep(CONST specification:string):boolean;
-      PROCEDURE addStep(CONST operation:P_imageOperation);
+      FUNCTION addStep(CONST specification:string; CONST atIndex:longint):boolean;
+      PROCEDURE addStep(CONST operation:P_imageOperation; CONST atIndex:longint);
+      PROCEDURE addStep(CONST newStep:P_workflowStep; CONST atIndex:longint);
 
       FUNCTION isValid: boolean; virtual;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual;
@@ -215,10 +216,11 @@ PROCEDURE T_generateImageWorkflow.confirmEditing;
     if not(isValid) then exit;
     if addingNewStep then begin
       {$ifdef debugMode}writeln(stdErr,'DEBUG T_generateImageWorkflow.confirmEditing: adding a new step');{$endif}
-      relatedEditor^.addStep(current^.prototype^.toString(tsm_forSerialization));
+      relatedEditor^.addStep(current^.prototype^.toString(tsm_forSerialization),editingStep);
     end else begin
       {$ifdef debugMode}writeln(stdErr,'DEBUG T_generateImageWorkflow.confirmEditing: updating step #',editingStep);{$endif}
       relatedEditor^.step[editingStep]^.specification:=current^.prototype^.toString(tsm_forSerialization);
+      relatedEditor^.stepChanged(editingStep);
     end;
   end;
 
@@ -558,52 +560,79 @@ FUNCTION T_simpleWorkflow.executeAsTodo: boolean;
       messageQueue^.Post('Invalid todo workflow. The last operation must be a save statement.',true,stepCount-1,stepCount);
       exit(false);
     end;
-    addStep(deleteOp.getOperationToDeleteFile(config.workflowFilename));
+    addStep(deleteOp.getOperationToDeleteFile(config.workflowFilename),maxLongint);
     executeWorkflowInBackground(false);
     result:=true;
   end;
 
+PROCEDURE T_simpleWorkflow.checkStepIO;
+  VAR stashesReady:T_arrayOfString;
+      i:longint;
+  begin
+    setLength(stashesReady,0);
+    if (length(steps)>0) and (steps[0]^.operation^.writesStash<>'') and (steps[0]^.outputImage<>nil) then append(stashesReady,steps[0]^.operation^.writesStash);
+
+    for i:=1 to length(steps)-1 do begin
+      if (steps[i]^.operation^.dependsOnImageBefore and (steps[i-1]^.outputImage=nil))
+      or ((steps[i]^.operation^.readsStash<>'') and not(arrContains(stashesReady,steps[i]^.operation^.readsStash)))
+      then begin
+        steps[i]^.clearOutputImage;
+        dropValues(stashesReady,steps[i]^.operation^.writesStash);
+      end;
+      if (steps[i]^.outputImage<>nil) and (steps[i]^.operation^.writesStash<>'') then append(stashesReady,steps[i]^.operation^.writesStash);
+    end;
+  end;
+
 PROCEDURE T_editorWorkflow.stepChanged(CONST index: longint);
-  VAR i:longint;
   begin
     ensureStop;
     enterCriticalSection(contextCS);
     try
-      if (index>=0) and (index<length(steps)) then step[index]^.refreshSpecString;
-      for i:=index to length(steps)-1 do steps[i]^.clearOutputImage;
-    finally
-      leaveCriticalSection(contextCS);
-    end;
-  end;
-
-FUNCTION T_simpleWorkflow.addStep(CONST specification: string): boolean;
-  VAR newStep:P_workflowStep;
-  begin
-    enterCriticalSection(contextCS);
-    try
-      new(newStep,create(specification));
-      if newStep^.isValid then begin
-        setLength(steps,length(steps)+1);
-        steps[length(steps)-1]:=newStep;
-        result:=true;
-      end else begin
-        messageQueue^.Post('Invalid step was rejected: '+specification,true,-1,0);
-        dispose(newStep,destroy);
-        result:=false;
+      if (index>=0) and (index<length(steps)) then begin
+        step[index]^.refreshSpecString;
+        step[index]^.clearOutputImage;
+        checkStepIO;
       end;
     finally
       leaveCriticalSection(contextCS);
     end;
   end;
 
-PROCEDURE T_simpleWorkflow.addStep(CONST operation: P_imageOperation);
+FUNCTION T_simpleWorkflow.addStep(CONST specification: string; CONST atIndex:longint): boolean;
   VAR newStep:P_workflowStep;
+  begin
+    new(newStep,create(specification));
+    if newStep^.isValid then begin
+      addStep(newStep,atIndex);
+      result:=true;
+    end else begin
+      messageQueue^.Post('Invalid step was rejected: '+specification,true,-1,0);
+      dispose(newStep,destroy);
+      result:=false;
+    end;
+  end;
+
+PROCEDURE T_simpleWorkflow.addStep(CONST operation: P_imageOperation; CONST atIndex:longint);
+  VAR newStep:P_workflowStep;
+  begin
+    new(newStep,create(operation));
+    addStep(newStep,atIndex);
+  end;
+
+PROCEDURE T_simpleWorkflow.addStep(CONST newStep:P_workflowStep; CONST atIndex:longint);
+  VAR i:longint;
+      at:longint;
   begin
     enterCriticalSection(contextCS);
     try
-      new(newStep,create(operation));
       setLength(steps,length(steps)+1);
-      steps[length(steps)-1]:=newStep;
+      if atIndex>=length(steps) then at:=length(steps)-1
+      else if atIndex<=0        then at:=0
+      else                           at:=atIndex;
+      for i:=length(steps)-1 downto at+1 do steps[i]:=steps[i-1];
+      steps[at]:=newStep;
+      newStep^.clearOutputImage;
+      checkStepIO;
     finally
       leaveCriticalSection(contextCS);
     end;
@@ -619,6 +648,7 @@ PROCEDURE T_editorWorkflow.swapStepDown(CONST index: longint);
         tmp           :=steps[index  ];
         steps[index  ]:=steps[index+1];
         steps[index+1]:=tmp;
+        //TODO: Changed?!?
         if isValid then stepChanged(index)
                    else stepChanged(0);
       finally
@@ -637,8 +667,12 @@ PROCEDURE T_editorWorkflow.removeStep(CONST index: longint);
         dispose(steps[index],destroy);
         for i:=index to length(steps)-2 do steps[i]:=steps[i+1];
         setLength(steps,length(steps)-1);
-        if isValid then stepChanged(index)
-                   else stepChanged(0);
+        if isValid and (index<length(steps)) then begin
+          if steps[index]^.operation^.dependsOnImageBefore then begin
+            steps[index]^.clearOutputImage;
+            checkStepIO;
+          end;
+        end;
       finally
         leaveCriticalSection(contextCS);
       end;
