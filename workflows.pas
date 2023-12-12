@@ -118,6 +118,7 @@ USES imageManipulation,
      ig_circlespirals,
      ig_tesselation,
      ig_buddhaBrot,
+     im_hq3x,
      myStringUtil,
      LazFileUtils;
 
