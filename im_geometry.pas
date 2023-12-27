@@ -31,8 +31,15 @@ FUNCTION isResizeOperation(CONST op:P_imageOperation):boolean;
   end;
 
 FUNCTION targetDimensions(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow):T_imageDimensions;
+  VAR dim:T_imageDimensions;
   begin
-    result:=context^.limitedDimensionsForResizeStep(imageDimensions(parameters.i0,parameters.i1));
+    if parameters.flag
+    then begin
+      dim:=context^.image.dimensions;
+      dim.width :=round(dim.width *parameters.f0);
+      dim.height:=round(dim.height*parameters.f0);
+      result:=context^.limitedDimensionsForResizeStep(dim);
+    end else result:=context^.limitedDimensionsForResizeStep(imageDimensions(parameters.i0,parameters.i1));
   end;
 
 PROCEDURE resize_impl       (CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow); begin context^.image.resize(targetDimensions(parameters,context),res_exact); end;
@@ -80,7 +87,7 @@ PROCEDURE rotDegrees_impl(CONST parameters:T_parameterValue; CONST context:P_abs
 
 FUNCTION resizeParameters(CONST name:string):P_parameterDescription;
   begin
-    result:=newParameterDescription(name,pt_2integers, 1, MAX_HEIGHT_OR_WIDTH)^
+    result:=newParameterDescription(name,pt_resizeParameter, 1, MAX_HEIGHT_OR_WIDTH)^
            .addChildParameterDescription(spa_i0,'width',pt_integer,1,MAX_HEIGHT_OR_WIDTH)^
            .addChildParameterDescription(spa_i1,'height',pt_integer,1,MAX_HEIGHT_OR_WIDTH)^
            .setDefaultValue('100x100');

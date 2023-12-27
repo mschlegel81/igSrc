@@ -32,13 +32,15 @@ TYPE
                    pt_1I1F,
                    pt_1I2F,
                    pt_1I3F,
-                   pt_2I2F);
-  CONST I0_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_enum..pt_intOr2Ints,pt_1I1F..pt_1I3F];
-        I1_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_2integers..pt_intOr2Ints,pt_jpgNameWithSize,pt_2I2F];
+                   pt_2I2F,
+
+                   pt_resizeParameter);
+  CONST I0_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_enum..pt_intOr2Ints,pt_1I1F..pt_1I3F,pt_resizeParameter];
+        I1_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_2integers..pt_intOr2Ints,pt_jpgNameWithSize,pt_2I2F,pt_resizeParameter];
         I2_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_3integers,pt_4integers];
         I3_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_4integers];
 
-        F0_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_float..pt_floatOr2Floats];
+        F0_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_float..pt_floatOr2Floats,pt_resizeParameter];
         F1_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_2floats..pt_floatOr2Floats,pt_1I1F..pt_1I3F];
         F2_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_3floats..pt_4floats,pt_1I2F..pt_1I3F,pt_2I2F];
         F3_RELEVANT_PARAMETER_TYPES:set of T_parameterType=[pt_4floats,pt_1I3F,pt_2I2F];
@@ -60,6 +62,7 @@ TYPE
       fileNameValue:string;
       intValue:array[0..3] of longint;
       floatValue:array[0..3] of double;
+      flagValue:boolean;
       valid:boolean;
       PROCEDURE setFileName(CONST newValue:string);
       PROCEDURE setDefaults;
@@ -85,6 +88,7 @@ TYPE
       PROPERTY f1:double read floatValue[1];
       PROPERTY f2:double read floatValue[2];
       PROPERTY f3:double read floatValue[3];
+      PROPERTY flag:boolean read flagValue;
       FUNCTION getNumericParameter(CONST index:byte):double;
       PROCEDURE setNumericParameter(CONST index:byte; CONST value:double);
       FUNCTION color:T_rgbFloatColor;
@@ -345,6 +349,7 @@ PROCEDURE T_parameterValue.setDefaults;
     fileNameValue:='';
     for i:=0 to 3 do intValue[i]:=0;
     for i:=0 to 3 do floatValue[i]:=0;
+    flagValue:=false;
     valid:=false;
   end;
 
@@ -444,6 +449,25 @@ FUNCTION T_parameterValue.canParse(CONST stringToParse: string;
           floatValue[0]:=strToFloat(txt);
         except
           begin valid:=false; exit(valid); end;
+        end;
+      end;
+      pt_resizeParameter: if startsWith(txt,'x') then begin
+        txt:=trim(copy(txt,2,length(txt)-1));
+        intValue[0]:=1; intValue[1]:=1;
+        floatValue[0]:=StrToFloatDef(txt,-1);
+        flagValue:=true;
+        valid:=floatValue[0]>0;
+        exit(valid);
+      end else begin
+        part:=split(txt,PARAMETER_SPLITTERS);
+        floatValue[0]:=1;
+        if length(part)<>2 then begin
+          valid:=false; exit(false);
+        end;
+        valid:=true;
+        for i:=0 to 1 do begin
+          intValue[i]:=StrToIntDef(part[i],-1);
+          valid:=valid and (intValue[i]>=0);
         end;
       end;
       pt_2integers,pt_3integers,pt_4integers,pt_intOr2Ints,
@@ -579,6 +603,8 @@ FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode)
                                ':'+floatToStr(floatValue[1])+
                                'x'+floatToStr(floatValue[2])+
                                ':'+floatToStr(floatValue[3]);
+      pt_resizeParameter: if flagValue then result+='x'+FloatToStr(floatValue[0])
+                                       else result+=intToStr(intValue[0])+'x'+intToStr(intValue[1]);
       pt_1I1F:result+=intToStr  (intValue  [0])+
                   ','+floatToStr(floatValue[1]);
       pt_1I2F:result+=intToStr  (intValue  [0])+
