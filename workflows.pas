@@ -785,8 +785,18 @@ PROCEDURE T_simpleWorkflow.configChanged;
   end;
 
 PROCEDURE T_editorWorkflow.configChanged;
+  VAR i:longint;
   begin
-    stepChanged(0);
+    ensureStop;
+    enterCriticalSection(contextCS);
+    try
+      for i:=0 to length(steps)-1 do begin
+        step[i]^.refreshSpecString;
+        step[i]^.clearOutputImage;
+      end;
+    finally
+      leaveCriticalSection(contextCS);
+    end;
   end;
 
 CONSTRUCTOR T_editorWorkflow.createEditorWorkflow(
