@@ -24,6 +24,7 @@ TYPE
     PROCEDURE setParameter(CONST index:byte; CONST value:T_parameterValue); virtual;
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE execute(CONST context:P_abstractWorkflow); virtual;
+    FUNCTION dependsOnImageBefore:boolean; virtual;
   end;
 
 IMPLEMENTATION
@@ -115,6 +116,11 @@ FUNCTION T_tilesAlgorithm.getParameter(CONST index: byte): T_parameterValue;
       8: result.createFromValue(parameterDescription(inherited numberOfParameters+8),moebiusC.re,moebiusC.im);
       9: result.createFromValue(parameterDescription(inherited numberOfParameters+9),moebiusD.re,moebiusD.im);
     end;
+  end;
+
+FUNCTION T_tilesAlgorithm.dependsOnImageBefore:boolean;
+  begin
+    result:=colorStyle = 1;
   end;
 
 PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);

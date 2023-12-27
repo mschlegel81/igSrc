@@ -20,6 +20,7 @@ TYPE
     PROCEDURE setParameter(CONST index:byte; CONST value:T_parameterValue); virtual;
     FUNCTION getParameter(CONST index:byte):T_parameterValue; virtual;
     PROCEDURE execute(CONST context:P_abstractWorkflow); virtual;
+    FUNCTION dependsOnImageBefore:boolean; virtual;
   end;
 
   T_circle=record
@@ -430,6 +431,11 @@ FUNCTION T_circleSpiralAlgorithm.getParameter(CONST index: byte): T_parameterVal
       4: result.createFromValue(parameterDescription(inherited numberOfParameters+4),d.re,d.im);
       5: result.createFromValue(parameterDescription(inherited numberOfParameters+5),colorStyle);
     end;
+  end;
+
+FUNCTION T_circleSpiralAlgorithm.dependsOnImageBefore:boolean;
+  begin
+    result:=colorStyle in [2,3];
   end;
 
 PROCEDURE T_circleSpiralAlgorithm.execute(CONST context:P_abstractWorkflow);
