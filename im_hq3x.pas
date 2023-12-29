@@ -62,7 +62,7 @@ PROCEDURE hq3x_impl(CONST parameters:T_parameterValue; CONST context:P_abstractW
   end;
 
 INITIALIZATION
-  registerSimpleOperation(imc_filter,newParameterDescription('hq3x',pt_float,0)^.addChildParameterDescription(spa_f0,'threshold',pt_float),@hq3x_impl);
+  registerSimpleOperation(imc_filter,newParameterDescription('hq3x',pt_float,0)^.addChildParameterDescription(spa_f0,'threshold',pt_float)^.setDefaultValue('0.2'),@hq3x_impl);
 
 end.
 

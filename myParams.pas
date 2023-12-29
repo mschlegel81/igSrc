@@ -454,7 +454,7 @@ FUNCTION T_parameterValue.canParse(CONST stringToParse: string;
       pt_resizeParameter: if startsWith(txt,'x') then begin
         txt:=trim(copy(txt,2,length(txt)-1));
         intValue[0]:=1; intValue[1]:=1;
-        floatValue[0]:=StrToFloatDef(txt,-1);
+        floatValue[0]:=strToFloatDef(txt,-1);
         flagValue:=true;
         valid:=floatValue[0]>0;
         exit(valid);
@@ -466,7 +466,7 @@ FUNCTION T_parameterValue.canParse(CONST stringToParse: string;
         end;
         valid:=true;
         for i:=0 to 1 do begin
-          intValue[i]:=StrToIntDef(part[i],-1);
+          intValue[i]:=strToIntDef(part[i],-1);
           valid:=valid and (intValue[i]>=0);
         end;
       end;
@@ -603,7 +603,7 @@ FUNCTION T_parameterValue.toString(CONST parameterNameMode: T_parameterNameMode)
                                ':'+floatToStr(floatValue[1])+
                                'x'+floatToStr(floatValue[2])+
                                ':'+floatToStr(floatValue[3]);
-      pt_resizeParameter: if flagValue then result+='x'+FloatToStr(floatValue[0])
+      pt_resizeParameter: if flagValue then result+='x'+floatToStr(floatValue[0])
                                        else result+=intToStr(intValue[0])+'x'+intToStr(intValue[1]);
       pt_1I1F:result+=intToStr  (intValue  [0])+
                   ','+floatToStr(floatValue[1]);
