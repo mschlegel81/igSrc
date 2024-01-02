@@ -5,27 +5,27 @@ IMPLEMENTATION
 USES imageManipulation,imageContexts,myParams,mypics,myColors,math,pixMaps;
 PROCEDURE blur_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    context^.image.blur(parameters.f0,parameters.f1);
+    context^.image.blur(parameters.f0,parameters.f1,@context^.cancellationRequested);
   end;
 
 PROCEDURE lagrangeDiff_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    context^.image.lagrangeDiffusion(parameters.f0,parameters.f1);
+    context^.image.lagrangeDiffusion(parameters.f0,parameters.f1,@context^.cancellationRequested);
   end;
 
 PROCEDURE radialBlur_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    context^.image.radialBlur(parameters.f0,parameters.f1,parameters.f2);
+    context^.image.radialBlur(parameters.f0,parameters.f1,parameters.f2,@context^.cancellationRequested);
   end;
 
 PROCEDURE rotationalBlur_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    context^.image.rotationalBlur(parameters.f0,parameters.f1,parameters.f2);
+    context^.image.rotationalBlur(parameters.f0,parameters.f1,parameters.f2,@context^.cancellationRequested);
   end;
 
 PROCEDURE sharpen_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    context^.image.sharpen(parameters.f0,parameters.f1);
+    context^.image.sharpen(parameters.f0,parameters.f1,@context^.cancellationRequested);
   end;
 
 PROCEDURE edges_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
@@ -50,7 +50,7 @@ PROCEDURE median_impl(CONST parameters:T_parameterValue; CONST context:P_abstrac
 
 PROCEDURE pseudoMedian_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    context^.image.myFilter(parameters.f0,parameters.f1);
+    context^.image.myFilter(parameters.f0,parameters.f1,@context^.cancellationRequested);
   end;
 
 PROCEDURE direction_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);

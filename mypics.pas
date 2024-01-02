@@ -95,18 +95,18 @@ TYPE
       //----------------------------------------------------:Statistic accessors
       PROCEDURE quantize(CONST numberOfColors:longint);
       FUNCTION directionMap(CONST relativeSigma:double):T_rawImage;
-      PROCEDURE lagrangeDiffusion(CONST relativeGradSigma,relativeBlurSigma:double);
-      PROCEDURE lagrangeDiffusion(VAR dirMap:T_rawImage; CONST relativeBlurSigma:double; CONST changeDirection:boolean=true);
-      PROCEDURE radialBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double);
-      PROCEDURE rotationalBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double);
+      PROCEDURE lagrangeDiffusion(CONST relativeGradSigma,relativeBlurSigma:double; CONST stopRequested:F_stopRequested=nil);
+      PROCEDURE lagrangeDiffusion(VAR dirMap:T_rawImage; CONST relativeBlurSigma:double; CONST changeDirection:boolean=true; CONST stopRequested:F_stopRequested=nil);
+      PROCEDURE radialBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double; CONST stopRequested:F_stopRequested=nil);
+      PROCEDURE rotationalBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double; CONST stopRequested:F_stopRequested=nil);
       PROCEDURE shine;
-      PROCEDURE sharpen(CONST relativeSigma,factor:double);
+      PROCEDURE sharpen(CONST relativeSigma,factor:double; CONST stopRequested:F_stopRequested=nil);
       PROCEDURE prewittEdges;
       PROCEDURE variance(CONST relativeSigma:double);
       PROCEDURE medianFilter(CONST relativeSigma:double);
       PROCEDURE modalFilter(CONST relativeSigma:double);
-      PROCEDURE sketch(CONST cover,relativeDirMapSigma,density,tolerance:double);
-      PROCEDURE myFilter(CONST thresholdDistParam,param:double);
+      PROCEDURE sketch(CONST cover,relativeDirMapSigma,density,tolerance:double; CONST stopRequested:F_stopRequested=nil);
+      PROCEDURE myFilter(CONST thresholdDistParam,param:double; CONST stopRequested:F_stopRequested=nil);
       PROCEDURE drip(CONST diffusiveness,range:double);
       FUNCTION rgbaSplit(CONST transparentColor:T_rgbFloatColor):T_rawImage;
       PROCEDURE halftone(CONST scale:single; CONST param:longint);
@@ -751,21 +751,22 @@ FUNCTION T_rawImage.directionMap(CONST relativeSigma:double):T_rawImage;
     for x:=0 to result.pixelCount-1 do result.data[x]:=normedDirection(result.data[x]);
   end;
 
-PROCEDURE T_rawImage.lagrangeDiffusion(CONST relativeGradSigma,relativeBlurSigma:double);
+PROCEDURE T_rawImage.lagrangeDiffusion(CONST relativeGradSigma,relativeBlurSigma:double; CONST stopRequested:F_stopRequested=nil);
   VAR dirMap:T_rawImage;
   begin
     dirMap:=directionMap(relativeGradSigma);
-    lagrangeDiffusion(dirMap,relativeBlurSigma);
+    lagrangeDiffusion(dirMap,relativeBlurSigma,true,stopRequested);
     dirMap.destroy;
   end;
 
-PROCEDURE T_rawImage.lagrangeDiffusion(VAR dirMap:T_rawImage; CONST relativeBlurSigma:double; CONST changeDirection:boolean=true);
+PROCEDURE T_rawImage.lagrangeDiffusion(VAR dirMap:T_rawImage; CONST relativeBlurSigma:double; CONST changeDirection:boolean=true; CONST stopRequested:F_stopRequested=nil);
   VAR output:T_rawImage;
       kernel:T_arrayOfDouble;
       x,y,i,k,ix,iy:longint;
       pos,dir:T_rgbFloatColor;
       colSum:T_rgbFloatColor;
       wgtSum:double;
+      shouldStop:F_stopRequested;
 
   PROCEDURE step; inline;
     VAR d:T_rgbFloatColor;
@@ -777,9 +778,10 @@ PROCEDURE T_rawImage.lagrangeDiffusion(VAR dirMap:T_rawImage; CONST relativeBlur
     end;
 
   begin
+    if stopRequested=nil then shouldStop:=@constantFalse else shouldStop:=stopRequested;
     kernel:=getSmoothingKernel(relativeBlurSigma/100*diagonal);
     output.create(dim.width,dim.height);
-    for y:=0 to dim.height-1 do
+    for y:=0 to dim.height-1 do if not shouldStop() then
     for x:=0 to dim.width-1 do begin
       colSum:=getPixel(x,y)*kernel[0];
       wgtSum:=              kernel[0];
@@ -807,7 +809,7 @@ FUNCTION cartNormalCol(CONST c:T_rgbFloatColor):T_rgbFloatColor;
     result:=c*(1/sqrt(1E-6+c[cc_red]*c[cc_red]+c[cc_green]*c[cc_green]+c[cc_blue]*c[cc_blue]));
   end;
 
-PROCEDURE T_rawImage.radialBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double);
+PROCEDURE T_rawImage.radialBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double; CONST stopRequested:F_stopRequested=nil);
   VAR dirMap:T_rawImage;
       x,y:longint;
   begin
@@ -816,11 +818,11 @@ PROCEDURE T_rawImage.radialBlur(CONST relativeBlurSigma,relativeCenterX,relative
       dirMap[x,y]:=cartNormalCol(rgbColor(x/dim.width-0.5-relativeCenterX,
                                           y/dim.height-0.5-relativeCenterY,
                                           0));
-    lagrangeDiffusion(dirMap,relativeBlurSigma,false);
+    lagrangeDiffusion(dirMap,relativeBlurSigma,false,stopRequested);
     dirMap.destroy;
   end;
 
-PROCEDURE T_rawImage.rotationalBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double);
+PROCEDURE T_rawImage.rotationalBlur(CONST relativeBlurSigma,relativeCenterX,relativeCenterY:double; CONST stopRequested:F_stopRequested=nil);
   VAR dirMap:T_rawImage;
       x,y:longint;
   begin
@@ -829,7 +831,7 @@ PROCEDURE T_rawImage.rotationalBlur(CONST relativeBlurSigma,relativeCenterX,rela
       dirMap[x,y]:=cartNormalCol(rgbColor(y/dim.height-0.5-relativeCenterY,
                                          -x/dim.width+0.5+relativeCenterX,
                                           0));
-    lagrangeDiffusion(dirMap,relativeBlurSigma,false);
+    lagrangeDiffusion(dirMap,relativeBlurSigma,false,stopRequested);
     dirMap.destroy;
   end;
 
@@ -869,12 +871,12 @@ PROCEDURE T_rawImage.shine;
     temp.destroy;
   end;
 
-PROCEDURE T_rawImage.sharpen(CONST relativeSigma,factor:double);
+PROCEDURE T_rawImage.sharpen(CONST relativeSigma,factor:double; CONST stopRequested:F_stopRequested=nil);
   VAR blurred:T_rawImage;
       x,y:longint;
   begin
     blurred.create(self);
-    blurred.blur(relativeSigma,relativeSigma);
+    blurred.blur(relativeSigma,relativeSigma,stopRequested);
     for y:=0 to dim.height-1 do for x:=0 to dim.width-1 do pixel[x,y]:= blurred[x,y]+(pixel[x,y]-blurred[x,y])*(1+factor);
     blurred.destroy;
   end;
@@ -1046,7 +1048,7 @@ PROCEDURE T_rawImage.modalFilter(CONST relativeSigma:double);
     output.destroy;
   end;
 
-PROCEDURE T_rawImage.sketch(CONST cover,relativeDirMapSigma,density,tolerance:double);
+PROCEDURE T_rawImage.sketch(CONST cover,relativeDirMapSigma,density,tolerance:double; CONST stopRequested:F_stopRequested=nil);
   VAR halfwidth:double;
       fixedDensity:double;
   PROCEDURE niceLine(CONST x0,y0,x1,y1:double; CONST color:T_rgbFloatColor; CONST alpha:double);
@@ -1130,7 +1132,10 @@ PROCEDURE T_rawImage.sketch(CONST cover,relativeDirMapSigma,density,tolerance:do
       result:=colDiff(temp[ix,iy],lineColor)<=tolerance;
     end;
 
+  VAR shouldStop:F_stopRequested;
+
   begin
+    if stopRequested=nil then shouldStop:=@constantFalse else shouldStop:=stopRequested;
     halfwidth:=diagonal/1500+0.25;
     grad:=directionMap(relativeDirMapSigma);
     temp.create(self);
@@ -1139,7 +1144,7 @@ PROCEDURE T_rawImage.sketch(CONST cover,relativeDirMapSigma,density,tolerance:do
     fixedDensity:=density/(dim.width*dim.height)*1E6;
     if fixedDensity>1 then alpha:=exp(fixedDensity*ln(cover));
     if alpha>1 then alpha:=1;
-    for l:=0 to 12 do for y:=0 to dim.height-1 do for x:=0 to dim.width-1 do if (lev(x,y)=l) and (random<fixedDensity) then begin
+    for l:=0 to 12 do for y:=0 to dim.height-1 do if not shouldStop() then for x:=0 to dim.width-1 do if (lev(x,y)=l) and (random<fixedDensity) then begin
       lineColor:=temp[x,y]+rgbColor(random-0.5,random-0.5,random-0.5)*0.05;
       dir:=grad[x,y];
       for k:=0 to 1 do begin
@@ -1157,7 +1162,7 @@ PROCEDURE T_rawImage.sketch(CONST cover,relativeDirMapSigma,density,tolerance:do
     grad.destroy;
   end;
 
-PROCEDURE T_rawImage.myFilter(CONST thresholdDistParam,param:double);
+PROCEDURE T_rawImage.myFilter(CONST thresholdDistParam,param:double; CONST stopRequested:F_stopRequested=nil);
   FUNCTION combine(CONST m1,m2,m3:T_rgbFloatColor):T_rgbFloatColor;
 {skew=(mean-median)/[standard deviation]
 skew=(M[1]-median)/s
@@ -1184,15 +1189,17 @@ s=sqrt(M[2]-sqr(M[1]))
 
   VAR m2,m3:T_rawImage;
       i:longint;
+      shouldStop:F_stopRequested;
   begin
+    if stopRequested=nil then shouldStop:=@constantFalse else shouldStop:=stopRequested;
     m2.create(dim.width,dim.height);
     for i:=0 to dim.width*dim.height-1 do m2.data[i]:=pot2(data[i]);
     m3.create(dim.width,dim.height);
     for i:=0 to dim.width*dim.height-1 do m3.data[i]:=pot3(data[i]);
-    blur(thresholdDistParam,thresholdDistParam);
-    m2.blur(thresholdDistParam,thresholdDistParam);
-    m3.blur(thresholdDistParam,thresholdDistParam);
-    for i:=0 to dim.width*dim.height-1 do data[i]:=combine(data[i],m2.data[i],m3.data[i]);
+    blur(thresholdDistParam,thresholdDistParam,shouldStop);
+    m2.blur(thresholdDistParam,thresholdDistParam,shouldStop);
+    m3.blur(thresholdDistParam,thresholdDistParam,shouldStop);
+    if not shouldStop() then for i:=0 to dim.width*dim.height-1 do data[i]:=combine(data[i],m2.data[i],m3.data[i]);
     m2.destroy;
     m3.destroy;
   end;
