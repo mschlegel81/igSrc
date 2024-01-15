@@ -248,6 +248,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
   (36,146,85),(36,109,85),(36,73,85),(36,36,170),(36,36,0),(36,0,85),(0,255,85),(0,219,85));
   TYPE T_colorTable=array of T_rgbFloatColor;
   VAR colorTable:T_colorTable;
+
   PROCEDURE standardAdaptiveColors;
     VAR i:longint;
         tree:T_colorTree;
@@ -697,13 +698,27 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         nextColor:T_rgbColor;
 
         colorTableIndex:longint;
+
+        downscaledImage:T_rawImage;
     begin
-      raw:=context^.image.rawData;
-      for i:=0 to context^.image.pixelCount-1 do avgColor+=raw[i];
-      avgColor*=(1/context^.image.pixelCount);
+
+      //Work on downscaled image to prevent single pixels from messing up the result
+      //...also speed up the otherwise horribly expensive approach
+      downscaledImage.create(context^.image.dimensions.width  shr 2,
+                             context^.image.dimensions.height shr 2);
+      downscaledImage.clearWithColor(BLACK);
+      for j:=0 to downscaledImage.dimensions.height shl 2-1 do begin
+        raw:=context^.image.linePtr(j);
+        for i:=0 to downscaledImage.dimensions.width shl 2-1 do
+          downscaledImage.multIncPixel(i shr 2,j shr 2,1,raw[i]*(1/16));
+      end;
+      raw:=downscaledImage.rawData;
+
+      for i:=0 to downscaledImage.pixelCount-1 do avgColor+=raw[i];
+      avgColor*=(1/downscaledImage.pixelCount);
 
       greatestDiff:=0;
-      for i:=0 to context^.image.pixelCount-1 do begin
+      for i:=0 to downscaledImage.pixelCount-1 do begin
         diff:=colDiff(avgColor,raw[i]);
         if diff>greatestDiff then begin
           greatestDiff:=diff;
@@ -716,7 +731,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
       for colorTableIndex:=1 to parameters.i0-1 do begin
         greatestDiff:=0;
-        for i:=0 to context^.image.pixelCount-1 do begin
+        for i:=0 to downscaledImage.pixelCount-1 do begin
           minDiff:=1E20;
           for j:=0 to colorTableIndex-1 do begin
             diff:=colDiff(raw[i],colorTable[j]);
@@ -729,6 +744,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         end;
         colorTable[colorTableIndex]:=nextColor;
       end;
+      downscaledImage.destroy;
     end;
 
   FUNCTION nearestColor(CONST pixel:T_rgbFloatColor):T_rgbFloatColor;
@@ -769,6 +785,33 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           if x>0  then context^.image.multIncPixel(x-1,y+1,1,error*3);
                        context^.image.multIncPixel(x  ,y+1,1,error*5);
           if x<xm then context^.image.multIncPixel(x+1,y+1,1,error*1);
+        end;
+      end;
+    end;
+
+  PROCEDURE jarvisJudiceNinkeDither;
+    VAR x,y,xm,ym:longint;
+        oldPixel,newPixel,error:T_rgbFloatColor;
+    begin
+      xm:=context^.image.dimensions.width -1;
+      ym:=context^.image.dimensions.height-1;
+      for y:=0 to ym do if not(context^.cancellationRequested) then for x:=0 to xm do begin
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/49);
+        if x<xm   then context^.image.multIncPixel(x+1,y,1,error*7);
+        if x<xm-1 then context^.image.multIncPixel(x+2,y,1,error*5);
+        if y<ym then begin
+          if x>1    then context^.image.multIncPixel(x-2,y+1,1,error*3);
+          if x>0    then context^.image.multIncPixel(x-1,y+1,1,error*5);
+                         context^.image.multIncPixel(x  ,y+1,1,error*7);
+          if x<xm   then context^.image.multIncPixel(x+1,y+1,1,error*5);
+          if x<xm-1 then context^.image.multIncPixel(x+2,y+1,1,error*3);
+        end;
+        if y<ym-1 then begin
+          if x>1    then context^.image.multIncPixel(x-2,y+2,1,error*1);
+          if x>0    then context^.image.multIncPixel(x-1,y+2,1,error*3);
+                         context^.image.multIncPixel(x  ,y+2,1,error*5);
+          if x<xm   then context^.image.multIncPixel(x+1,y+2,1,error*3);
+          if x<xm-1 then context^.image.multIncPixel(x+2,y+2,1,error*1);
         end;
       end;
     end;
@@ -918,6 +961,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       2: lineBasedDither;
       3: kochCurveDither;
       4: blockDither_4x4;
+      5: jarvisJudiceNinkeDither;
     end;
   end;
 
@@ -944,7 +988,8 @@ registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_
                                                                                                        'Floyd-Steinberg',
                                                                                                        'Line-Based',
                                                                                                        'Koch-Curve',
-                                                                                                       'Block-Dither'),
+                                                                                                       'Block-Dither',
+                                                                                                       'Jarvis-Judice-Ninke'),
                                                         @quantizeCustom_impl);
 
 end.
