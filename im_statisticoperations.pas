@@ -686,6 +686,51 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       for k:=0 to length(colorTable)-1 do colorTable[k]:=ALTERNATIVE_COLOR_TABLE[k];
     end;
 
+  PROCEDURE bruteForceColorTable;
+    VAR i,j:longint;
+        raw:P_floatColor;
+        avgColor:T_rgbColor=(0,0,0);
+
+        diff,
+        minDiff,
+        greatestDiff:double;
+        nextColor:T_rgbColor;
+
+        colorTableIndex:longint;
+    begin
+      raw:=context^.image.rawData;
+      for i:=0 to context^.image.pixelCount-1 do avgColor+=raw[i];
+      avgColor*=(1/context^.image.pixelCount);
+
+      greatestDiff:=0;
+      for i:=0 to context^.image.pixelCount-1 do begin
+        diff:=colDiff(avgColor,raw[i]);
+        if diff>greatestDiff then begin
+          greatestDiff:=diff;
+          nextColor:=raw[i];
+        end;
+      end;
+
+      setLength(colorTable,parameters.i0);
+      colorTable[0]:=nextColor;
+
+      for colorTableIndex:=1 to parameters.i0-1 do begin
+        greatestDiff:=0;
+        for i:=0 to context^.image.pixelCount-1 do begin
+          minDiff:=1E20;
+          for j:=0 to colorTableIndex-1 do begin
+            diff:=colDiff(raw[i],colorTable[j]);
+            if diff<minDiff then minDiff:=diff;
+          end;
+          if minDiff>greatestDiff then begin
+            greatestDiff:=minDiff;
+            nextColor:=raw[i];
+          end;
+        end;
+        colorTable[colorTableIndex]:=nextColor;
+      end;
+    end;
+
   FUNCTION nearestColor(CONST pixel:T_rgbFloatColor):T_rgbFloatColor;
     VAR k      :longint;
         kBest  :longint=-1;
@@ -723,7 +768,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         if y<ym then begin
           if x>0  then context^.image.multIncPixel(x-1,y+1,1,error*3);
                        context^.image.multIncPixel(x  ,y+1,1,error*5);
-          if x<xm then context^.image.multIncPixel(x  ,y+1,1,error*1);
+          if x<xm then context^.image.multIncPixel(x+1,y+1,1,error*1);
         end;
       end;
     end;
@@ -865,6 +910,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       4: medianCutColors;
       5: kMeansColorTable;
       6: modifiedMedianCut;
+      7: bruteForceColorTable;
     end;
     case byte(parameters.i2) of
       0: noDither;
@@ -892,7 +938,8 @@ registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_
                                                                                                       'Monochrome adaptive',
                                                                                                       'Median cut',
                                                                                                       'k-means adaptive',
-                                                                                                      'Modified median cut')
+                                                                                                      'Modified median cut',
+                                                                                                      'Brute force')
                                                         ^.addEnumChildDescription(spa_i2,'Dither mode','none',
                                                                                                        'Floyd-Steinberg',
                                                                                                        'Line-Based',
