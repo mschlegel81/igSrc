@@ -470,7 +470,7 @@ FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string; CONST tolerantPar
       result:=false;
     end else begin
       result:=parseWorkflow(readFile(fileName),tolerantParsing);
-      result:=result and (length(steps)>0) and isValid;
+      result:=result and (length(steps)>0);
       if result then begin
         config.workflowFilename:=fileName;
         messageQueue^.Post(fileName+' loaded',false,-1,0);
