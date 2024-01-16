@@ -355,7 +355,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           i:longint;
           tmp:T_sample;
       begin
-        pivot:=list.sample[Left+random(Right-Left)].color[channel];
+        pivot:=list.sample[Left+(Right-Left) shr 1].color[channel];
         result:=Left;
         for i:=Left to Right-1 do if list.sample[i].color[channel]<pivot then begin
           tmp                :=list.sample[result];
@@ -1029,7 +1029,6 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
   begin
     //project does not take parameters into account, so we can just pass the current parameters
-    randseed:=0; //enforce determinism
     project_impl(parameters,context);
     case byte(parameters.i1) of
       0: standardAdaptiveColors;
