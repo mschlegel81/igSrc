@@ -794,7 +794,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       for colorTableIndex:=1 to parameters.i0-1 do begin
         greatestDiff:=0;
         for i:=0 to length(chunks)-1 do if chunks[i].pending then begin
-          minDiff:=Infinity;
+          minDiff:=infinity;
           for j:=0 to colorTableIndex-1 do begin
             diff:=colDiff(chunks[i].color,colorTable[j]);
             if diff<minDiff then minDiff:=diff;

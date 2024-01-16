@@ -252,7 +252,7 @@ FUNCTION CohenSutherland_LineVisible(a,b:T_Complex; CONST box:T_boundingBox):boo
             x := box.x0;
           end;
 
-        (* NOTE:if you follow this algorithm exactly(at least for c#), then you will fall into an infinite loop
+        (* note:if you follow this algorithm exactly(at least for c#), then you will fall into an infinite loop
         in case a line crosses more than two segments. to avoid that problem, leave OUT the last else
         if(outcodeOut & Left) and just make it else *)
 
