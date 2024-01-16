@@ -249,6 +249,15 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
   TYPE T_colorTable=array of T_rgbFloatColor;
   VAR colorTable:T_colorTable;
 
+  FUNCTION redmean_sqr(CONST x,y:T_rgbFloatColor):double; inline;
+    VAR r_bar:double;
+    begin
+      r_bar:=(x[cc_red]+y[cc_red])*0.5;
+      result:=sqr(x[cc_red  ]-y[cc_red  ])*(2+r_bar)
+             +sqr(x[cc_green]-y[cc_green])*4
+             +sqr(x[cc_blue ]-y[cc_blue ])*(3-r_bar);
+    end;
+
   PROCEDURE standardAdaptiveColors;
     VAR i:longint;
         tree:T_colorTree;
@@ -559,7 +568,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         for sample in allSamples do begin
           bestDist:=infinity; i:=0;
           for k:=0 to length(colorTable)-1 do begin
-            dist:=colDiff(colorTable[k],sample.color);
+            dist:=redmean_sqr(colorTable[k],sample.color);
             if dist<bestDist then begin
               bestDist:=dist;
               i:=k;
@@ -621,7 +630,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           bestDist:=infinity;
           bestIdx :=-1;
           for i:=0 to length(buckets)-1 do begin
-            tmp:=colDiff(buckets[i].spread,s.color);
+            tmp:=redmean_sqr(buckets[i].spread,s.color);
             if tmp<bestDist then begin
               bestIdx :=i;
               bestDist:=tmp;
@@ -724,7 +733,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
       greatestDiff:=0;
       for i:=0 to downscaledImage.pixelCount-1 do begin
-        diff:=colDiff(avgColor,raw[i]);
+        diff:=redmean_sqr(avgColor,raw[i]);
         if diff>greatestDiff then begin
           greatestDiff:=diff;
           nextColor:=raw[i];
@@ -739,7 +748,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         for i:=0 to downscaledImage.pixelCount-1 do begin
           minDiff:=1E20;
           for j:=0 to colorTableIndex-1 do begin
-            diff:=colDiff(raw[i],colorTable[j]);
+            diff:=redmean_sqr(raw[i],colorTable[j]);
             if diff<minDiff then minDiff:=diff;
           end;
           if minDiff>greatestDiff then begin
@@ -781,7 +790,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       setLength(colorTable,parameters.i0);
       greatestDiff:=0;
       for i:=0 to length(chunks)-1 do begin
-        diff:=colDiff(avgColor,chunks[i].color);
+        diff:=redmean_sqr(avgColor,chunks[i].color);
         if diff>greatestDiff then begin
           greatestDiff:=diff;
           nextColor:=chunks[i].color;
@@ -796,7 +805,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         for i:=0 to length(chunks)-1 do if chunks[i].pending then begin
           minDiff:=infinity;
           for j:=0 to colorTableIndex-1 do begin
-            diff:=colDiff(chunks[i].color,colorTable[j]);
+            diff:=redmean_sqr(chunks[i].color,colorTable[j]);
             if diff<minDiff then minDiff:=diff;
           end;
           if minDiff>greatestDiff then begin
@@ -818,7 +827,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         minDist:double=infinity;
     begin
       for k:=0 to length(colorTable)-1 do begin
-        dist:=colDiff(colorTable[k],pixel);
+        dist:=redmean_sqr(colorTable[k],pixel);
         if dist<minDist then begin
           minDist:=dist;
           kBest  :=k;
