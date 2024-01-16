@@ -881,7 +881,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
       for y:=0 to ym do if not(context^.cancellationRequested) then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/49);
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/48);
         if x<xm   then context^.image.multIncPixel(x+1,y,1,error*7);
         if x<xm-1 then context^.image.multIncPixel(x+2,y,1,error*5);
         if y<ym then begin
@@ -996,7 +996,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE blockDither_4x4;
-    CONST KOCH:array[0..30] of longint=(5,6,2,3,7,11,15,14,10,9,13,12,8,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9,5,4,0);
+    CONST KOCH:array[0..15] of longint=(5,6,9,10,14,13,12,8,4,0,1,2,3,7,11,15);
 
     VAR xm,ym,ix,iy,dx,dy,k:longint;
         col:array[0..15] of T_rgbFloatColor;
