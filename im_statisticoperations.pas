@@ -1029,6 +1029,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
   begin
     //project does not take parameters into account, so we can just pass the current parameters
+    randseed:=0; //enforce determinism
     project_impl(parameters,context);
     case byte(parameters.i1) of
       0: standardAdaptiveColors;
