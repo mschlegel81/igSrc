@@ -7,7 +7,8 @@ USES sysutils,
      Dialogs,
      imageStashes,
      generationBasics,
-     pixMaps;
+     pixMaps,
+     serializationUtil;
 
 TYPE
   T_workflowType=(wft_generative,wft_manipulative,wft_fixated,wft_halfFix,wft_generativeWithSave,wft_manipulativeWithSave,wft_empty_or_unknown);
@@ -72,7 +73,7 @@ TYPE
     PROCEDURE execute; virtual; abstract;
   end;
 
-  T_abstractWorkflow=object
+  T_abstractWorkflow=object(T_serializable)
     protected
       contextCS:TRTLCriticalSection;
       currentExecution:record

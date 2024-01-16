@@ -4,13 +4,14 @@ USES
   myParams,
   mypics,
   imageContexts,
-  ExtCtrls;
+  ExtCtrls,
+  serializationUtil;
 TYPE
 P_workflowStep=^T_workflowStep;
 
 { T_workflowStep }
 
-T_workflowStep=object
+T_workflowStep=object(T_serializable)
   private
     specString   :string;
     valid        :boolean;
@@ -22,6 +23,7 @@ T_workflowStep=object
     outputImage: P_rawImage;
     CONSTRUCTOR create(CONST spec:string);
     CONSTRUCTOR create(CONST op:P_imageOperation);
+    CONSTRUCTOR initializeForReadingFromStream;
     DESTRUCTOR destroy;
     PROCEDURE execute(CONST context:P_abstractWorkflow);
     PROPERTY specification:string read specString write setSpecification;
@@ -34,6 +36,9 @@ T_workflowStep=object
     PROCEDURE refreshSpecString;
     FUNCTION outputPreview:TImage;
     PROPERTY outputHash:longword read outputHash_;
+    FUNCTION getSerialVersion:dword; virtual;
+    FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
+    PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
 end;
 
 IMPLEMENTATION
@@ -62,6 +67,16 @@ CONSTRUCTOR T_workflowStep.create(CONST op: P_imageOperation);
     specString:=op^.toString(tsm_withNiceParameterName);
     valid     :=true;
     outputImage:=nil; outputPreview_:=nil; outputHash_:=0;
+  end;
+
+CONSTRUCTOR T_workflowStep.initializeForReadingFromStream;
+  begin
+    operation_:=nil;
+    specString:='';
+    valid     :=false;
+    outputImage:=nil;
+    outputPreview_:=nil;
+    outputHash_:=0;
   end;
 
 DESTRUCTOR T_workflowStep.destroy;
@@ -139,6 +154,26 @@ FUNCTION T_workflowStep.outputPreview: TImage;
       outputImage^.copyToImage(outputPreview_);
     end;
     result:=outputPreview_;
+  end;
+
+FUNCTION T_workflowStep.getSerialVersion: dword;
+  begin
+    result:=345871;
+  end;
+
+FUNCTION T_workflowStep.loadFromStream(VAR stream: T_bufferedInputStreamWrapper): boolean;
+  begin
+    clearOutputImage;
+    specString:=stream.readAnsiString;
+    if (operation_<>nil) then dispose(operation_,destroy);
+    operation_:=parseOperation(specString);
+    valid:=operation_<>nil;
+    result:=valid;
+  end;
+
+PROCEDURE T_workflowStep.saveToStream(VAR stream: T_bufferedOutputStreamWrapper);
+  begin
+    if valid then stream.writeAnsiString(specString);
   end;
 
 end.

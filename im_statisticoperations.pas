@@ -704,13 +704,18 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
       //Work on downscaled image to prevent single pixels from messing up the result
       //...also speed up the otherwise horribly expensive approach
+      j:=0;
+      diff:=1;
+      while (context^.image.dimensions.width shr j)*(context^.image.dimensions.height shr j)>65536 do begin
+        j+=1; diff*=0.25;
+      end;
       downscaledImage.create(context^.image.dimensions.width  shr 2,
                              context^.image.dimensions.height shr 2);
       downscaledImage.clearWithColor(BLACK);
       for j:=0 to downscaledImage.dimensions.height shl 2-1 do begin
         raw:=context^.image.linePtr(j);
         for i:=0 to downscaledImage.dimensions.width shl 2-1 do
-          downscaledImage.multIncPixel(i shr 2,j shr 2,1,raw[i]*(1/16));
+          downscaledImage.multIncPixel(i shr 2,j shr 2,1,raw[i]*diff);
       end;
       raw:=downscaledImage.rawData;
 
@@ -786,6 +791,27 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
                        context^.image.multIncPixel(x  ,y+1,1,error*5);
           if x<xm then context^.image.multIncPixel(x+1,y+1,1,error*1);
         end;
+      end;
+    end;
+
+  PROCEDURE atkinsonDither;
+    VAR x,y,xm,ym:longint;
+        oldPixel,newPixel,error:T_rgbFloatColor;
+    begin
+      xm:=context^.image.dimensions.width -1;
+      ym:=context^.image.dimensions.height-1;
+      for y:=0 to ym do if not(context^.cancellationRequested) then for x:=0 to xm do begin
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel);
+        context^.image[x,y]:=newPixel;
+        error:=(oldPixel-newPixel)*0.125;
+        if x<xm   then context^.image.multIncPixel(x+1,y,1,error);
+        if x<xm-1 then context^.image.multIncPixel(x+2,y,1,error);
+        if y<ym then begin
+          if x>0  then context^.image.multIncPixel(x-1,y+1,1,error);
+                       context^.image.multIncPixel(x  ,y+1,1,error);
+          if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
+        end;
+        if y<ym-1 then context^.image.multIncPixel(x  ,y+2,1,error);
       end;
     end;
 
@@ -962,6 +988,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       3: kochCurveDither;
       4: blockDither_4x4;
       5: jarvisJudiceNinkeDither;
+      6: atkinsonDither;
     end;
   end;
 
@@ -989,7 +1016,8 @@ registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_
                                                                                                        'Line-Based',
                                                                                                        'Koch-Curve',
                                                                                                        'Block-Dither',
-                                                                                                       'Jarvis-Judice-Ninke'),
+                                                                                                       'Jarvis-Judice-Ninke',
+                                                                                                       'Atkinson'),
                                                         @quantizeCustom_impl);
 
 end.

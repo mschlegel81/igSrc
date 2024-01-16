@@ -2,7 +2,8 @@ UNIT generationBasics;
 INTERFACE
 USES pixMaps,
      mypics,
-     myGenerics;
+     myGenerics,
+     serializationUtil;
 CONST
     C_workflowExtension='.WF';
     C_todoExtension='.TODO';
@@ -12,7 +13,10 @@ CONST
 TYPE
   F_simpleCallback=PROCEDURE of object;
   P_imageWorkflowConfiguration=^T_imageWorkflowConfiguration;
-  T_imageWorkflowConfiguration=object
+
+  { T_imageWorkflowConfiguration }
+
+  T_imageWorkflowConfiguration=object(T_serializable)
     private
       //Varying over config lifetime:
       initialImageFilename             :string;
@@ -41,6 +45,9 @@ TYPE
       PROPERTY initialResolution:T_imageDimensions read fInitialResolution write setInitialResolution;
       PROPERTY initialImageName:string read initialImageFilename;
       FUNCTION associatedDirectory:string;
+      FUNCTION getSerialVersion:dword; virtual;
+      FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
+      PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
   end;
 
   P_structuredMessage=^T_structuredMessage;
@@ -317,6 +324,29 @@ FUNCTION T_imageWorkflowConfiguration.associatedDirectory: string;
     then result:=paramStr(0)
     else result:=workflowFilename;
     result:=ExtractFileDir(result);
+  end;
+
+FUNCTION T_imageWorkflowConfiguration.getSerialVersion: dword;
+  begin
+    result:=1;
+  end;
+
+FUNCTION T_imageWorkflowConfiguration.loadFromStream(VAR stream: T_bufferedInputStreamWrapper): boolean;
+  begin
+    setDefaults;
+    result:=inherited;
+    initialImageFilename:=stream.readAnsiString;
+    workflowFilename:=stream.readAnsiString;
+    intermediateResultsPreviewQuality:=stream.readBoolean;
+    result:=result and stream.allOkay;
+  end;
+
+PROCEDURE T_imageWorkflowConfiguration.saveToStream(VAR stream: T_bufferedOutputStreamWrapper);
+  begin
+    inherited;
+    stream.writeAnsiString(initialImageFilename);
+    stream.writeAnsiString(workflowFilename);
+    stream.writeBoolean(intermediateResultsPreviewQuality);
   end;
 
 end.

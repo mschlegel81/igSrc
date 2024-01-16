@@ -4,7 +4,7 @@ USES myGenerics,
      pixMaps,
      myParams,mypics,sysutils,imageGeneration,mySys,FileUtil,Dialogs,
      generationBasics,
-     imageContexts,workflowSteps;
+     imageContexts,workflowSteps,serializationUtil;
 
 TYPE
   P_simpleWorkflow=^T_simpleWorkflow;
@@ -29,8 +29,8 @@ TYPE
       FUNCTION stepCount:longint; virtual;
       FUNCTION parseWorkflow(data:T_arrayOfString; CONST tolerantParsing:boolean):boolean;
       FUNCTION workflowText:T_arrayOfString;
-      FUNCTION readFromFile(CONST fileName:string; CONST tolerantParsing:boolean):boolean;
-      PROCEDURE saveToFile(CONST fileName:string);
+      FUNCTION readWorkflowOnlyFromFile(CONST fileName:string; CONST tolerantParsing:boolean):boolean;
+      PROCEDURE saveWorkflowOnlyToFile(CONST fileName:string);
       FUNCTION todoLines(CONST savingToFile:string; CONST savingWithSizeLimit:longint):T_arrayOfString;
       PROCEDURE saveAsTodo(CONST savingToFile:string; CONST savingWithSizeLimit:longint);
       PROCEDURE appendSaveStep(CONST savingToFile:string; CONST savingWithSizeLimit:longint);
@@ -48,6 +48,9 @@ TYPE
   end;
 
   P_editorWorkflow=^T_editorWorkflow;
+
+  { T_editorWorkflow }
+
   T_editorWorkflow=object(T_simpleWorkflow)
     protected
       PROCEDURE beforeAll; virtual;
@@ -59,6 +62,10 @@ TYPE
       PROCEDURE swapStepDown(CONST index:longint);
       PROCEDURE removeStep(CONST index:longint);
       FUNCTION isEditorWorkflow: boolean; virtual;
+
+      FUNCTION getSerialVersion:dword; virtual;
+      FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
+      PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
   end;
 
   P_generateImageWorkflow=^T_generateImageWorkflow;
@@ -462,7 +469,7 @@ FUNCTION T_simpleWorkflow.workflowText: T_arrayOfString;
     end;
   end;
 
-FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string; CONST tolerantParsing:boolean): boolean;
+FUNCTION T_simpleWorkflow.readWorkflowOnlyFromFile(CONST fileName: string; CONST tolerantParsing:boolean): boolean;
   begin
     messageQueue^.Post('Trying to parse workflow from file: '+fileName,false,-1,0);
     if not(fileExists(fileName)) then begin
@@ -478,7 +485,7 @@ FUNCTION T_simpleWorkflow.readFromFile(CONST fileName: string; CONST tolerantPar
     end;
   end;
 
-PROCEDURE T_simpleWorkflow.saveToFile(CONST fileName: string);
+PROCEDURE T_simpleWorkflow.saveWorkflowOnlyToFile(CONST fileName: string);
   begin
     messageQueue^.Post('Writing workflow to file: '+fileName,false,-1,0);
     writeFile(fileName,workflowText);
@@ -683,6 +690,41 @@ PROCEDURE T_editorWorkflow.removeStep(CONST index: longint);
 FUNCTION T_editorWorkflow.isEditorWorkflow: boolean;
   begin
     result:=true;
+  end;
+
+FUNCTION T_editorWorkflow.getSerialVersion: dword;
+  begin
+    result:=234814109;
+  end;
+
+FUNCTION T_editorWorkflow.loadFromStream(VAR stream: T_bufferedInputStreamWrapper): boolean;
+  VAR count:longint;
+      i:longint;
+  begin
+    result:=inherited;
+    result:=result and config.loadFromStream(stream);
+    if not(result) then exit(false);
+    count:=stream.readNaturalNumber;
+    setLength(steps,count);
+    for i:=0 to length(steps)-1 do steps[i]:=nil;
+    for i:=0 to length(steps)-1 do if result then begin
+      new(steps[i],initializeForReadingFromStream);
+      result:=result and steps[i]^.loadFromStream(stream);
+    end;
+    result:=result and stream.allOkay;
+    if result then exit(true);
+
+    for i:=0 to length(steps)-1 do if steps[i]<>nil then dispose(steps[i],destroy);
+    setLength(steps,0);
+  end;
+
+PROCEDURE T_editorWorkflow.saveToStream(VAR stream: T_bufferedOutputStreamWrapper);
+  VAR i:longint;
+  begin
+    inherited;
+    config.saveToStream(stream);
+    stream.writeNaturalNumber(length(steps));
+    for i:=0 to length(steps)-1 do steps[i]^.saveToStream(stream);
   end;
 
 FUNCTION T_simpleWorkflow.workflowType: T_workflowType;
