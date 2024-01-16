@@ -234,12 +234,10 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
   VAR colorTable:T_colorTable;
 
   FUNCTION redmean_sqr(CONST x,y:T_rgbFloatColor):double; inline;
-    VAR r_bar:double;
     begin
-      r_bar:=(x[cc_red]+y[cc_red])*0.5;
-      result:=sqr(x[cc_red  ]-y[cc_red  ])*(2+r_bar)
-             +sqr(x[cc_green]-y[cc_green])*4
-             +sqr(x[cc_blue ]-y[cc_blue ])*(3-r_bar);
+      result:=sqr(x[cc_red  ]-y[cc_red  ])*(SUBJECTIVE_GREY_RED_WEIGHT  *SUBJECTIVE_GREY_RED_WEIGHT  )
+             +sqr(x[cc_green]-y[cc_green])*(SUBJECTIVE_GREY_GREEN_WEIGHT*SUBJECTIVE_GREY_GREEN_WEIGHT)
+             +sqr(x[cc_blue ]-y[cc_blue ])*(SUBJECTIVE_GREY_BLUE_WEIGHT *SUBJECTIVE_GREY_BLUE_WEIGHT );
     end;
 
   PROCEDURE standardAdaptiveColors;
@@ -874,22 +872,22 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
       for y:=0 to ym do if not(context^.cancellationRequested) then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/48);
-        if x<xm   then context^.image.multIncPixel(x+1,y,1,error*7);
-        if x<xm-1 then context^.image.multIncPixel(x+2,y,1,error*5);
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.99;
+        if x<xm   then context^.image.multIncPixel(x+1,y,1,error*0.1458);
+        if x<xm-1 then context^.image.multIncPixel(x+2,y,1,error*0.1041);
         if y<ym then begin
-          if x>1    then context^.image.multIncPixel(x-2,y+1,1,error*3);
-          if x>0    then context^.image.multIncPixel(x-1,y+1,1,error*5);
-                         context^.image.multIncPixel(x  ,y+1,1,error*7);
-          if x<xm   then context^.image.multIncPixel(x+1,y+1,1,error*5);
-          if x<xm-1 then context^.image.multIncPixel(x+2,y+1,1,error*3);
+          if x>1    then context^.image.multIncPixel(x-2,y+1,1,error*0.0625);
+          if x>0    then context^.image.multIncPixel(x-1,y+1,1,error*0.1041);
+                         context^.image.multIncPixel(x  ,y+1,1,error*0.1458);
+          if x<xm   then context^.image.multIncPixel(x+1,y+1,1,error*0.1041);
+          if x<xm-1 then context^.image.multIncPixel(x+2,y+1,1,error*0.0625);
         end;
         if y<ym-1 then begin
-          if x>1    then context^.image.multIncPixel(x-2,y+2,1,error*1);
-          if x>0    then context^.image.multIncPixel(x-1,y+2,1,error*3);
-                         context^.image.multIncPixel(x  ,y+2,1,error*5);
-          if x<xm   then context^.image.multIncPixel(x+1,y+2,1,error*3);
-          if x<xm-1 then context^.image.multIncPixel(x+2,y+2,1,error*1);
+          if x>1    then context^.image.multIncPixel(x-2,y+2,1,error*0.0208);
+          if x>0    then context^.image.multIncPixel(x-1,y+2,1,error*0.0625);
+                         context^.image.multIncPixel(x  ,y+2,1,error*0.1041);
+          if x<xm   then context^.image.multIncPixel(x+1,y+2,1,error*0.0625);
+          if x<xm-1 then context^.image.multIncPixel(x+2,y+2,1,error*0.0208);
         end;
       end;
     end;
@@ -898,49 +896,24 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     VAR x,y,xm,ym:longint;
         oldPixel,newPixel,error:T_rgbFloatColor;
     begin
-      // 1 -> - and +
-      // 0 -> -
-      // 2 -> +
-      // 3 -> simple
       xm:=context^.image.dimensions.width -1;
-      ym:=context^.image.dimensions.height-1;
-      for y:=0 to ym do if (y and 3)=1 then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/7);
-        if x> 0 then context^.image.multIncPixel(x-1,y-1,1,error);
-                     context^.image.multIncPixel(x  ,y-1,1,error);
-        if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
-        if x<xm then context^.image.multIncPixel(x+1,y  ,1,error);
-        if y<ym then begin
-          if x> 0 then context^.image.multIncPixel(x-1,y+1,1,error);
-                       context^.image.multIncPixel(x  ,y+1,1,error);
-          if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
-        end;
+      ym:=context^.image.dimensions.height-1;      for y:=0 to ym do if odd(y) then for x:=0 to xm do begin
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.33; context^.image[x,y]:=newPixel+error;
+        if x<xm then context^.image.multIncPixel(x+1,y,1,error);
+        if y<ym then context^.image.multIncPixel(x,y+1,1,error);
+      end else for x:=xm downto 0 do begin
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.33; context^.image[x,y]:=newPixel+error;
+        if x>0  then context^.image.multIncPixel(x-1,y,1,error);
+        if y<ym then context^.image.multIncPixel(x,y+1,1,error);
       end;
-      if context^.cancellationRequested then exit;
-      for y:=0 to ym do case byte(y and 3) of
-      0: for x:=xm downto 0 do begin
-           oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/4);
-           if y>0 then begin
-             if x> 0 then context^.image.multIncPixel(x-1,y-1,1,error);
-                          context^.image.multIncPixel(x  ,y-1,1,error);
-             if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
-           end;
-           if x> 0 then context^.image.multIncPixel(x-1,y,1,error);
-         end;
-      2: for x:=xm downto 0 do begin
-           oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/4);
-           if y<ym then begin
-             if x> 0 then context^.image.multIncPixel(x-1,y+1,1,error);
-                          context^.image.multIncPixel(x  ,y+1,1,error);
-             if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
-           end;
-           if x> 0 then context^.image.multIncPixel(x-1,y,1,error);
-         end;
-      end;
-      if context^.cancellationRequested then exit;
-      for y:=0 to ym do if (y and 3)=3 then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.5;
-        if x<xm then context^.image.multIncPixel(x+1,y  ,1,error);
+      for y:=ym downto 0 do if odd(y) then for x:=xm downto 0 do begin
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.48; context^.image[x,y]:=newPixel;
+        if x>0  then context^.image.multIncPixel(x-1,y,1,error);
+        if y>0  then context^.image.multIncPixel(x,y-1,1,error);
+      end else for x:=0 to xm do begin
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.48; context^.image[x,y]:=newPixel;
+        if x<xm then context^.image.multIncPixel(x+1,y,1,error);
+        if y>0  then context^.image.multIncPixel(x,y-1,1,error);
       end;
     end;
 
