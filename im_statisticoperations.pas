@@ -430,7 +430,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       end;
     end;
 
-  FUNCTION medianCutBuckets:T_colorLists;
+  FUNCTION medianCutBuckets(CONST targetBucketCount:longint):T_colorLists;
     VAR buckets:T_colorLists;
     FUNCTION splitAllLists:boolean;
       VAR i,i0:longint;
@@ -515,8 +515,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     begin
       setLength(buckets,1);
       buckets[0]:=firstBucket;
-      while (length(buckets)*3<=parameters.i0) and not context^.cancellationRequested and splitAllLists do begin end;
-      while (length(buckets)  < parameters.i0) and not context^.cancellationRequested and splitOneList(buckets) do begin end;
+      while (length(buckets)*3<=targetBucketCount) and not context^.cancellationRequested and splitAllLists do begin end;
+      while (length(buckets)  < targetBucketCount) and not context^.cancellationRequested and splitOneList(buckets) do begin end;
       result:=buckets;
     end;
 
@@ -524,7 +524,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     VAR k:longint;
         buckets:T_colorLists;
     begin
-      buckets:=medianCutBuckets;
+      buckets:=medianCutBuckets(parameters.i0);
       setLength(colorTable,length(buckets));
       for k:=0 to length(buckets)-1 do begin
         colorTable[k]:=averageColor(buckets[k]);
@@ -571,7 +571,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       end;
 
     begin
-      buckets:=medianCutBuckets;
+      buckets:=medianCutBuckets(parameters.i0);
       collectAveragePerBucket;
       //collect all samples
       setLength(allSamples,i);
@@ -656,7 +656,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
     VAR i,j,k:longint;
     begin
-      buckets:=medianCutBuckets;
+      buckets:=medianCutBuckets(parameters.i0);
       k:=0;
       for i:=0 to length(buckets)-1 do k+=length(buckets[i].sample);
       setLength(allSamples,k);
@@ -688,7 +688,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE bruteForceColorTable;
-    VAR i,j:longint;
+    VAR i,j,scalePow:longint;
         raw:P_floatColor;
         avgColor:T_rgbColor=(0,0,0);
 
@@ -704,18 +704,18 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
       //Work on downscaled image to prevent single pixels from messing up the result
       //...also speed up the otherwise horribly expensive approach
-      j:=0;
+      scalePow:=0;
       diff:=1;
-      while (context^.image.dimensions.width shr j)*(context^.image.dimensions.height shr j)>65536 do begin
-        j+=1; diff*=0.25;
+      while (context^.image.dimensions.width shr scalePow)*(context^.image.dimensions.height shr scalePow)>65536 do begin
+        scalePow+=1; diff*=0.25;
       end;
-      downscaledImage.create(context^.image.dimensions.width  shr 2,
-                             context^.image.dimensions.height shr 2);
+      downscaledImage.create(context^.image.dimensions.width  shr scalePow,
+                             context^.image.dimensions.height shr scalePow);
       downscaledImage.clearWithColor(BLACK);
-      for j:=0 to downscaledImage.dimensions.height shl 2-1 do begin
+      for j:=0 to downscaledImage.dimensions.height shl scalePow-1 do begin
         raw:=context^.image.linePtr(j);
-        for i:=0 to downscaledImage.dimensions.width shl 2-1 do
-          downscaledImage.multIncPixel(i shr 2,j shr 2,1,raw[i]*diff);
+        for i:=0 to downscaledImage.dimensions.width shl scalePow-1 do
+          downscaledImage.multIncPixel(i shr scalePow,j shr scalePow,1,raw[i]*diff);
       end;
       raw:=downscaledImage.rawData;
 
@@ -750,6 +750,65 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         colorTable[colorTableIndex]:=nextColor;
       end;
       downscaledImage.destroy;
+    end;
+
+  PROCEDURE bruteForceMedianCut;
+    VAR buckets:T_colorLists;
+        chunks:array of record
+          pending:boolean;
+          color:T_rgbFloatColor;
+        end;
+        colorTableIndex,i,j,k: longint;
+        greatestDiff,
+        minDiff,
+        diff: double;
+        avgColor :T_rgbFloatColor=(0,0,0);
+        nextColor:T_rgbFloatColor;
+
+    begin
+      buckets:=medianCutBuckets(parameters.i0*64);
+      setLength(chunks,length(buckets));
+      i:=0;
+      for k:=0 to length(chunks)-1 do begin
+        chunks[k].color  :=averageColor(buckets[k]);
+        chunks[k].pending:=true;
+        avgColor+=chunks[k].color*length(buckets[k].sample);
+        i+=                       length(buckets[k].sample);
+      end;
+      avgColor*=1/i;
+
+      setLength(buckets,0);
+      setLength(colorTable,parameters.i0);
+      greatestDiff:=0;
+      for i:=0 to length(chunks)-1 do begin
+        diff:=colDiff(avgColor,chunks[i].color);
+        if diff>greatestDiff then begin
+          greatestDiff:=diff;
+          nextColor:=chunks[i].color;
+          k:=i;
+        end;
+      end;
+
+      colorTable[0]:=nextColor;
+      chunks[k].pending:=false;
+      for colorTableIndex:=1 to parameters.i0-1 do begin
+        greatestDiff:=0;
+        for i:=0 to length(chunks)-1 do if chunks[i].pending then begin
+          minDiff:=Infinity;
+          for j:=0 to colorTableIndex-1 do begin
+            diff:=colDiff(chunks[i].color,colorTable[j]);
+            if diff<minDiff then minDiff:=diff;
+          end;
+          if minDiff>greatestDiff then begin
+            greatestDiff:=minDiff;
+            nextColor:=chunks[i].color;
+            k:=i;
+          end;
+        end;
+        colorTable[colorTableIndex]:=nextColor;
+        chunks[k].pending:=false;
+      end;
+      setLength(chunks,0);
     end;
 
   FUNCTION nearestColor(CONST pixel:T_rgbFloatColor):T_rgbFloatColor;
@@ -980,6 +1039,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       5: kMeansColorTable;
       6: modifiedMedianCut;
       7: bruteForceColorTable;
+      8: bruteForceMedianCut;
     end;
     case byte(parameters.i2) of
       0: noDither;
@@ -1010,7 +1070,8 @@ registerSimpleOperation(imc_statistic,newParameterDescription('quantize',    pt_
                                                                                                       'Median cut',
                                                                                                       'k-means adaptive',
                                                                                                       'Modified median cut',
-                                                                                                      'Brute force')
+                                                                                                      'Brute force',
+                                                                                                      'BF/MC')
                                                         ^.addEnumChildDescription(spa_i2,'Dither mode','none',
                                                                                                        'Floyd-Steinberg',
                                                                                                        'Line-Based',
