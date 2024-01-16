@@ -912,10 +912,11 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
       for y:=0 to ym do if (y and 3)=1 then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.16666666666666666;
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/7);
         if x> 0 then context^.image.multIncPixel(x-1,y-1,1,error);
                      context^.image.multIncPixel(x  ,y-1,1,error);
         if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
+        if x<xm then context^.image.multIncPixel(x+1,y  ,1,error);
         if y<ym then begin
           if x> 0 then context^.image.multIncPixel(x-1,y+1,1,error);
                        context^.image.multIncPixel(x  ,y+1,1,error);
@@ -924,25 +925,30 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       end;
       if context^.cancellationRequested then exit;
       for y:=0 to ym do case byte(y and 3) of
-      0: for x:=0 to xm do begin
-           oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.3333333333333333;
+      0: for x:=xm downto 0 do begin
+           oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/4);
            if y>0 then begin
              if x> 0 then context^.image.multIncPixel(x-1,y-1,1,error);
                           context^.image.multIncPixel(x  ,y-1,1,error);
              if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
            end;
+           if x> 0 then context^.image.multIncPixel(x-1,y,1,error);
          end;
-      2: for x:=0 to xm do begin
-           oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.3333333333333333;
+      2: for x:=xm downto 0 do begin
+           oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*(1/4);
            if y<ym then begin
              if x> 0 then context^.image.multIncPixel(x-1,y+1,1,error);
                           context^.image.multIncPixel(x  ,y+1,1,error);
              if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
            end;
+           if x> 0 then context^.image.multIncPixel(x-1,y,1,error);
          end;
       end;
       if context^.cancellationRequested then exit;
-      for y:=0 to ym do if (y and 3)=3 then for x:=0 to xm do context^.image[x,y]:=nearestColor(context^.image[x,y]);
+      for y:=0 to ym do if (y and 3)=3 then for x:=0 to xm do begin
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.5;
+        if x<xm then context^.image.multIncPixel(x+1,y  ,1,error);
+      end;
     end;
 
   PROCEDURE kochCurveDither;
