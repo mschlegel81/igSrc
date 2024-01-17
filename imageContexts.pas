@@ -112,6 +112,7 @@ TYPE
       //General workflow control
       PROCEDURE ensureStop;
       PROCEDURE postStop;
+      PROCEDURE stopBeforeEditing(CONST firstIndex,lastIndex:longint);
       FUNCTION  executing:boolean;
       FUNCTION  isDone:boolean;
       FUNCTION  cancellationRequested:boolean;
@@ -470,7 +471,22 @@ PROCEDURE T_abstractWorkflow.ensureStop;
     end;
     while not(currentExecution.workflowState in [ts_cancelled,ts_ready]) do begin
       leaveCriticalSection(contextCS);
-      sleep(10);
+      sleep(1);
+      enterCriticalSection(contextCS);
+    end;
+    leaveCriticalSection(contextCS);
+  end;
+
+PROCEDURE T_abstractWorkflow.stopBeforeEditing(CONST firstIndex,lastIndex:longint);
+  begin
+    enterCriticalSection(contextCS);
+    if currentExecution.workflowState=ts_evaluating then begin
+      currentExecution.workflowState:=ts_stopRequested;
+      messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex,stepCount);
+    end;
+    while not(currentExecution.workflowState in [ts_cancelled,ts_ready]) and (currentExecution.currentStepIndex>=firstIndex) and (currentExecution.currentStepIndex<=lastIndex) do begin
+      leaveCriticalSection(contextCS);
+      sleep(1);
       enterCriticalSection(contextCS);
     end;
     leaveCriticalSection(contextCS);

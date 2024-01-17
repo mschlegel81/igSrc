@@ -59,8 +59,8 @@ TYPE
     public
       CONSTRUCTOR createEditorWorkflow(CONST messageQueue_:P_structuredMessageQueue);
       PROCEDURE stepChanged(CONST index:longint);
-      PROCEDURE swapStepDown(CONST index:longint);
-      PROCEDURE removeStep(CONST index:longint);
+      PROCEDURE swapStepDown(CONST firstIndex,lastIndex:longint);
+      PROCEDURE removeStep(CONST firstIndex,lastIndex:longint);
       FUNCTION isEditorWorkflow: boolean; virtual;
 
       FUNCTION getSerialVersion:dword; virtual;
@@ -593,7 +593,7 @@ PROCEDURE T_simpleWorkflow.checkStepIO;
 
 PROCEDURE T_editorWorkflow.stepChanged(CONST index: longint);
   begin
-    ensureStop;
+    stopBeforeEditing(index,index);
     enterCriticalSection(contextCS);
     try
       if (index>=0) and (index<length(steps)) then begin
@@ -646,38 +646,42 @@ PROCEDURE T_simpleWorkflow.addStep(CONST newStep:P_workflowStep; CONST atIndex:l
     end;
   end;
 
-PROCEDURE T_editorWorkflow.swapStepDown(CONST index: longint);
+PROCEDURE T_editorWorkflow.swapStepDown(CONST firstIndex,lastIndex:longint);
   VAR tmp:P_workflowStep;
+      index:longint;
   begin
-    if (index>=0) and (index<length(steps)-1) then begin
-      ensureStop;
+    if (firstIndex>=0) and (firstIndex<=lastIndex) and (lastIndex<length(steps)-1) then begin
+      stopBeforeEditing(firstIndex,lastIndex+1);
       enterCriticalSection(contextCS);
       try
-        tmp           :=steps[index  ];
-        steps[index  ]:=steps[index+1];
-        steps[index+1]:=tmp;
-        //TODO: Changed?!?
-        if isValid then stepChanged(index)
-                   else stepChanged(0);
+        for index:=lastIndex downto firstIndex do begin
+          tmp           :=steps[index  ];
+          steps[index  ]:=steps[index+1];
+          steps[index+1]:=tmp;
+          if isValid then stepChanged(index)
+                     else stepChanged(0);
+        end;
       finally
         leaveCriticalSection(contextCS);
       end;
     end;
   end;
 
-PROCEDURE T_editorWorkflow.removeStep(CONST index: longint);
+PROCEDURE T_editorWorkflow.removeStep(CONST firstIndex,lastIndex:longint);
   VAR i:longint;
+      delta:longint;
   begin
-    if (index>=0) and (index<length(steps)) then begin
-      ensureStop;
+    if (firstIndex>=0) and (firstIndex<=lastIndex) and (lastIndex<length(steps)) then begin
+      stopBeforeEditing(firstIndex,lastIndex);
       enterCriticalSection(contextCS);
       try
-        dispose(steps[index],destroy);
-        for i:=index to length(steps)-2 do steps[i]:=steps[i+1];
-        setLength(steps,length(steps)-1);
-        if isValid and (index<length(steps)) then begin
-          if steps[index]^.operation^.dependsOnImageBefore then begin
-            steps[index]^.clearOutputImage;
+        delta:=lastIndex-firstIndex+1;
+        for i:=firstIndex to lastIndex do dispose(steps[i],destroy);
+        for i:=firstIndex to length(steps)-1-delta do steps[i]:=steps[i+delta];
+        setLength(steps,length(steps)-delta);
+        if isValid and (firstIndex<length(steps)) then begin
+          if steps[firstIndex]^.operation^.dependsOnImageBefore then begin
+            steps[firstIndex]^.clearOutputImage;
             checkStepIO;
           end;
         end;
