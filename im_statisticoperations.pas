@@ -1,6 +1,8 @@
 UNIT im_statisticOperations;
 INTERFACE
 
+USES pixMaps;
+
 IMPLEMENTATION
 USES imageManipulation,imageContexts,myParams,mypics,myColors,math,myGenerics,im_colors;
 FUNCTION measure(CONST a,b:single):single;
@@ -232,22 +234,38 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
   (207,121,227),( 88,177,110),(127, 60,  0),(172, 71,255),( 76, 20, 45),(223,255,226),(195, 19, 95),( 40,179,141),(152, 99,  0),( 98, 32,156),(139,149, 65),(169,180,205),(107,  6,201),( 35,241,183),( 42,224, 11),(255, 99,192));
   TYPE T_colorTable=array of T_rgbFloatColor;
   VAR colorTable:T_colorTable;
+      colorSource:P_rawImage=nil;
 
-  //FUNCTION redmean_sqr(CONST x,y:T_rgbFloatColor):double; inline;
-  //  begin
-  //    result:=sqr(x[cc_red  ]-y[cc_red  ])*(SUBJECTIVE_GREY_RED_WEIGHT  *SUBJECTIVE_GREY_RED_WEIGHT  )
-  //           +sqr(x[cc_green]-y[cc_green])*(SUBJECTIVE_GREY_GREEN_WEIGHT*SUBJECTIVE_GREY_GREEN_WEIGHT)
-  //           +sqr(x[cc_blue ]-y[cc_blue ])*(SUBJECTIVE_GREY_BLUE_WEIGHT *SUBJECTIVE_GREY_BLUE_WEIGHT );
-  //  end;
+  PROCEDURE ensureColorSource;
+    VAR scalePow,i,j: longint;
+        diff: extended;
+        raw: P_floatColor;
+    begin
+      if colorSource<>nil then exit;
+      scalePow:=1;
+      diff:=0.25;
+      while (context^.image.dimensions.width shr scalePow)*(context^.image.dimensions.height shr scalePow)>65536 do begin
+        scalePow+=1; diff*=0.25;
+      end;
+      new(colorSource,create(context^.image.dimensions.width  shr scalePow,
+                             context^.image.dimensions.height shr scalePow));
+      colorSource^.clearWithColor(BLACK);
+      for j:=0 to colorSource^.dimensions.height shl scalePow-1 do begin
+        raw:=context^.image.linePtr(j);
+        for i:=0 to colorSource^.dimensions.width shl scalePow-1 do
+          colorSource^.multIncPixel(i shr scalePow,j shr scalePow,1,raw[i]*diff);
+      end;
+    end;
 
   PROCEDURE standardAdaptiveColors;
     VAR i:longint;
         tree:T_colorTree;
         raw:P_floatColor;
     begin
-      raw:=context^.image.rawData;
+      ensureColorSource;
+      raw:=colorSource^.rawData;
       tree.create;
-      for i:=0 to context^.image.pixelCount-1 do tree.addSample(raw[i]);
+      for i:=0 to colorSource^.pixelCount-1 do tree.addSample(raw[i]);
       tree.finishSampling(parameters.i0);
       colorTable:=tree.colorTable;
       tree.destroy;
@@ -262,14 +280,15 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         g:double=0;
         b:double=0;
     begin
-      raw:=context^.image.rawData;
-      for i:=0 to context^.image.pixelCount-1 do begin
+      ensureColorSource;
+      raw:=colorSource^.rawData;
+      for i:=0 to colorSource^.pixelCount-1 do begin
         tmp:=raw[i];
         r+=tmp[cc_red];
         g+=tmp[cc_green];
         b+=tmp[cc_blue];
       end;
-      i:=context^.image.pixelCount;
+      i:=colorSource^.pixelCount;
       hsv_global:=rgbColor(r/i,g/i,b/i);
       setLength(colorTable,parameters.i0);
       for i:=0 to length(colorTable)-1 do begin
@@ -466,16 +485,17 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
       VAR channel:T_colorChannel;
       begin
-        raw:=context^.image.rawData;
-        setLength(arr,context^.image.pixelCount);
-        for i:=0 to context^.image.pixelCount-1 do begin
+        ensureColorSource;
+        raw:=colorSource^.rawData;
+        setLength(arr,colorSource^.pixelCount);
+        for i:=0 to colorSource^.pixelCount-1 do begin
           tmp:=projectedColor(raw[i]);
           arr[i]:=(tmp[cc_red] or longint(tmp[cc_green]) shl 8 or longint(tmp[cc_blue]) shl 16);
         end;
         prepareColorList;
         if length(result.sample)>50000*27 then begin
-          setLength(arr,context^.image.pixelCount);
-          for i:=0 to context^.image.pixelCount-1 do begin
+          setLength(arr,colorSource^.pixelCount);
+          for i:=0 to colorSource^.pixelCount-1 do begin
             tmp:=projectedColor(raw[i]);
             for channel in RGB_CHANNELS do
               tmp[channel]:=round(tmp[channel]/3)*3;
@@ -483,8 +503,8 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           end;
           prepareColorList;
         end else if length(result.sample)>50000*8 then begin
-          setLength(arr,context^.image.pixelCount);
-          for i:=0 to context^.image.pixelCount-1 do begin
+          setLength(arr,colorSource^.pixelCount);
+          for i:=0 to colorSource^.pixelCount-1 do begin
             tmp:=projectedColor(raw[i]);
             for channel in RGB_CHANNELS do begin
               if tmp[channel]<127 then begin
@@ -689,32 +709,17 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         nextColor:T_rgbColor;
 
         colorTableIndex:longint;
-
-        downscaledImage:T_rawImage;
     begin
 
       //Work on downscaled image to prevent single pixels from messing up the result
       //...also speed up the otherwise horribly expensive approach
-      scalePow:=0;
-      diff:=1;
-      while (context^.image.dimensions.width shr scalePow)*(context^.image.dimensions.height shr scalePow)>65536 do begin
-        scalePow+=1; diff*=0.25;
-      end;
-      downscaledImage.create(context^.image.dimensions.width  shr scalePow,
-                             context^.image.dimensions.height shr scalePow);
-      downscaledImage.clearWithColor(BLACK);
-      for j:=0 to downscaledImage.dimensions.height shl scalePow-1 do begin
-        raw:=context^.image.linePtr(j);
-        for i:=0 to downscaledImage.dimensions.width shl scalePow-1 do
-          downscaledImage.multIncPixel(i shr scalePow,j shr scalePow,1,raw[i]*diff);
-      end;
-      raw:=downscaledImage.rawData;
 
-      for i:=0 to downscaledImage.pixelCount-1 do avgColor+=raw[i];
-      avgColor*=(1/downscaledImage.pixelCount);
-
+      ensureColorSource;
+      raw:=colorSource^.rawData;
+      for i:=0 to colorSource^.pixelCount-1 do avgColor+=raw[i];
+      avgColor*=(1/colorSource^.pixelCount);
       greatestDiff:=0;
-      for i:=0 to downscaledImage.pixelCount-1 do begin
+      for i:=0 to colorSource^.pixelCount-1 do begin
         diff:=colDiff(avgColor,raw[i]);
         if diff>greatestDiff then begin
           greatestDiff:=diff;
@@ -727,7 +732,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
       for colorTableIndex:=1 to parameters.i0-1 do begin
         greatestDiff:=0;
-        for i:=0 to downscaledImage.pixelCount-1 do begin
+        for i:=0 to colorSource^.pixelCount-1 do begin
           minDiff:=1E20;
           for j:=0 to colorTableIndex-1 do begin
             diff:=colDiff(raw[i],colorTable[j]);
@@ -740,7 +745,6 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         end;
         colorTable[colorTableIndex]:=nextColor;
       end;
-      downscaledImage.destroy;
     end;
 
   PROCEDURE bruteForceMedianCut;
@@ -757,6 +761,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         nextColor:T_rgbFloatColor;
 
     begin
+      ensureColorSource;
       buckets:=medianCutBuckets(parameters.i0*64);
       setLength(chunks,length(buckets));
       i:=0;
@@ -872,7 +877,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
       for y:=0 to ym do if not(context^.cancellationRequested) then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=(oldPixel-newPixel)*0.99;
+        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); context^.image[x,y]:=newPixel; error:=oldPixel-newPixel;
         if x<xm   then context^.image.multIncPixel(x+1,y,1,error*0.1458);
         if x<xm-1 then context^.image.multIncPixel(x+2,y,1,error*0.1041);
         if y<ym then begin
@@ -968,11 +973,29 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE blockDither_4x4;
-    CONST KOCH:array[0..15] of longint=(5,6,9,10,14,13,12,8,4,0,1,2,3,7,11,15);
+    CONST KOCH:array[0..15,0..15] of longint=((0,1,2,3,7,6,10,11,15,14,13,12,8,9,5,4),
+                                              (1,2,3,7,6,10,11,15,14,13,12,8,9,5,4,0),
+                                              (2,3,7,6,10,11,15,14,13,12,8,9,5,4,0,1),
+                                              (3,7,6,10,11,15,14,13,12,8,9,5,4,0,1,2),
+                                              (4,0,1,2,3,7,6,10,11,15,14,13,12,8,9,5),
+                                              (5,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9),
+                                              (6,10,11,15,14,13,12,8,9,5,4,0,1,2,3,7),
+                                              (7,6,10,11,15,14,13,12,8,9,5,4,0,1,2,3),
+                                              (8,9,5,4,0,1,2,3,7,6,10,11,15,14,13,12),
+                                              (9,5,4,0,1,2,3,7,6,10,11,15,14,13,12,8),
+                                              (10,11,15,14,13,12,8,9,5,4,0,1,2,3,7,6),
+                                              (11,15,14,13,12,8,9,5,4,0,1,2,3,7,6,10),
+                                              (12,8,9,5,4,0,1,2,3,7,6,10,11,15,14,13),
+                                              (13,12,8,9,5,4,0,1,2,3,7,6,10,11,15,14),
+                                              (14,13,12,8,9,5,4,0,1,2,3,7,6,10,11,15),
+                                              (15,14,13,12,8,9,5,4,0,1,2,3,7,6,10,11));
 
     VAR xm,ym,ix,iy,dx,dy,k:longint;
         col:array[0..15] of T_rgbFloatColor;
         err:T_rgbFloatColor;
+        e_,e_max:double;
+        k_start:longint;
+
         oldPixel:T_rgbFloatColor;
     begin
       xm:=context^.image.dimensions.width -1;
@@ -986,12 +1009,23 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
           else col[dx+4*dy]:=col[dx+4*dy-1];
         end else for dx:=0 to 3 do col[dx+4*dy]:=col[dx+4*dy-4];
         //Process block:
+        k_start:=0;
+        e_max:=0;
+        for k:=0 to 15 do begin
+          oldPixel:=col[k];
+          e_:=colDiff(oldPixel,nearestColor(oldPixel));
+          if e_>e_max then begin
+            e_max:=e_;
+            k_start:=k;
+          end;
+        end;
         err:=BLACK;
-        for k in KOCH do begin
+        for k in KOCH[k_start] do begin
           oldPixel:=col[k]+err;
           col[k]:=nearestColor(oldPixel);
           err:=oldPixel-col[k];
         end;
+
         //Write back block:
         for dy:=0 to 3 do if iy+dy<=ym then
         for dx:=0 to 3 do if ix+dx<=xm then
@@ -1012,6 +1046,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       7: bruteForceColorTable;
       8: bruteForceMedianCut;
     end;
+    if colorSource<>nil then dispose(colorSource,destroy);
     case byte(parameters.i2) of
       0: noDither;
       1: floydSteinbergDither;
