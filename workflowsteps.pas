@@ -13,11 +13,12 @@ P_workflowStep=^T_workflowStep;
 
 T_workflowStep=object(T_serializable)
   private
-    specString   :string;
-    valid        :boolean;
-    operation_   :P_imageOperation;
-    outputPreview_: TImage;
-    outputHash_   : longword;
+    specString     : string;
+    valid          : boolean;
+    operation_     : P_imageOperation;
+    outputPreview_ : TImage;
+    outputHash_    : longword;
+    executionTicks_: qword;
     PROCEDURE setSpecification(CONST spec:string);
   public
     outputImage: P_rawImage;
@@ -39,9 +40,11 @@ T_workflowStep=object(T_serializable)
     FUNCTION getSerialVersion:dword; virtual;
     FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
     PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
+    PROPERTY executionTicks:qword read executionTicks_;
 end;
 
 IMPLEMENTATION
+USES sysutils;
 VAR next_hash:longword=0;
 PROCEDURE T_workflowStep.setSpecification(CONST spec: string);
   begin
@@ -59,6 +62,7 @@ CONSTRUCTOR T_workflowStep.create(CONST spec: string);
     operation_:=nil;
     setSpecification(spec);
     outputImage:=nil; outputPreview_:=nil; outputHash_:=0;
+    executionTicks_:=0;
   end;
 
 CONSTRUCTOR T_workflowStep.create(CONST op: P_imageOperation);
@@ -67,6 +71,7 @@ CONSTRUCTOR T_workflowStep.create(CONST op: P_imageOperation);
     specString:=op^.toString(tsm_withNiceParameterName);
     valid     :=true;
     outputImage:=nil; outputPreview_:=nil; outputHash_:=0;
+    executionTicks_:=0;
   end;
 
 CONSTRUCTOR T_workflowStep.initializeForReadingFromStream;
@@ -77,6 +82,7 @@ CONSTRUCTOR T_workflowStep.initializeForReadingFromStream;
     outputImage:=nil;
     outputPreview_:=nil;
     outputHash_:=0;
+    executionTicks_:=0;
   end;
 
 DESTRUCTOR T_workflowStep.destroy;
@@ -86,15 +92,17 @@ DESTRUCTOR T_workflowStep.destroy;
   end;
 
 PROCEDURE T_workflowStep.execute(CONST context: P_abstractWorkflow);
+  VAR start:qword;
   begin
     if valid then begin
       if outputImage=nil then begin
         context^.messageQueue^.Post(specification,false,context^.currentStepIndex,context^.stepCount);
+        start:=GetTickCount64;
         operation_^.execute(context);
+        executionTicks_:=GetTickCount64-start;
       end else begin
         context^.image.copyFromPixMap(outputImage^);
       end;
-
     end else begin
       context^.cancelWithError('Invalid step: '+specification);
     end;
@@ -109,6 +117,7 @@ PROCEDURE T_workflowStep.clearOutputImage;
       outputPreview_:=nil;
     end;
     outputHash_:=0;
+    executionTicks_:=0;
   end;
 
 PROCEDURE T_workflowStep.saveOutputImage(VAR image: T_rawImage);

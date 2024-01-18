@@ -699,10 +699,9 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
     end;
 
   PROCEDURE bruteForceColorTable;
-    VAR i,j,scalePow:longint;
+    VAR i,j:longint;
         raw:P_floatColor;
         avgColor:T_rgbColor=(0,0,0);
-
         diff,
         minDiff,
         greatestDiff:double;
@@ -710,10 +709,6 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
         colorTableIndex:longint;
     begin
-
-      //Work on downscaled image to prevent single pixels from messing up the result
-      //...also speed up the otherwise horribly expensive approach
-
       ensureColorSource;
       raw:=colorSource^.rawData;
       for i:=0 to colorSource^.pixelCount-1 do avgColor+=raw[i];
@@ -902,24 +897,12 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
         oldPixel,newPixel,error:T_rgbFloatColor;
     begin
       xm:=context^.image.dimensions.width -1;
-      ym:=context^.image.dimensions.height-1;      for y:=0 to ym do if odd(y) then for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.33; context^.image[x,y]:=newPixel+error;
-        if x<xm then context^.image.multIncPixel(x+1,y,1,error);
-        if y<ym then context^.image.multIncPixel(x,y+1,1,error);
-      end else for x:=xm downto 0 do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.33; context^.image[x,y]:=newPixel+error;
-        if x>0  then context^.image.multIncPixel(x-1,y,1,error);
-        if y<ym then context^.image.multIncPixel(x,y+1,1,error);
-      end;
-      for y:=ym downto 0 do if odd(y) then for x:=xm downto 0 do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.48; context^.image[x,y]:=newPixel;
-        if x>0  then context^.image.multIncPixel(x-1,y,1,error);
-        if y>0  then context^.image.multIncPixel(x,y-1,1,error);
-      end else for x:=0 to xm do begin
-        oldPixel:=context^.image[x,y]; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.48; context^.image[x,y]:=newPixel;
-        if x<xm then context^.image.multIncPixel(x+1,y,1,error);
-        if y>0  then context^.image.multIncPixel(x,y-1,1,error);
-      end;
+      ym:=context^.image.dimensions.height-1;
+      error:=BLACK;
+      for y:=0 to ym do
+      if odd(y)
+      then for x:=0 to xm     do begin oldPixel:=context^.image[x,y]+error; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.98; context^.image[x,y]:=newPixel; end
+      else for x:=xm downto 0 do begin oldPixel:=context^.image[x,y]+error; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.98; context^.image[x,y]:=newPixel; end;
     end;
 
   PROCEDURE kochCurveDither;
