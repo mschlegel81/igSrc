@@ -589,6 +589,7 @@ PROCEDURE T_tilesAlgorithm.execute(CONST context: P_abstractWorkflow);
     tileBuilder.create(context,BorderWidth,borderAngle);
     scanColor:=colorStyle=1;
     createGeometry;
+    if not cancellationRequested then
     tileBuilder.execute(not(scanColor),color);
     tileBuilder.destroy;
   end; end;

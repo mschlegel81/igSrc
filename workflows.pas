@@ -85,7 +85,7 @@ TYPE
       PROPERTY algorithmIndex:longint read getAlgorithmIndex write setAlgorithmIndex;
       PROPERTY algorithm:P_algorithmMeta read current;
       FUNCTION startEditing(CONST stepIndex:longint):boolean;
-      PROCEDURE startEditingForNewStep;
+      PROCEDURE startEditingForNewStep(CONST toBeInsertedAtIndex:longint);
       PROCEDURE confirmEditing;
       FUNCTION isValid: boolean; virtual;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions; virtual;
@@ -212,16 +212,17 @@ FUNCTION T_generateImageWorkflow.startEditing(CONST stepIndex: longint): boolean
     result:=true;
   end;
 
-PROCEDURE T_generateImageWorkflow.startEditingForNewStep;
+PROCEDURE T_generateImageWorkflow.startEditingForNewStep(CONST toBeInsertedAtIndex:longint);
   begin
     current:=imageGenerationAlgorithms[0];
     addingNewStep:=true;
-    editingStep:=relatedEditor^.stepCount;
+    editingStep:=toBeInsertedAtIndex;
   end;
 
 PROCEDURE T_generateImageWorkflow.confirmEditing;
   begin
     if not(isValid) then exit;
+    relatedEditor^.ensureStop;
     if addingNewStep then begin
       {$ifdef debugMode}writeln(stdErr,'DEBUG T_generateImageWorkflow.confirmEditing: adding a new step');{$endif}
       relatedEditor^.addStep(current^.prototype^.toString(tsm_forSerialization),editingStep);
