@@ -409,8 +409,8 @@ FUNCTION scanTriangle(VAR triangleInfo:T_triangleInfo; CONST imgBB:T_boundingBox
     ss-=s*s*(1/k);
     if k=0 then begin
       triangleInfo.variance:=0;
-      x:=round(max(imgBB.x0,min(imgBB.x1, (triangleInfo.base.p0.re+triangleInfo.base.p1.re+triangleInfo.base.p2.re)/3)));
-      y:=round(max(imgBB.y0,min(imgBB.y1, (triangleInfo.base.p0.im+triangleInfo.base.p1.im+triangleInfo.base.p2.im)/3)));
+      x:=round(max(imgBB.x0,min(imgBB.x1-1, (triangleInfo.base.p0.re+triangleInfo.base.p1.re+triangleInfo.base.p2.re)/3)));
+      y:=round(max(imgBB.y0,min(imgBB.y1-1, (triangleInfo.base.p0.im+triangleInfo.base.p1.im+triangleInfo.base.p2.im)/3)));
       triangleInfo.base.color:=image.pixel[x,y];
       result:=0;
     end else begin
@@ -608,7 +608,7 @@ PROCEDURE T_tileBuilder.execute(CONST doClear:boolean; CONST clearColor:T_rgbFlo
       yChunkCount:=context^.image.dimensions.height div CHUNK_BLOCK_SIZE; if yChunkCount*CHUNK_BLOCK_SIZE<context^.image.dimensions.height then inc(yChunkCount);
       setLength(todos,context^.image.chunksInMap);
       for i:=0 to length(todos)-1 do new(todos[i],create(i,@(context^.image)));
-      for quad in drawable do begin
+      for quad in drawable do if not(context^.cancellationRequested) then begin
         quadBB:=getBoundingBox(quad);
         i0:=max(0            ,floor(quadBB.x0/CHUNK_BLOCK_SIZE));
         i1:=min(xChunkCount-1,ceil (quadBB.x1/CHUNK_BLOCK_SIZE));

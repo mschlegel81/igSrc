@@ -263,15 +263,13 @@ FUNCTION T_generateImageWorkflow.stepCount:longint;
   begin result:=1; end;
 
 PROCEDURE T_simpleWorkflow.headlessWorkflowExecution;
-  VAR stepStarted:double;
   begin
     enterCriticalSection(contextCS);
     while (currentExecution.workflowState=ts_evaluating) and (currentExecution.currentStepIndex<length(steps)) do begin
       leaveCriticalSection(contextCS);
-      stepStarted:=now;
       steps[currentExecution.currentStepIndex]^.execute(@self);
       enterCriticalSection(contextCS);
-      afterStep(currentExecution.currentStepIndex,now-stepStarted);
+      afterStep(currentExecution.currentStepIndex,steps[currentExecution.currentStepIndex]^.executionTicks/(24*60*60*1000));
       inc(currentExecution.currentStepIndex);
     end;
     afterAll;
@@ -279,8 +277,7 @@ PROCEDURE T_simpleWorkflow.headlessWorkflowExecution;
   end;
 
 CONST reportStepTimeIfLargerThan={$ifdef debugMode}0.1/(24*60*60){$else}5/(24*60*60){$endif};
-PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint;
-  CONST elapsed: double);
+PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint; CONST elapsed: double);
   VAR accessedStash:string='';
       thereIsALaterAccess:boolean=false;
       i:longint;
@@ -298,11 +295,11 @@ PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint;
     end;
   end;
 
-PROCEDURE T_editorWorkflow.afterStep(CONST stepIndex: longint;
-  CONST elapsed: double);
+PROCEDURE T_editorWorkflow.afterStep(CONST stepIndex: longint; CONST elapsed: double);
   begin
     if elapsed>reportStepTimeIfLargerThan then messageQueue^.Post('Finished step after '+myTimeToStr(elapsed),false,currentStepIndex,stepCount);
-    step[stepIndex]^.saveOutputImage(image);
+    if currentExecution.workflowState in [ts_evaluating,ts_ready]
+    then step[stepIndex]^.saveOutputImage(image);
   end;
 
 PROCEDURE T_simpleWorkflow.afterAll;
