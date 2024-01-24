@@ -216,22 +216,22 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
   (128,32,64),(191,128,223),(159,159,64),(191,191,96),(191,255,128),(255,32,64),(128,159,255),(255,128,96),
   (128,255,96),(191,96,255),(0,96,159),(0,32,32),(0,96,96),(0,32,255),(159,255,64),(191,32,191));
   CONST ALTERNATIVE_COLOR_TABLE:array[0..255] of T_rgbColor=(
-  (  0,  0,  0),(255,255,255),(  0,112,255),(255,  0,167),( 50,255,  0),(227,139,  6),( 76,245,186),(188,131,194),( 74,  0,162),( 15,129, 85),(203,255, 82),(180,  4,  0),(102, 87,  0),(163, 57,109),(157, 38,255),(123,181, 52),
-  ( 98,170,252),(  0, 15,255),(  0,223, 97),(255,193,150),(  8, 41, 90),(  0,168,177),(255, 64, 59),( 79, 93,174),(181,209,218),(255, 72,245),(100,166,145),(255,164,255),(149,243,  0),( 40,156,  0),( 99,  0, 64),(  0,219,255),
-  (  0, 81, 14),(102,254, 91),(216,121,103),(255,219,  0),(133,116, 77),(229,  0, 75),(167,  1,172),(127,104,255),(177,195,120),( 88,  0,243),(196, 65,187),( 60, 62,241),(  0, 46,177),(127,255,255),(230,  9,255),(186, 73, 10),
-  ( 67, 81, 68),(241,175, 71),(231,255,166),(153,255,157),( 53,205, 41),(151,138,  0),( 59, 39, 18),(  0,108,152),(190,193, 15),(255, 79,143),( 22,165,240),( 90, 50,125),( 47,179, 99),(  0,228,167),(  1,  0,137),( 77,141, 52),
-  (255,136,174),(145,103,148),(121, 44,191),(125,207,180),( 66,123,226),(136,159,201),(197, 99,255),(163,  0, 98),( 74,220,255),(241, 27,  1),( 36,255,231),(  0,216,  0),(113,205,107),(140, 42, 45),(214,175,190),(211, 28,134),
-  ( 60,126,131),(154,225, 63),( 46,  1, 96),(  3,252, 47),( 18,  0,199),(234,210,248),( 57,229,130),(  0,170, 48),(246,247, 48),(255,234,113),(192,255,251),(197, 39, 60),(203,104, 48),( 19, 89,205),(178,158,255),(170,151, 96),
-  ( 33, 78,119),( 29,118, 33),(213, 22,197),( 61,247, 55),(103,207,  0),(  0,132,209),( 66,185,198),(150, 77,215),(252, 93,  0),(197,221,163),(114,  8,  0),(219,102,169),(244,119,234),(208, 53,243),(127,212,237),(102,132,177),
-  ( 99, 93,113),(247, 53,190),( 17, 16, 47),(205, 80,122),( 42, 32,143),(  2,191,133),(114, 13,112),( 94,132,  0),(214,213, 65),( 71, 36,183),(  0, 84, 69),(145, 87, 39),(248,234,209),(151,147,149),(125,247,204),( 10,255,128),
-  (193,155, 44),(145,  0,226),( 51,156,162),( 78, 39, 75),(116,101,202),(114, 64,253),(157,235,112),(105,150, 95),(152, 66,165),(255,148,114),(255, 42,111),( 54, 19,221),(117,250, 41),(  0,147,130),(122,  8,159),(117, 69, 76),
-  ( 58,  0,  3),(  0,255,198),(242, 92, 91),( 40,202,163),( 82,217, 75),(206,255,  0),(142,179,245),(238,180,  0),(180,248,200),(  0,211, 53),(163,228,255),( 27,215,210),(186,  0, 52),( 81,174, 23),(100, 34,230),(207,149,145),
-  (223, 56, 26),( 44, 66,167),(186, 11,243),(170, 37,207),(190, 75, 74),(161, 40,  0),(157, 26,135),( 78,115, 83),(141,  2, 40),(178,175,161),( 28, 57, 48),( 92, 72,211),(251,  5,117),(  3, 51,227),(176,255, 40),(255,208, 50),
-  (149,125,220),(247, 38,235),(116,115, 34),(103,255,143),(225,202,114),(255,188,207),(245,224,163),(255,125, 53),(207,171,100),(  4, 40,  9),(132,129,117),(  0, 52,132),(255,  6,216),( 39,252, 94),(223, 87,217),(145,195, 14),
-  ( 53,190,250),( 60,104,  4),(201,249,131),( 75,157,220),(218,225, 21),(219, 54, 95),(120,165,  0),(129,225,144),(217,151,230),( 50, 49,105),( 73,180, 64),(176,189, 67),(187,113,139),(178,224, 19),(129, 49,139),( 98,206, 40),
-  ( 42,193,  0),(189,112,  0),(  0,255,  5),( 38,155, 67),( 87,217,213),( 57, 76, 26),(221, 18, 39),(  0,134,  3),( 47,124,184),( 89,203,148),(170,102, 97),( 71,108, 43),(  0,104,111),(223, 58,152),(101, 61, 33),( 83,235, 19),
-  (111,140,235),( 37, 91,248),(  0,186,213),(  0, 76,161),(165,126, 45),( 54,156,123),(176, 97,179),(163,166, 19),(  0,187, 86),(139,176,108),(144,255, 80),(106, 75,150),(  0,176,  7),(137, 33, 86),( 44,212, 98),( 85, 91,249),
-  (207,121,227),( 88,177,110),(127, 60,  0),(172, 71,255),( 76, 20, 45),(223,255,226),(195, 19, 95),( 40,179,141),(152, 99,  0),( 98, 32,156),(139,149, 65),(169,180,205),(107,  6,201),( 35,241,183),( 42,224, 11),(255, 99,192));
+  (  0,  0,  0),(255,255,255),(  0,255,  0),(255,  0,255),(254,127,  2),(  2,128,253),(128,196,127),(158,  0, 97),( 97,  1,255),(103,110,  5),(  0, 25,146),(252,112,153),(  0,255,175),(167,255,  0),(160,144,255),(255,255,112),
+  (  0,146, 84),(102,255,248),(248,  0,  5),(104, 83,166),(255,  6,143),(112,  3,  0),( 78,203, 39),(184, 99, 74),(210,198,185),(184, 56,217),( 70, 50, 78),(208,190, 58),( 44,165,171),(  0, 26,247),( 23,252, 89),(255,114,255),
+  (  5, 97,  0),(255,250,  1),( 79,172,249),( 80, 85,250),( 17,230,255),( 85,133, 87),(255, 56, 66),(104,  0,162),(181, 54,  0),(174,255, 96),( 82,251,168),(  0,101,167),(171,129,151),(178,229,253),(158,255,181),(148,177,  7),
+  (  5,176, 11),(170, 56,144),(254,132, 78),(  0, 72, 89),(100,255, 92),( 52, 41,196),(120,161,191),(255,184,129),(219,  0, 71),( 14,  0, 74),( 51,191,106),(245,185,247),(131,173, 68),( 55, 46,  8),(255, 62,205),(135, 54, 53),
+  (186,122,  2),(167,  0,255),(168,  0,183),(245, 64,  1),(210,118,205),(254,254,183),(191,183,120),(121, 44,214),(131, 96,110),(  0,198,203),(102,255,  6),( 53,100, 43),(221,255, 54),( 54,105,134),( 56,  6,122),(230, 60,124),
+  ( 55,109,197),(242,189,  5),(167,  1, 33),(228,  3,199),(136,104,215),( 11,  1,196),(129,202,233),(139,229, 47),(105,  1, 65),( 49,255, 35),( 61,154,  8),( 53,255,218),(  0,203,140),( 91,151,141),( 11, 79,221),(115, 38,116),
+  (227, 51,255),(254,157,192),(206,243,145),(  0,202, 64),( 75,204,201),(213,139, 46),(192, 97,255),(194, 48, 54),(205,252,210),(213,124,115),(255,213, 77),(212, 74,173),(199,  5,135),(174,160,203),(  1, 49, 34),( 25,177,253),
+  ( 42,214,  0),(110,129,254),(144,130, 36),(192,207,  1),(  3,148,139),(153,201,175),( 67,  0, 29),( 43,234,136),(104, 96, 55),( 44,165, 58),(129,248,137),(141,147,112),( 46, 53,144),( 53,128,248),( 52, 39,254),(215,154,159),
+  (117, 57,  0),(  0,144,201),( 81,201,150),(  8,133, 36),(212,145,249),(218, 89, 37),(163, 57, 94),( 66,220,252),(211,222, 97),(147, 68,254),(255,209,204),( 37,113, 88),(181,151, 83),( 87,  8,207),( 97,150, 42),(166,206, 82),
+  ( 96,205, 86),(153, 86,176),(255,172, 49),(146,  9,142),(  2, 50,186),( 47,  4,167),(116,239,203),(151, 86, 21),(184,183,249),(  0,253, 47),(109,207,  0),(207, 19, 16),(203, 19,234),( 48,218, 70),(  1,108,118),( 36,213,177),
+  ( 94,129,211),(179, 94,120),( 85, 71,206),( 29, 37, 99),(203,164,  9),(229, 90, 86),(185,228, 44),(254, 20, 97),(155, 43,185),(232, 35,168),(255,109,201),( 48,112,  0),( 57,157,213),(172,169, 43),(227,168, 95),( 86, 83,108),
+  (167,220,135),(126,125,162),(224,225,241),( 89, 56, 37),( 91,245, 49),(203, 34, 98),(119, 42,160),( 41, 54, 48),(244,222, 34),(253,226,148),( 43,147,118),(174,220,210),( 14,238,213),( 60,  5, 75),(143,105, 70),(245, 21, 43),
+  (230, 88,230),(137,235, 91),(149,255,230),(134,  0,223),( 45,  2,227),(148, 26,  3),(  9, 90, 49),( 15,212,102),( 80,229,118),(  0,247,128),(104,167,104),(102, 46,255),(  0, 68,137),( 37, 88,255),(128,142,  0),(176, 97,217),
+  (211,247,  3),(210,112,155),( 37, 77,108),(216,164,211),( 25,  6, 34),(220,202,145),(  3,218, 22),( 28,129,175),(114,214,170),( 79, 48,167),(152,167,149),(255, 98, 55),( 15,  0,116),(160,124,189),(128,160,232),(255,101,114),
+  (153,217, 10),( 42,254,178),(101,  0,106),(149,107,252),(195, 33,183),( 70,128,165),( 35, 76,179),( 38,198,220),(143, 15, 62),( 51, 66,226),( 95,110,137),( 75,173, 80),( 92,172,214),(250,189,169),(127, 71,138),( 61,255, 97),
+  (118,196, 38),( 19, 60,  0),( 78, 37,128),(108, 38, 77),(  1,176,111),( 38,198, 37),(255, 25,221),(248,147,232),( 75, 81,  7),(255, 69,157),(222, 43,209),(  3,173,171),(129, 14,187),(115, 25, 34),(251,243,219),(255,152,152));
   TYPE T_colorTable=array of T_rgbFloatColor;
   VAR colorTable:T_colorTable;
       colorSource:P_rawImage=nil;
@@ -899,10 +899,47 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
       error:=BLACK;
-      for y:=0 to ym do
-      if odd(y)
-      then for x:=0 to xm     do begin oldPixel:=context^.image[x,y]+error; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.98; context^.image[x,y]:=newPixel; end
-      else for x:=xm downto 0 do begin oldPixel:=context^.image[x,y]+error; newPixel:=nearestColor(oldPixel); error:=(oldPixel-newPixel)*0.98; context^.image[x,y]:=newPixel; end;
+      for y:=0 to ym do case byte(y and 3) of
+        1: for x:=0 to xm do begin
+             oldPixel:=context^.image[x,y];
+             newPixel:=nearestColor(oldPixel);
+             error:=(oldPixel-newPixel)*(1/8);
+             context^.image[x,y]:=newPixel;
+             if x>0  then context^.image.multIncPixel(x-1,y-1,1,error);
+                          context^.image.multIncPixel(x  ,y-1,1,error*2);
+             if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
+             if y<ym then begin
+               if x>0  then context^.image.multIncPixel(x-1,y+1,1,error);
+                            context^.image.multIncPixel(x  ,y+1,1,error*2);
+               if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
+             end;
+           end;
+       2:  for x:=0 to xm do begin
+             oldPixel:=context^.image[x,y];
+             newPixel:=nearestColor(oldPixel);
+             error:=(oldPixel-newPixel)*(1/4*0.9);
+             context^.image[x,y]:=newPixel;
+             if y<ym then begin
+               if x>0  then context^.image.multIncPixel(x-1,y+1,1,error);
+                            context^.image.multIncPixel(x  ,y+1,1,error*2);
+               if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
+             end;
+           end;
+      end;
+      for y:=ym downto 0 do case byte(y and 3) of
+        0: for x:=0 to xm do begin
+             oldPixel:=context^.image[x,y];
+             newPixel:=nearestColor(oldPixel);
+             error:=(oldPixel-newPixel)*(1/4*0.9);
+             context^.image[x,y]:=newPixel;
+             if y>0 then begin
+               if x>0  then context^.image.multIncPixel(x-1,y-1,1,error);
+                            context^.image.multIncPixel(x  ,y-1,1,error*2);
+               if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
+             end;
+           end;
+        3: for x:=0 to xm do context^.image[x,y]:=nearestColor(context^.image[x,y]);
+      end;
     end;
 
   PROCEDURE kochCurveDither;
@@ -955,64 +992,180 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       end;
     end;
 
-  PROCEDURE blockDither_4x4;
-    CONST KOCH:array[0..15,0..15] of longint=((0,1,2,3,7,6,10,11,15,14,13,12,8,9,5,4),
-                                              (1,2,3,7,6,10,11,15,14,13,12,8,9,5,4,0),
-                                              (2,3,7,6,10,11,15,14,13,12,8,9,5,4,0,1),
-                                              (3,7,6,10,11,15,14,13,12,8,9,5,4,0,1,2),
-                                              (4,0,1,2,3,7,6,10,11,15,14,13,12,8,9,5),
-                                              (5,4,0,1,2,3,7,6,10,11,15,14,13,12,8,9),
-                                              (6,10,11,15,14,13,12,8,9,5,4,0,1,2,3,7),
-                                              (7,6,10,11,15,14,13,12,8,9,5,4,0,1,2,3),
-                                              (8,9,5,4,0,1,2,3,7,6,10,11,15,14,13,12),
-                                              (9,5,4,0,1,2,3,7,6,10,11,15,14,13,12,8),
-                                              (10,11,15,14,13,12,8,9,5,4,0,1,2,3,7,6),
-                                              (11,15,14,13,12,8,9,5,4,0,1,2,3,7,6,10),
-                                              (12,8,9,5,4,0,1,2,3,7,6,10,11,15,14,13),
-                                              (13,12,8,9,5,4,0,1,2,3,7,6,10,11,15,14),
-                                              (14,13,12,8,9,5,4,0,1,2,3,7,6,10,11,15),
-                                              (15,14,13,12,8,9,5,4,0,1,2,3,7,6,10,11));
-
-    VAR xm,ym,ix,iy,dx,dy,k:longint;
-        col:array[0..15] of T_rgbFloatColor;
-        err:T_rgbFloatColor;
-        e_,e_max:double;
-        k_start:longint;
-
-        oldPixel:T_rgbFloatColor;
+  PROCEDURE blockDither;
+    CONST two_way_factor=0.5*0.9;
+          one_way_factor=    0.8;
+    VAR xm,ym,x,y:longint;
+        error,oldPixel, newPixel:T_rgbFloatColor;
     begin
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
-      for iy:=0 to ym do if (iy and 3=0) then
-      for ix:=0 to xm do if (ix and 3=0) then begin
-        //Fetch block:
-        for dy:=0 to 3 do if iy+dy<=ym then begin
-          for dx:=0 to 3 do if ix+dx<=xm
-          then col[dx+4*dy]:=context^.image[ix+dx,iy+dy]
-          else col[dx+4*dy]:=col[dx+4*dy-1];
-        end else for dx:=0 to 3 do col[dx+4*dy]:=col[dx+4*dy-4];
-        //Process block:
-        k_start:=0;
-        e_max:=0;
-        for k:=0 to 15 do begin
-          oldPixel:=col[k];
-          e_:=colDiff(oldPixel,nearestColor(oldPixel));
-          if e_>e_max then begin
-            e_max:=e_;
-            k_start:=k;
+      for y:=0 to ym do case byte(y and 7) of
+        3: begin
+          for x:=0 to xm do case byte(x and 7) of
+            3: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/12);
+              context^.image.checkedInc(x-1,y-1,error  );
+              context^.image.checkedInc(x  ,y-1,error*2);
+              context^.image.checkedInc(x+1,y-1,error  );
+              context^.image.checkedInc(x-1,y  ,error*2);
+              context^.image.checkedInc(x+1,y  ,error*2);
+              context^.image.checkedInc(x-1,y+1,error  );
+              context^.image.checkedInc(x  ,y+1,error*2);
+              context^.image.checkedInc(x+1,y+1,error  );
+            end;
+            4..6: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/8);
+              context^.image.checkedInc(x  ,y-1,error*2);
+              context^.image.checkedInc(x+1,y-1,error  );
+              context^.image.checkedInc(x+1,y  ,error*2);
+              context^.image.checkedInc(x  ,y+1,error*2);
+              context^.image.checkedInc(x+1,y+1,error  );
+            end;
+          end;
+          for x:=xm downto 0 do case byte(x and 7) of
+            0..2: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/8);
+              context^.image.checkedInc(x  ,y-1,error*2);
+              context^.image.checkedInc(x-1,y-1,error  );
+              context^.image.checkedInc(x-1,y  ,error*2);
+              context^.image.checkedInc(x  ,y+1,error*2);
+              context^.image.checkedInc(x-1,y+1,error  );
+            end;
+            7: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*two_way_factor;
+              context^.image.checkedInc(x,y-1,error);
+              context^.image.checkedInc(x,y+1,error);
+            end;
           end;
         end;
-        err:=BLACK;
-        for k in KOCH[k_start] do begin
-          oldPixel:=col[k]+err;
-          col[k]:=nearestColor(oldPixel);
-          err:=oldPixel-col[k];
+        4..6: begin
+          for x:=0 to xm do case byte(x and 7) of
+            3: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/8);
+              context^.image.checkedInc(x-1,y  ,error*2);
+              context^.image.checkedInc(x+1,y  ,error*2);
+              context^.image.checkedInc(x-1,y+1,error  );
+              context^.image.checkedInc(x  ,y+1,error*2);
+              context^.image.checkedInc(x+1,y+1,error  );
+            end;
+            4..6: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/5);
+              context^.image.checkedInc(x+1,y  ,error*2);
+              context^.image.checkedInc(x  ,y+1,error*2);
+              context^.image.checkedInc(x+1,y+1,error);
+            end;
+          end;
+          for x:=xm downto 0 do case byte(x and 7) of
+            0..2: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/5);
+              context^.image.checkedInc(x-1,y  ,error*2);
+              context^.image.checkedInc(x  ,y+1,error*2);
+              context^.image.checkedInc(x-1,y+1,error);
+            end;
+            7: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              context^.image.checkedInc(x,y+1,(oldPixel-newPixel)*one_way_factor);
+            end;
+          end;
         end;
-
-        //Write back block:
-        for dy:=0 to 3 do if iy+dy<=ym then
-        for dx:=0 to 3 do if ix+dx<=xm then
-          context^.image[ix+dx,iy+dy]:=col[dx+4*dy];
+      end;
+      for y:=ym downto 0 do case byte(y and 7) of
+        0..2: begin
+          for x:=0 to xm do case byte(x and 7) of
+            3: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/8);
+              context^.image.checkedInc(x-1,y-1,error  );
+              context^.image.checkedInc(x  ,y-1,error*2);
+              context^.image.checkedInc(x+1,y-1,error  );
+              context^.image.checkedInc(x-1,y  ,error*2);
+              context^.image.checkedInc(x+1,y  ,error*2);
+            end;
+            4..6: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/5);
+              context^.image.checkedInc(x  ,y-1,error*2);
+              context^.image.checkedInc(x+1,y-1,error  );
+              context^.image.checkedInc(x+1,y  ,error*2);
+            end;
+          end;
+          for x:=xm downto 0 do case byte(x and 7) of
+            0..2: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*(1/8);
+              context^.image.checkedInc(x  ,y-1,error*2);
+              context^.image.checkedInc(x-1,y-1,error  );
+              context^.image.checkedInc(x-1,y  ,error*2);
+            end;
+            7: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              context^.image.checkedInc(x,y-1,(oldPixel-newPixel)*one_way_factor);
+            end;
+          end;
+        end;
+        7: begin
+          for x:=0 to xm do case byte(x and 7) of
+            3: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              error:=(oldPixel-newPixel)*two_way_factor;
+              context^.image.checkedInc(x-1,y,error);
+              context^.image.checkedInc(x+1,y,error);
+            end;
+            4..6: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              context^.image.checkedInc(x+1,y,(oldPixel-newPixel)*one_way_factor);
+            end;
+          end;
+          for x:=xm downto 0 do case byte(x and 7) of
+            0..2: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+              context^.image.checkedInc(x-1,y,(oldPixel-newPixel)*one_way_factor);
+            end;
+            7: begin
+              oldPixel:=context^.image[x,y];
+              newPixel:=nearestColor(oldPixel);
+              context^.image[x,y]:=newPixel;
+            end;
+          end;
+        end;
       end;
     end;
 
@@ -1035,7 +1188,7 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
       1: floydSteinbergDither;
       2: lineBasedDither;
       3: kochCurveDither;
-      4: blockDither_4x4;
+      4: blockDither;
       5: jarvisJudiceNinkeDither;
       6: atkinsonDither;
     end;

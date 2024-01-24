@@ -65,6 +65,7 @@ TYPE
       //Access per pixel:-------------------------------------------------------
       PROPERTY pixel     [x,y:longint]:T_rgbFloatColor read getPixel write setPixel; default;
       PROCEDURE multIncPixel(CONST x,y:longint; CONST factor:single; CONST increment:T_rgbFloatColor);
+      PROCEDURE checkedInc(CONST x,y:longint; CONST increment:T_rgbFloatColor);
       //-------------------------------------------------------:Access per pixel
       //Chunk access:-----------------------------------------------------------
       FUNCTION chunksInMap:longint;
@@ -298,6 +299,12 @@ PROCEDURE T_rawImage.multIncPixel(CONST x,y:longint; CONST factor:single; CONST 
   begin
     k:=x+y*dim.width;
     data[k]:=data[k]*factor+increment;
+  end;
+
+PROCEDURE T_rawImage.checkedInc(CONST x,y:longint; CONST increment:T_rgbFloatColor);
+  begin
+    if (x<0) or (x>=dim.width) or (y<0) or (y>=dim.height) then exit;
+    data[x+y*dim.width]+=increment;
   end;
 
 FUNCTION T_rawImage.chunksInMap: longint;
