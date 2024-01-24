@@ -16,12 +16,12 @@ TYPE
       PROCEDURE afterStep(CONST stepIndex:longint; CONST elapsed:double); virtual;
       PROCEDURE beforeAll; virtual;
       PROCEDURE afterAll ;
-      PROCEDURE configChanged; virtual;
       PROCEDURE checkStepIO;
     private
       FUNCTION getStep(index:longint):P_workflowStep;
     public
       config:T_imageWorkflowConfiguration;
+      PROCEDURE configChanged; virtual;
       CONSTRUCTOR createSimpleWorkflow(CONST messageQueue_:P_structuredMessageQueue);
       DESTRUCTOR destroy; virtual;
       PROCEDURE clear;
@@ -55,8 +55,8 @@ TYPE
     protected
       PROCEDURE beforeAll; virtual;
       PROCEDURE afterStep(CONST stepIndex:longint; CONST elapsed:double); virtual;
-      PROCEDURE configChanged; virtual;
     public
+      PROCEDURE configChanged; virtual;
       CONSTRUCTOR createEditorWorkflow(CONST messageQueue_:P_structuredMessageQueue);
       PROCEDURE stepChanged(CONST index:longint);
       PROCEDURE swapStepDown(CONST firstIndex,lastIndex:longint);

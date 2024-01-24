@@ -262,8 +262,7 @@ PROCEDURE T_imageWorkflowConfiguration.setInitialImage(CONST fileName: string);
     if onStep0Changed<>nil then onStep0Changed();
   end;
 
-PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(
-  VAR image: T_rawImage);
+PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(VAR image: T_rawImage);
   PROCEDURE reloadInitialImage;
     begin
       new(cachedInitialImage,create(initialImageFilename));

@@ -469,7 +469,7 @@ PROCEDURE T_rawImage.loadFromFile(CONST fileName: ansistring);
       exit;
     end;
     ext:=uppercase(extractFileExt(useFilename));
-    if (ext=JPG_EXT) or (ext=PNG_EXT) or (ext=BMP_EXT) then begin
+    if (ext=JPG_EXT) or (ext=JPEG_EXT) or (ext=PNG_EXT) or (ext=BMP_EXT) then begin
       enterCriticalSection(globalFileLock);
       reStoreImg:=TImage.create(nil);
       leaveCriticalSection(globalFileLock);

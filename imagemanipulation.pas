@@ -156,8 +156,7 @@ FUNCTION T_simpleImageOperation.toString(nameMode: T_parameterNameMode): string;
     result:=parameters.toString(nameMode);
   end;
 
-FUNCTION T_simpleImageOperation.alterParameter(CONST newParameterString: string
-  ): boolean;
+FUNCTION T_simpleImageOperation.alterParameter(CONST newParameterString: string): boolean;
   begin
     result:= parameters.canParse(newParameterString);
   end;
