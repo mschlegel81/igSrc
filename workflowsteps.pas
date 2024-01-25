@@ -13,17 +13,18 @@ P_workflowStep=^T_workflowStep;
 
 T_workflowStep=object(T_serializable)
   private
-    specString     : string;
-    valid          : boolean;
-    operation_     : P_imageOperation;
-    outputPreview_ : TImage;
-    outputHash_    : longword;
-    executionTicks_: qword;
+    specString         : string;
+    valid              : boolean;
+    operation_         : P_imageOperation;
+    outputPreview_     : TImage;
+    outputHash_        : longword;
+    executionTicks_    : qword;
     PROCEDURE setSpecification(CONST spec:string);
   public
     outputImage: P_rawImage;
     CONSTRUCTOR create(CONST spec:string);
     CONSTRUCTOR create(CONST op:P_imageOperation);
+    CONSTRUCTOR clone(CONST original:P_workflowStep);
     CONSTRUCTOR initializeForReadingFromStream;
     DESTRUCTOR destroy;
     PROCEDURE execute(CONST context:P_abstractWorkflow);
@@ -83,6 +84,18 @@ CONSTRUCTOR T_workflowStep.initializeForReadingFromStream;
     outputPreview_:=nil;
     outputHash_:=0;
     executionTicks_:=0;
+  end;
+
+CONSTRUCTOR T_workflowStep.clone(CONST original:P_workflowStep);
+  begin
+    operation_:=nil;
+    setSpecification(original^.specification);
+    if original^.outputImage=nil
+    then outputImage:=nil
+    else new(outputImage,create(original^.outputImage^));
+    outputPreview_:=nil;
+    outputHash_:=original^.outputHash_;
+    executionTicks_:=original^.executionTicks_;
   end;
 
 DESTRUCTOR T_workflowStep.destroy;

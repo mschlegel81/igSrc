@@ -32,6 +32,7 @@ TYPE
       workflowFilename:string;
       intermediateResultsPreviewQuality:boolean;
       CONSTRUCTOR create(CONST step0Changed:F_simpleCallback);
+      CONSTRUCTOR clone(CONST original:T_imageWorkflowConfiguration);
       DESTRUCTOR destroy;
       PROCEDURE setDefaults;
       PROCEDURE setInitialImage     (VAR image:T_rawImage);
@@ -212,6 +213,18 @@ CONSTRUCTOR T_imageWorkflowConfiguration.create(CONST step0Changed: F_simpleCall
     setDefaults;
   end;
 
+CONSTRUCTOR T_imageWorkflowConfiguration.clone(CONST original:T_imageWorkflowConfiguration);
+  begin
+    onStep0Changed:=original.onStep0Changed;
+    initialImageFilename             :=original.initialImageFilename             ;
+    fInitialResolution               :=original.fInitialResolution               ;
+    fImageSizeLimit                  :=original.fImageSizeLimit                  ;
+    cachedInitialImageWasScaled      :=original.cachedInitialImageWasScaled      ;
+    cachedInitialImage               :=original.cachedInitialImage               ;
+    workflowFilename                 :=original.workflowFilename                 ;
+    intermediateResultsPreviewQuality:=original.intermediateResultsPreviewQuality;
+  end;
+
 DESTRUCTOR T_imageWorkflowConfiguration.destroy;
   begin
     clearImage;
@@ -263,10 +276,17 @@ PROCEDURE T_imageWorkflowConfiguration.setInitialImage(CONST fileName: string);
   end;
 
 PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(VAR image: T_rawImage);
-  PROCEDURE reloadInitialImage;
+  FUNCTION reloadInitialImage:boolean;
     begin
       new(cachedInitialImage,create(initialImageFilename));
       cachedInitialImageWasScaled:=false;
+      if (cachedInitialImage^.pixelCount<=1) or not(cachedInitialImage^.successfullyLoaded) then begin
+        image.resize(fInitialResolution,res_dataResize);
+        image.drawCheckerboard;
+        initialImageFilename:='';
+        clearImage;
+        result:=false;
+      end else result:=true;
     end;
   begin
     if initialImageFilename<>'' then begin
@@ -275,16 +295,16 @@ PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(VAR image: T_rawI
         image.copyFromPixMap(cachedInitialImage^);
         limitImageSize(image);
       end else begin
-        if cachedInitialImage=nil then reloadInitialImage;
+        if (cachedInitialImage=nil) and not(reloadInitialImage) then exit;
         if not(cachedInitialImage^.dimensions.fitsInto(fImageSizeLimit)) then begin
           //This block handles images being too large
-          if cachedInitialImageWasScaled then reloadInitialImage;
+          if cachedInitialImageWasScaled and not(reloadInitialImage) then exit;
           cachedInitialImageWasScaled:=limitImageSize(cachedInitialImage^);
         end else if cachedInitialImageWasScaled
           and not((cachedInitialImage^.dimensions.height=fImageSizeLimit.height) or
                   (cachedInitialImage^.dimensions.width =fImageSizeLimit.width)) then begin
           //This block handles images being too small after a previous scaling
-          reloadInitialImage;
+          if not(reloadInitialImage) then exit;
           cachedInitialImageWasScaled:=limitImageSize(cachedInitialImage^);
         end;
         image.copyFromPixMap(cachedInitialImage^);

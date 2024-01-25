@@ -54,6 +54,7 @@ TYPE
   P_rawImage=^T_rawImage;
   T_rawImage=object(T_rgbFloatMap)
     private
+      successfullyLoaded_:boolean;
       //Helper routines:--------------------------------------------------------
       PROCEDURE copyToImage(CONST srcRect:TRect; VAR destImage: TImage);
       //--------------------------------------------------------:Helper routines
@@ -62,6 +63,7 @@ TYPE
       CONSTRUCTOR create(CONST fileName:ansistring);
       CONSTRUCTOR create(VAR original:T_rawImage);
       DESTRUCTOR destroy;
+      PROPERTY successfullyLoaded:boolean read successfullyLoaded_;
       //Access per pixel:-------------------------------------------------------
       PROPERTY pixel     [x,y:longint]:T_rgbFloatColor read getPixel write setPixel; default;
       PROCEDURE multIncPixel(CONST x,y:longint; CONST factor:single; CONST increment:T_rgbFloatColor);
@@ -211,17 +213,20 @@ FUNCTION T_colChunk.markAlias(CONST globalTol:single):boolean;
 CONSTRUCTOR T_rawImage.create(CONST width_, height_: longint);
   begin
     inherited create(width_,height_);
+    successfullyLoaded_:=false;
   end;
 
 CONSTRUCTOR T_rawImage.create(CONST fileName: ansistring);
   begin
     inherited create(1,1);
+    successfullyLoaded_:=false;
     loadFromFile(fileName);
   end;
 
 CONSTRUCTOR T_rawImage.create(VAR original: T_rawImage);
   begin
     inherited create(1,1);
+    successfullyLoaded_:=false;
     copyFromPixMap(original);
   end;
 
@@ -466,6 +471,7 @@ PROCEDURE T_rawImage.loadFromFile(CONST fileName: ansistring);
     if fileExists(fileName) then useFilename:=fileName
     else begin
       writeln(stdErr,'Image ',fileName,' cannot be loaded because it does not exist');
+      successfullyLoaded_:=false;
       exit;
     end;
     ext:=uppercase(extractFileExt(useFilename));
@@ -473,13 +479,17 @@ PROCEDURE T_rawImage.loadFromFile(CONST fileName: ansistring);
       enterCriticalSection(globalFileLock);
       reStoreImg:=TImage.create(nil);
       leaveCriticalSection(globalFileLock);
-      reStoreImg.SetInitialBounds(0,0,10000,10000);
-      if ext=PNG_EXT then reStoreImg.picture.PNG   .loadFromFile(useFilename) else
-      if ext=BMP_EXT then reStoreImg.picture.Bitmap.loadFromFile(useFilename)
-                     else reStoreImg.picture.Jpeg  .loadFromFile(useFilename);
-      reStoreImg.SetBounds(0,0,reStoreImg.picture.width,reStoreImg.picture.height);
-      copyFromImage(reStoreImg);
-      reStoreImg.free;
+      try
+        reStoreImg.SetInitialBounds(0,0,10000,10000);
+        if ext=PNG_EXT then reStoreImg.picture.PNG   .loadFromFile(useFilename) else
+        if ext=BMP_EXT then reStoreImg.picture.Bitmap.loadFromFile(useFilename)
+                       else reStoreImg.picture.Jpeg  .loadFromFile(useFilename);
+        reStoreImg.SetBounds(0,0,reStoreImg.picture.width,reStoreImg.picture.height);
+        copyFromImage(reStoreImg);
+        successfullyLoaded_:=true;
+      finally
+        reStoreImg.free;
+      end;
     end else restoreDump;
   end;
 

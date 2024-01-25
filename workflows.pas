@@ -48,9 +48,6 @@ TYPE
   end;
 
   P_editorWorkflow=^T_editorWorkflow;
-
-  { T_editorWorkflow }
-
   T_editorWorkflow=object(T_simpleWorkflow)
     protected
       PROCEDURE beforeAll; virtual;
@@ -58,6 +55,7 @@ TYPE
     public
       PROCEDURE configChanged; virtual;
       CONSTRUCTOR createEditorWorkflow(CONST messageQueue_:P_structuredMessageQueue);
+      CONSTRUCTOR clone(CONST original:P_editorWorkflow);
       PROCEDURE stepChanged(CONST index:longint);
       PROCEDURE swapStepDown(CONST firstIndex,lastIndex:longint);
       PROCEDURE removeStep(CONST firstIndex,lastIndex:longint);
@@ -66,6 +64,25 @@ TYPE
       FUNCTION getSerialVersion:dword; virtual;
       FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
       PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
+  end;
+
+  { T_editorWorkflowHistory }
+  T_workflowState=record
+    plain:P_editorWorkflow;
+    serialized:ansistring;
+  end;
+
+  T_editorWorkflowHistory=object
+    private
+      undoList,redoList:array of ansistring;
+    public
+      CONSTRUCTOR create;
+      DESTRUCTOR destroy;
+      PROCEDURE postState(VAR wf:T_editorWorkflow);
+      FUNCTION canUndo:boolean;
+      FUNCTION canRedo:boolean;
+      PROCEDURE performUndo(VAR wf:T_editorWorkflow);
+      PROCEDURE performRedo(VAR wf:T_editorWorkflow);
   end;
 
   P_generateImageWorkflow=^T_generateImageWorkflow;
@@ -103,6 +120,7 @@ IMPLEMENTATION
 //These are binding uses
 //Initialization of those units registers image operations
 USES imageManipulation,
+     Classes,
      im_stashing,
      im_geometry,
      im_colors,
@@ -128,6 +146,95 @@ USES imageManipulation,
      im_hq3x,
      myStringUtil,
      LazFileUtils;
+
+{ T_editorWorkflowHistory }
+
+CONSTRUCTOR T_editorWorkflowHistory.create;
+  begin
+    setLength(undoList,0);
+    setLength(redoList,0);
+  end;
+
+DESTRUCTOR T_editorWorkflowHistory.destroy;
+  begin
+    setLength(undoList,0);
+    setLength(redoList,0);
+  end;
+
+FUNCTION readState(VAR wf:T_editorWorkflow):ansistring;
+  VAR streamWrapper:T_bufferedOutputStreamWrapper;
+      stream:TStringStream;
+  begin
+    stream:=TStringStream.create();
+    streamWrapper.create(stream);
+    wf.saveToStream(streamWrapper);
+    streamWrapper.flush;
+    result:=stream.DataString;
+    streamWrapper.destroy;
+  end;
+
+PROCEDURE applyState(VAR wf:T_editorWorkflow; CONST rawData:ansistring);
+  VAR streamWrapper:T_bufferedInputStreamWrapper;
+      stream:TStringStream;
+      i:longint;
+  begin
+    stream:=TStringStream.create(rawData);
+    streamWrapper.create(stream);
+    for i:=0 to length(wf.steps)-1 do dispose(wf.steps[i],destroy);
+    setLength(wf.steps,0);
+    wf.loadFromStream(streamWrapper);
+    streamWrapper.destroy;
+  end;
+
+PROCEDURE T_editorWorkflowHistory.postState(VAR wf: T_editorWorkflow);
+  begin
+    setLength(undoList,length(undoList)+1);
+    undoList[length(undoList)-1]:=readState(wf);
+  end;
+
+FUNCTION T_editorWorkflowHistory.canUndo: boolean;
+  begin
+    result:=length(undoList)>0;
+  end;
+
+FUNCTION T_editorWorkflowHistory.canRedo: boolean;
+  begin
+    result:=length(redoList)>0;
+  end;
+
+PROCEDURE T_editorWorkflowHistory.performUndo(VAR wf: T_editorWorkflow);
+  VAR initialRes: T_imageDimensions;
+  begin
+    if length(undoList)=0 then exit;
+    initialRes:=wf.config.initialResolution;
+    wf.postStop;
+    setLength(redoList,length(redoList)+1);
+    redoList[length(redoList)-1]:=readState(wf);
+    wf.ensureStop;
+    applyState(wf,undoList[length(undoList)-1]);
+    setLength(undoList,length(undoList)-1);
+    if wf.config.initialResolution<>initialRes then begin
+      wf.config.initialResolution:=initialRes;
+      wf.configChanged;
+    end;
+  end;
+
+PROCEDURE T_editorWorkflowHistory.performRedo(VAR wf: T_editorWorkflow);
+  VAR initialRes: T_imageDimensions;
+  begin
+    if length(redoList)=0 then exit;
+    initialRes:=wf.config.initialResolution;
+    wf.postStop;
+    setLength(undoList,length(undoList)+1);
+    undoList[length(undoList)-1]:=readState(wf);
+    wf.ensureStop;
+    applyState(wf,redoList[length(redoList)-1]);
+    setLength(redoList,length(redoList)-1);
+    if wf.config.initialResolution<>initialRes then begin
+      wf.config.initialResolution:=initialRes;
+      wf.configChanged;
+    end;
+  end;
 
 CONSTRUCTOR T_standaloneWorkflow.create;
   VAR ownedMessageQueue:P_structuredMessageQueue;
@@ -577,8 +684,10 @@ PROCEDURE T_simpleWorkflow.checkStepIO;
   begin
     setLength(stashesReady,0);
     if (length(steps)>0) and (steps[0]^.operation^.writesStash<>'') and (steps[0]^.outputImage<>nil) then append(stashesReady,steps[0]^.operation^.writesStash);
+    steps[0]^.checkOutputResolution(@self,config.initialResolution);
 
     for i:=1 to length(steps)-1 do begin
+      steps[i]^.checkOutputResolution(@self,steps[i-1]^.expectedResolution);
       if (steps[i]^.operation^.dependsOnImageBefore and (steps[i-1]^.outputImage=nil))
       or ((steps[i]^.operation^.readsStash<>'') and not(arrContains(stashesReady,steps[i]^.operation^.readsStash)))
       then begin
@@ -843,12 +952,20 @@ PROCEDURE T_editorWorkflow.configChanged;
     end;
   end;
 
-CONSTRUCTOR T_editorWorkflow.createEditorWorkflow(
-  CONST messageQueue_: P_structuredMessageQueue);
+CONSTRUCTOR T_editorWorkflow.createEditorWorkflow(CONST messageQueue_: P_structuredMessageQueue);
   begin
     inherited createContext(messageQueue_);
     config.create(@configChanged);
     setLength(steps,0);
+  end;
+
+CONSTRUCTOR T_editorWorkflow.clone(CONST original:P_editorWorkflow);
+  VAR i:longint;
+  begin
+    inherited createContext(messageQueue);
+    config.clone(original^.config);
+    setLength(steps,length(original^.steps));
+    for i:=0 to length(steps)-1 do new(steps[i],clone(original^.steps[i]));
   end;
 
 end.
