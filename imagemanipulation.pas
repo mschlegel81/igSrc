@@ -1,7 +1,8 @@
 UNIT imageManipulation;
 INTERFACE
 USES myParams,
-     imageContexts;
+     imageContexts,
+     pixMaps;
 TYPE
 T_simpleOperationKind=(sok_inputDependent,
                        sok_inputIndependent,
@@ -27,6 +28,9 @@ T_simpleImageOperationMeta=object(T_imageOperationMeta)
   end;
 
 P_simpleImageOperation=^T_simpleImageOperation;
+
+{ T_simpleImageOperation }
+
 T_simpleImageOperation=object(T_imageOperation)
   private
     parameters:T_parameterValue;
@@ -43,6 +47,7 @@ T_simpleImageOperation=object(T_imageOperation)
     FUNCTION dependsOnImageBefore:boolean; virtual;
     FUNCTION toString(nameMode:T_parameterNameMode):string; virtual;
     FUNCTION alterParameter(CONST newParameterString:string):boolean; virtual;
+    FUNCTION getExpectedOutputResolution(CONST context:P_abstractWorkflow; CONST inputResolution:T_imageDimensions):T_imageDimensions; virtual;
   end;
 
 T_deleteFileMeta=object(T_simpleImageOperationMeta)
@@ -156,9 +161,15 @@ FUNCTION T_simpleImageOperation.toString(nameMode: T_parameterNameMode): string;
     result:=parameters.toString(nameMode);
   end;
 
-FUNCTION T_simpleImageOperation.alterParameter(CONST newParameterString: string): boolean;
+FUNCTION T_simpleImageOperation.alterParameter(CONST newParameterString: string
+  ): boolean;
   begin
     result:= parameters.canParse(newParameterString);
+  end;
+
+FUNCTION T_simpleImageOperation.getExpectedOutputResolution(CONST context: P_abstractWorkflow; CONST inputResolution: T_imageDimensions): T_imageDimensions;
+  begin
+    result:=meta^.getExpectedOutputResolution(context,inputResolution,parameters);
   end;
 
 CONSTRUCTOR T_simpleImageOperationMeta.create(

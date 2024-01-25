@@ -684,10 +684,9 @@ PROCEDURE T_simpleWorkflow.checkStepIO;
   begin
     setLength(stashesReady,0);
     if (length(steps)>0) and (steps[0]^.operation^.writesStash<>'') and (steps[0]^.outputImage<>nil) then append(stashesReady,steps[0]^.operation^.writesStash);
-    steps[0]^.checkOutputResolution(@self,config.initialResolution);
-
+     //step[0]^.operation^.meta^.getExpectedOutputResolution(@self,config.initialResolution,step[0]^.operation.);
     for i:=1 to length(steps)-1 do begin
-      steps[i]^.checkOutputResolution(@self,steps[i-1]^.expectedResolution);
+//      steps[i]^.checkOutputResolution(@self,steps[i-1]^.expectedResolution);
       if (steps[i]^.operation^.dependsOnImageBefore and (steps[i-1]^.outputImage=nil))
       or ((steps[i]^.operation^.readsStash<>'') and not(arrContains(stashesReady,steps[i]^.operation^.readsStash)))
       then begin

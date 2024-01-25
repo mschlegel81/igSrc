@@ -34,7 +34,10 @@ TYPE
       FUNCTION getSimpleParameterDescription:P_parameterDescription; virtual; abstract;
       FUNCTION getDefaultOperation:P_imageOperation; virtual; abstract;
       FUNCTION getDefaultParameterString:string; virtual;
+      FUNCTION getExpectedOutputResolution(CONST context:P_abstractWorkflow; CONST inputResolution:T_imageDimensions; CONST parameters:T_parameterValue):T_imageDimensions; virtual;
   end;
+
+  { T_imageOperation }
 
   T_imageOperation=object
     protected
@@ -54,6 +57,7 @@ TYPE
       FUNCTION modifiesImage:boolean; virtual;
       FUNCTION toString(nameMode:T_parameterNameMode):string; virtual; abstract;
       FUNCTION alterParameter(CONST newParameterString:string):boolean; virtual; abstract;
+      FUNCTION getExpectedOutputResolution(CONST context:P_abstractWorkflow; CONST inputResolution:T_imageDimensions):T_imageDimensions; virtual;
   end;
 
   F_errorFeedbackRoutine=PROCEDURE(CONST message:string) of object;
@@ -238,7 +242,12 @@ FUNCTION T_imageOperation.readsStash: string; begin result:=''; end;
 FUNCTION T_imageOperation.writesStash: string; begin result:=''; end;
 FUNCTION T_imageOperation.readsFile: string; begin result:=''; end;
 FUNCTION T_imageOperation.writesFile: string; begin result:=''; end;
-FUNCTION T_imageOperation.modifiesImage:boolean; begin result:=true; end;
+FUNCTION T_imageOperation.modifiesImage: boolean; begin result:=true; end;
+
+FUNCTION T_imageOperation.getExpectedOutputResolution(CONST context: P_abstractWorkflow; CONST inputResolution: T_imageDimensions): T_imageDimensions;
+  begin
+    result:=inputResolution;
+  end;
 
 CONSTRUCTOR T_imageOperationMeta.create(CONST name_: string;
   CONST cat_: T_imageManipulationCategory);
@@ -257,6 +266,11 @@ FUNCTION T_imageOperationMeta.getDefaultParameterString: string;
     temporaryOperation:=getDefaultOperation;
     result:=temporaryOperation^.toString(tsm_withNiceParameterName);
     dispose(temporaryOperation,destroy);
+  end;
+
+FUNCTION T_imageOperationMeta.getExpectedOutputResolution(CONST context:P_abstractWorkflow; CONST inputResolution:T_imageDimensions; CONST parameters:T_parameterValue):T_imageDimensions;
+  begin
+    result:=inputResolution;
   end;
 
 CONSTRUCTOR T_parallelTask.create(CONST id_:longint);

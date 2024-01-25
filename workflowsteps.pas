@@ -2,6 +2,7 @@ UNIT workflowSteps;
 INTERFACE
 USES
   myParams,
+  pixMaps,
   mypics,
   imageContexts,
   ExtCtrls,
