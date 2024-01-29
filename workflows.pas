@@ -56,6 +56,7 @@ TYPE
       PROCEDURE configChanged; virtual;
       CONSTRUCTOR createEditorWorkflow(CONST messageQueue_:P_structuredMessageQueue);
       CONSTRUCTOR clone(CONST original:P_editorWorkflow);
+      PROCEDURE copyFrom(CONST original:P_editorWorkflow);
       PROCEDURE stepChanged(CONST index:longint);
       PROCEDURE swapStepDown(CONST firstIndex,lastIndex:longint);
       PROCEDURE removeStep(CONST firstIndex,lastIndex:longint);
@@ -67,14 +68,25 @@ TYPE
   end;
 
   { T_editorWorkflowHistory }
-  T_workflowState=record
+  P_workflowState=^T_workflowState;
+
+  { T_workflowState }
+
+  T_workflowState=object
     plain:P_editorWorkflow;
     serialized:ansistring;
+
+    CONSTRUCTOR create(VAR state:T_editorWorkflow);
+    CONSTRUCTOR createFromString(CONST s:ansistring);
+    DESTRUCTOR destroy;
+    PROCEDURE serialize;
+    PROCEDURE deserialize;
+    PROCEDURE apply(VAR target:T_editorWorkflow);
   end;
 
-  T_editorWorkflowHistory=object
+  T_editorWorkflowHistory=object(T_serializable)
     private
-      undoList,redoList:array of ansistring;
+      undoList,redoList:array of P_workflowState;
     public
       CONSTRUCTOR create;
       DESTRUCTOR destroy;
@@ -83,6 +95,10 @@ TYPE
       FUNCTION canRedo:boolean;
       PROCEDURE performUndo(VAR wf:T_editorWorkflow);
       PROCEDURE performRedo(VAR wf:T_editorWorkflow);
+
+      FUNCTION getSerialVersion:dword; virtual;
+      FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
+      PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
   end;
 
   P_generateImageWorkflow=^T_generateImageWorkflow;
@@ -147,6 +163,60 @@ USES imageManipulation,
      myStringUtil,
      LazFileUtils;
 
+{ T_workflowState }
+
+CONSTRUCTOR T_workflowState.create(VAR state: T_editorWorkflow);
+  begin
+    serialized:='';
+    new(plain,clone(@state));
+  end;
+
+CONSTRUCTOR T_workflowState.createFromString(CONST s: ansistring);
+  begin
+    plain:=nil;
+    serialized:=s;
+  end;
+
+DESTRUCTOR T_workflowState.destroy;
+  begin
+    if plain<>nil then dispose(plain,destroy);
+    serialized:='';
+  end;
+
+PROCEDURE T_workflowState.serialize;
+  VAR streamWrapper:T_bufferedOutputStreamWrapper;
+      stream:TStringStream;
+  begin
+    if plain=nil then exit;
+    stream:=TStringStream.create();
+    streamWrapper.create(stream);
+    plain^.saveToStream(streamWrapper);
+    streamWrapper.flush;
+    serialized:=stream.DataString;
+    streamWrapper.destroy;
+    dispose(plain,destroy);
+    plain:=nil;
+  end;
+
+PROCEDURE T_workflowState.deserialize;
+  VAR streamWrapper:T_bufferedInputStreamWrapper;
+      stream:TStringStream;
+      i:longint;
+  begin
+    if plain<>nil then exit;
+    stream:=TStringStream.create(serialized);
+    streamWrapper.create(stream);
+    new(plain,createEditorWorkflow(nil));
+    plain^.loadFromStream(streamWrapper);
+    streamWrapper.destroy;
+  end;
+
+PROCEDURE T_workflowState.apply(VAR target: T_editorWorkflow);
+  begin
+    deserialize;
+    target.copyFrom(plain);
+  end;
+
 { T_editorWorkflowHistory }
 
 CONSTRUCTOR T_editorWorkflowHistory.create;
@@ -161,35 +231,35 @@ DESTRUCTOR T_editorWorkflowHistory.destroy;
     setLength(redoList,0);
   end;
 
-FUNCTION readState(VAR wf:T_editorWorkflow):ansistring;
-  VAR streamWrapper:T_bufferedOutputStreamWrapper;
-      stream:TStringStream;
-  begin
-    stream:=TStringStream.create();
-    streamWrapper.create(stream);
-    wf.saveToStream(streamWrapper);
-    streamWrapper.flush;
-    result:=stream.DataString;
-    streamWrapper.destroy;
-  end;
-
-PROCEDURE applyState(VAR wf:T_editorWorkflow; CONST rawData:ansistring);
-  VAR streamWrapper:T_bufferedInputStreamWrapper;
-      stream:TStringStream;
-      i:longint;
-  begin
-    stream:=TStringStream.create(rawData);
-    streamWrapper.create(stream);
-    for i:=0 to length(wf.steps)-1 do dispose(wf.steps[i],destroy);
-    setLength(wf.steps,0);
-    wf.loadFromStream(streamWrapper);
-    streamWrapper.destroy;
-  end;
-
+//FUNCTION readState(VAR wf:T_editorWorkflow):ansistring;
+//  VAR streamWrapper:T_bufferedOutputStreamWrapper;
+//      stream:TStringStream;
+//  begin
+//    stream:=TStringStream.create();
+//    streamWrapper.create(stream);
+//    wf.saveToStream(streamWrapper);
+//    streamWrapper.flush;
+//    result:=stream.DataString;
+//    streamWrapper.destroy;
+//  end;
+//
+//PROCEDURE applyState(VAR wf:T_editorWorkflow; CONST rawData:ansistring);
+//  VAR streamWrapper:T_bufferedInputStreamWrapper;
+//      stream:TStringStream;
+//      i:longint;
+//  begin
+//    stream:=TStringStream.create(rawData);
+//    streamWrapper.create(stream);
+//    for i:=0 to length(wf.steps)-1 do dispose(wf.steps[i],destroy);
+//    setLength(wf.steps,0);
+//    wf.loadFromStream(streamWrapper);
+//    streamWrapper.destroy;
+//  end;
+//
 PROCEDURE T_editorWorkflowHistory.postState(VAR wf: T_editorWorkflow);
   begin
     setLength(undoList,length(undoList)+1);
-    undoList[length(undoList)-1]:=readState(wf);
+    new(undoList[length(undoList)-1],create(wf));
   end;
 
 FUNCTION T_editorWorkflowHistory.canUndo: boolean;
@@ -209,9 +279,10 @@ PROCEDURE T_editorWorkflowHistory.performUndo(VAR wf: T_editorWorkflow);
     initialRes:=wf.config.initialResolution;
     wf.postStop;
     setLength(redoList,length(redoList)+1);
-    redoList[length(redoList)-1]:=readState(wf);
+    new(redoList[length(redoList)-1],create(wf));
     wf.ensureStop;
-    applyState(wf,undoList[length(undoList)-1]);
+    undoList[length(undoList)-1]^.apply(wf);
+    dispose(undoList[length(undoList)-1],destroy);
     setLength(undoList,length(undoList)-1);
     if wf.config.initialResolution<>initialRes then begin
       wf.config.initialResolution:=initialRes;
@@ -226,13 +297,60 @@ PROCEDURE T_editorWorkflowHistory.performRedo(VAR wf: T_editorWorkflow);
     initialRes:=wf.config.initialResolution;
     wf.postStop;
     setLength(undoList,length(undoList)+1);
-    undoList[length(undoList)-1]:=readState(wf);
+    new(undoList[length(undoList)-1],create(wf));
     wf.ensureStop;
-    applyState(wf,redoList[length(redoList)-1]);
+    redoList[length(redoList)-1]^.apply(wf);
+    dispose(redoList[length(redoList)-1],destroy);
     setLength(redoList,length(redoList)-1);
     if wf.config.initialResolution<>initialRes then begin
       wf.config.initialResolution:=initialRes;
       wf.configChanged;
+    end;
+  end;
+
+FUNCTION T_editorWorkflowHistory.getSerialVersion: dword;
+  begin result:=2342141; end;
+
+FUNCTION T_editorWorkflowHistory.loadFromStream(VAR stream: T_bufferedInputStreamWrapper): boolean;
+  VAR count:qword;
+      i:longint;
+  begin
+    count:=stream.readNaturalNumber;
+    result:=(count<1000);
+    setLength(undoList,count);
+    for i:=0 to length(undoList)-1 do undoList[i]:=nil;
+    for i:=0 to length(undoList)-1 do new(undoList[i],createFromString(stream.readAnsiString));
+    count:=stream.readNaturalNumber;
+    result:=stream.allOkay and result and (count<1000);
+    setLength(redoList,count);
+    for i:=0 to length(redoList)-1 do redoList[i]:=nil;
+    for i:=0 to length(redoList)-1 do new(redoList[i],createFromString(stream.readAnsiString));
+    result:=result and stream.allOkay;
+    if not(result) then begin
+      for i:=0 to length(undoList)-1 do if undoList[i]<>nil then dispose(undoList[i],destroy);
+      setLength(undoList,0);
+      for i:=0 to length(redoList)-1 do if redoList[i]<>nil then dispose(redoList[i],destroy);
+      setLength(redoList,0);
+    end;
+  end;
+
+PROCEDURE T_editorWorkflowHistory.saveToStream(VAR stream: T_bufferedOutputStreamWrapper);
+  VAR i,imax:longint;
+  begin
+    imax:=length(undoList);
+    if imax>1000 then imax:=1000;
+    stream.writeNaturalNumber(imax);
+    for i:=0 to imax-1 do begin
+      undoList[i]^.serialize;
+      stream.writeAnsiString(undoList[i]^.serialized);
+    end;
+
+    imax:=length(redoList);
+    if imax>1000 then imax:=1000;
+    stream.writeNaturalNumber(imax);
+    for i:=0 to imax-1 do begin
+      redoList[i]^.serialize;
+      stream.writeAnsiString(redoList[i]^.serialized);
     end;
   end;
 
@@ -260,7 +378,7 @@ PROCEDURE T_generateImageWorkflow.beforeAll;
       messageQueue^.Post('Starting preview calculation',false,-1,0);
       image.resize(relatedEditor^.config.initialResolution,res_dataResize);
       if (editingStep>0) and (editingStep-1<relatedEditor^.stepCount) and (relatedEditor^.step[editingStep-1]^.outputImage<>nil) then begin
-        image.copyFromPixMap(relatedEditor^.step[editingStep-1]^.outputImage^);
+        image.copyFromPixMap(relatedEditor^.step[editingStep-1]^.outputImage^.image);
         relatedEditor^.config.limitImageSize(image);
       end else image.drawCheckerboard;
     finally
@@ -508,7 +626,7 @@ PROCEDURE T_editorWorkflow.beforeAll;
       end;
       with currentExecution do while (currentStepIndex<length(steps)) and (steps[currentStepIndex]^.outputImage<>nil) do inc(currentStepIndex);
       if currentExecution.currentStepIndex>0
-      then image.copyFromPixMap(steps[currentExecution.currentStepIndex-1]^.outputImage^)
+      then image.copyFromPixMap(steps[currentExecution.currentStepIndex-1]^.outputImage^.image)
       else config.prepareImageForWorkflow(image);
       messageQueue^.postSeparator;
       if currentExecution.currentStepIndex=0
@@ -520,7 +638,7 @@ PROCEDURE T_editorWorkflow.beforeAll;
       for i:=0 to currentExecution.currentStepIndex-1 do if (steps[i]^.isValid) and (steps[i]^.outputImage<>nil) and (steps[i]^.operation^.writesStash<>'') then begin
         {$ifdef debugMode}messageQueue^.Post('Restoring stash "'+steps[i]^.operation^.writesStash+'" from output',false,i,stepCount); {$endif}
         stash.stashImage(steps[i]^.operation^.writesStash,
-                         steps[i]^.outputImage^);
+                         steps[i]^.outputImage^.image);
       end;
 
     finally
@@ -961,8 +1079,17 @@ CONSTRUCTOR T_editorWorkflow.createEditorWorkflow(CONST messageQueue_: P_structu
 CONSTRUCTOR T_editorWorkflow.clone(CONST original:P_editorWorkflow);
   VAR i:longint;
   begin
-    inherited createContext(messageQueue);
+    inherited createContext(nil);
     config.clone(original^.config);
+    setLength(steps,length(original^.steps));
+    for i:=0 to length(steps)-1 do new(steps[i],clone(original^.steps[i]));
+  end;
+
+PROCEDURE T_editorWorkflow.copyFrom(CONST original:P_editorWorkflow);
+  VAR i:longint;
+  begin
+    config.copyFrom(original^.config);
+    for i:=0 to length(steps)-1 do dispose(steps[i],destroy);
     setLength(steps,length(original^.steps));
     for i:=0 to length(steps)-1 do new(steps[i],clone(original^.steps[i]));
   end;

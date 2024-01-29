@@ -3,7 +3,8 @@ INTERFACE
 USES pixMaps,
      mypics,
      myGenerics,
-     serializationUtil;
+     serializationUtil,
+     refCountedImages;
 CONST
     C_workflowExtension='.WF';
     C_todoExtension='.TODO';
@@ -23,8 +24,8 @@ TYPE
       fInitialResolution,
       fImageSizeLimit                  :T_imageDimensions;
       cachedInitialImageWasScaled      :boolean;
-      cachedInitialImage               :P_rawImage;
-      onStep0Changed                   :F_simpleCallback;
+      cachedInitialImage               :P_referenceCountedImage;
+      onConfigChanged                  :F_simpleCallback;
       PROCEDURE clearImage;
       PROCEDURE setInitialResolution(CONST res:T_imageDimensions);
       PROCEDURE setMaximumResolution(CONST res:T_imageDimensions);
@@ -33,14 +34,17 @@ TYPE
       intermediateResultsPreviewQuality:boolean;
       CONSTRUCTOR create(CONST step0Changed:F_simpleCallback);
       CONSTRUCTOR clone(CONST original:T_imageWorkflowConfiguration);
+      PROCEDURE copyFrom(CONST original:T_imageWorkflowConfiguration);
       DESTRUCTOR destroy;
       PROCEDURE setDefaults;
       PROCEDURE setInitialImage     (VAR image:T_rawImage);
       PROCEDURE setInitialImage     (CONST fileName:string);
       PROCEDURE prepareImageForWorkflow(VAR image:T_rawImage);
       FUNCTION getFirstTodoStep:string;
+      FUNCTION trueInitialResolution:T_imageDimensions;
       {Returns true if the image was modified}
       FUNCTION limitImageSize(VAR image:T_rawImage):boolean;
+      FUNCTION limitImageSize(VAR image:P_referenceCountedImage):boolean;
       FUNCTION limitedDimensionsForResizeStep(CONST tgtDim:T_imageDimensions):T_imageDimensions;
       PROPERTY sizeLimit        :T_imageDimensions read fImageSizeLimit    write setMaximumResolution;
       PROPERTY initialResolution:T_imageDimensions read fInitialResolution write setInitialResolution;
@@ -201,26 +205,37 @@ FUNCTION T_structuredMessage.toString(CONST messageStringLengthLimit:longint): s
 
 PROCEDURE T_imageWorkflowConfiguration.clearImage;
   begin
-    if cachedInitialImage<>nil then dispose(cachedInitialImage,destroy);
-    cachedInitialImage:=nil;
+    disposeRCImage(cachedInitialImage);
     cachedInitialImageWasScaled:=false;
   end;
 
 CONSTRUCTOR T_imageWorkflowConfiguration.create(CONST step0Changed: F_simpleCallback);
   begin
-    onStep0Changed:=step0Changed;
+    onConfigChanged:=step0Changed;
     cachedInitialImage:=nil;
     setDefaults;
   end;
 
 CONSTRUCTOR T_imageWorkflowConfiguration.clone(CONST original:T_imageWorkflowConfiguration);
   begin
-    onStep0Changed:=original.onStep0Changed;
+    onConfigChanged:=nil;
     initialImageFilename             :=original.initialImageFilename             ;
     fInitialResolution               :=original.fInitialResolution               ;
     fImageSizeLimit                  :=original.fImageSizeLimit                  ;
     cachedInitialImageWasScaled      :=original.cachedInitialImageWasScaled      ;
-    cachedInitialImage               :=original.cachedInitialImage               ;
+    cachedInitialImage               :=rereference(original.cachedInitialImage)  ;
+    workflowFilename                 :=original.workflowFilename                 ;
+    intermediateResultsPreviewQuality:=original.intermediateResultsPreviewQuality;
+  end;
+
+PROCEDURE T_imageWorkflowConfiguration.copyFrom(CONST original:T_imageWorkflowConfiguration);
+  begin
+    clearImage;
+    initialImageFilename             :=original.initialImageFilename             ;
+    fInitialResolution               :=original.fInitialResolution               ;
+    fImageSizeLimit                  :=original.fImageSizeLimit                  ;
+    cachedInitialImageWasScaled      :=original.cachedInitialImageWasScaled      ;
+    cachedInitialImage               :=rereference(original.cachedInitialImage)  ;
     workflowFilename                 :=original.workflowFilename                 ;
     intermediateResultsPreviewQuality:=original.intermediateResultsPreviewQuality;
   end;
@@ -246,7 +261,7 @@ PROCEDURE T_imageWorkflowConfiguration.setInitialResolution(
     if fInitialResolution=res then exit;
     fInitialResolution:=res;
     fImageSizeLimit:=fImageSizeLimit.max(fInitialResolution);
-    if onStep0Changed<>nil then onStep0Changed();
+    if onConfigChanged<>nil then onConfigChanged();
   end;
 
 PROCEDURE T_imageWorkflowConfiguration.setMaximumResolution(
@@ -255,7 +270,7 @@ PROCEDURE T_imageWorkflowConfiguration.setMaximumResolution(
     if sizeLimit=res then exit;
     fImageSizeLimit:=res;
     fInitialResolution:=fImageSizeLimit.min(fInitialResolution);
-    if onStep0Changed<>nil then onStep0Changed();
+    if onConfigChanged<>nil then onConfigChanged();
   end;
 
 PROCEDURE T_imageWorkflowConfiguration.setInitialImage(
@@ -264,7 +279,7 @@ PROCEDURE T_imageWorkflowConfiguration.setInitialImage(
     clearImage;
     new(cachedInitialImage,create(image));
     initialImageFilename:=C_nullSourceOrTargetFileName;
-    if onStep0Changed<>nil then onStep0Changed();
+    if onConfigChanged<>nil then onConfigChanged();
   end;
 
 PROCEDURE T_imageWorkflowConfiguration.setInitialImage(CONST fileName: string);
@@ -272,15 +287,15 @@ PROCEDURE T_imageWorkflowConfiguration.setInitialImage(CONST fileName: string);
     if fileName=initialImageFilename then exit;
     clearImage;
     initialImageFilename:=fileName;
-    if onStep0Changed<>nil then onStep0Changed();
+    if onConfigChanged<>nil then onConfigChanged();
   end;
 
 PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(VAR image: T_rawImage);
   FUNCTION reloadInitialImage:boolean;
     begin
-      new(cachedInitialImage,create(initialImageFilename));
+      new(cachedInitialImage,createFromFileName(initialImageFilename));
       cachedInitialImageWasScaled:=false;
-      if (cachedInitialImage^.pixelCount<=1) or not(cachedInitialImage^.successfullyLoaded) then begin
+      if (cachedInitialImage^.image.pixelCount<=1) or not(cachedInitialImage^.image.successfullyLoaded) then begin
         image.resize(fInitialResolution,res_dataResize);
         image.drawCheckerboard;
         initialImageFilename:='';
@@ -292,22 +307,22 @@ PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(VAR image: T_rawI
     if initialImageFilename<>'' then begin
       if initialImageFilename=C_nullSourceOrTargetFileName then begin
         //Special source without associated file
-        image.copyFromPixMap(cachedInitialImage^);
+        image.copyFromPixMap(cachedInitialImage^.image);
         limitImageSize(image);
       end else begin
         if (cachedInitialImage=nil) and not(reloadInitialImage) then exit;
-        if not(cachedInitialImage^.dimensions.fitsInto(fImageSizeLimit)) then begin
+        if not(cachedInitialImage^.image.dimensions.fitsInto(fImageSizeLimit)) then begin
           //This block handles images being too large
           if cachedInitialImageWasScaled and not(reloadInitialImage) then exit;
-          cachedInitialImageWasScaled:=limitImageSize(cachedInitialImage^);
+          cachedInitialImageWasScaled:=limitImageSize(cachedInitialImage);
         end else if cachedInitialImageWasScaled
-          and not((cachedInitialImage^.dimensions.height=fImageSizeLimit.height) or
-                  (cachedInitialImage^.dimensions.width =fImageSizeLimit.width)) then begin
+          and not((cachedInitialImage^.image.dimensions.height=fImageSizeLimit.height) or
+                  (cachedInitialImage^.image.dimensions.width =fImageSizeLimit.width)) then begin
           //This block handles images being too small after a previous scaling
           if not(reloadInitialImage) then exit;
-          cachedInitialImageWasScaled:=limitImageSize(cachedInitialImage^);
+          cachedInitialImageWasScaled:=limitImageSize(cachedInitialImage);
         end;
-        image.copyFromPixMap(cachedInitialImage^);
+        image.copyFromPixMap(cachedInitialImage^.image);
       end;
     end else begin
       image.resize(fInitialResolution,res_dataResize);
@@ -322,11 +337,28 @@ FUNCTION T_imageWorkflowConfiguration.getFirstTodoStep: string;
     else result:=C_resizeStatementName+':'+intToStr(fInitialResolution.width)+','+intToStr(fInitialResolution.height);
   end;
 
-FUNCTION T_imageWorkflowConfiguration.limitImageSize(
-  VAR image: T_rawImage): boolean;
+FUNCTION T_imageWorkflowConfiguration.trueInitialResolution:T_imageDimensions;
+  begin
+    if cachedInitialImage=nil
+    then result:=fInitialResolution
+    else result:=cachedInitialImage^.image.dimensions;
+  end;
+
+FUNCTION T_imageWorkflowConfiguration.limitImageSize(VAR image: T_rawImage): boolean;
   begin
     if image.dimensions.fitsInto(fImageSizeLimit) then exit(false);
     image.resize(fImageSizeLimit,res_fit);
+    result:=true;
+  end;
+
+FUNCTION T_imageWorkflowConfiguration.limitImageSize(VAR image:P_referenceCountedImage):boolean;
+  VAR otherImage:P_referenceCountedImage;
+  begin
+    if image^.image.dimensions.fitsInto(fImageSizeLimit) then exit(false);
+    new(otherImage,create(image^.image));
+    otherImage^.image.resize(fImageSizeLimit,res_fit);
+    disposeRCImage(image);
+    image:=otherImage;
     result:=true;
   end;
 

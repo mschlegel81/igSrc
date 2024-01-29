@@ -6,23 +6,20 @@ USES
   mypics,
   imageContexts,
   ExtCtrls,
-  serializationUtil;
+  serializationUtil,
+  refCountedImages;
 TYPE
 P_workflowStep=^T_workflowStep;
-
-{ T_workflowStep }
-
 T_workflowStep=object(T_serializable)
   private
     specString         : string;
     valid              : boolean;
     operation_         : P_imageOperation;
-    outputPreview_     : TImage;
-    outputHash_        : longword;
     executionTicks_    : qword;
     PROCEDURE setSpecification(CONST spec:string);
   public
-    outputImage: P_rawImage;
+    outputImage: P_referenceCountedImage;
+    expectedResolution:T_imageDimensions;
     CONSTRUCTOR create(CONST spec:string);
     CONSTRUCTOR create(CONST op:P_imageOperation);
     CONSTRUCTOR clone(CONST original:P_workflowStep);
@@ -37,8 +34,6 @@ T_workflowStep=object(T_serializable)
     FUNCTION toStringPart(CONST configPart:boolean):string;
     FUNCTION hasComplexParameterDescription:boolean;
     PROCEDURE refreshSpecString;
-    FUNCTION outputPreview:TImage;
-    PROPERTY outputHash:longword read outputHash_;
     FUNCTION getSerialVersion:dword; virtual;
     FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
     PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
@@ -63,7 +58,7 @@ CONSTRUCTOR T_workflowStep.create(CONST spec: string);
   begin
     operation_:=nil;
     setSpecification(spec);
-    outputImage:=nil; outputPreview_:=nil; outputHash_:=0;
+    outputImage:=nil;
     executionTicks_:=0;
   end;
 
@@ -72,7 +67,7 @@ CONSTRUCTOR T_workflowStep.create(CONST op: P_imageOperation);
     operation_:=op;
     specString:=op^.toString(tsm_withNiceParameterName);
     valid     :=true;
-    outputImage:=nil; outputPreview_:=nil; outputHash_:=0;
+    outputImage:=nil;
     executionTicks_:=0;
   end;
 
@@ -82,8 +77,6 @@ CONSTRUCTOR T_workflowStep.initializeForReadingFromStream;
     specString:='';
     valid     :=false;
     outputImage:=nil;
-    outputPreview_:=nil;
-    outputHash_:=0;
     executionTicks_:=0;
   end;
 
@@ -91,11 +84,7 @@ CONSTRUCTOR T_workflowStep.clone(CONST original:P_workflowStep);
   begin
     operation_:=nil;
     setSpecification(original^.specification);
-    if original^.outputImage=nil
-    then outputImage:=nil
-    else new(outputImage,create(original^.outputImage^));
-    outputPreview_:=nil;
-    outputHash_:=original^.outputHash_;
+    outputImage:=rereference(original^.outputImage);
     executionTicks_:=original^.executionTicks_;
   end;
 
@@ -115,7 +104,7 @@ PROCEDURE T_workflowStep.execute(CONST context: P_abstractWorkflow);
         operation_^.execute(context);
         executionTicks_:=GetTickCount64-start;
       end else begin
-        context^.image.copyFromPixMap(outputImage^);
+        context^.image.copyFromPixMap(outputImage^.image);
       end;
     end else begin
       context^.cancelWithError('Invalid step: '+specification);
@@ -124,22 +113,14 @@ PROCEDURE T_workflowStep.execute(CONST context: P_abstractWorkflow);
 
 PROCEDURE T_workflowStep.clearOutputImage;
   begin
-    if outputImage<>nil then dispose(outputImage,destroy);
-    outputImage:=nil;
-    if outputPreview_<>nil then begin
-      outputPreview_.destroy;
-      outputPreview_:=nil;
-    end;
-    outputHash_:=0;
+    disposeRCImage(outputImage);
     executionTicks_:=0;
   end;
 
 PROCEDURE T_workflowStep.saveOutputImage(VAR image: T_rawImage);
   begin
-    if outputImage=nil
-    then new(outputImage,create(image))
-    else outputImage^.copyFromPixMap(image);
-    outputHash_:=interLockedIncrement(next_hash);
+    disposeRCImage(outputImage);
+    new(outputImage,create(image))
   end;
 
 FUNCTION T_workflowStep.toStringPart(CONST configPart: boolean): string;
@@ -168,15 +149,6 @@ FUNCTION T_workflowStep.hasComplexParameterDescription: boolean;
 PROCEDURE T_workflowStep.refreshSpecString;
   begin
     if operation_<>nil then specString:=operation_^.toString(tsm_withNiceParameterName);
-  end;
-
-FUNCTION T_workflowStep.outputPreview: TImage;
-  begin
-    if (outputPreview_=nil) and (outputImage<>nil) then begin
-      outputPreview_:=TImage.create(nil);
-      outputImage^.copyToImage(outputPreview_);
-    end;
-    result:=outputPreview_;
   end;
 
 FUNCTION T_workflowStep.getSerialVersion: dword;
