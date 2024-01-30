@@ -160,6 +160,7 @@ USES imageManipulation,
      ig_tesselation,
      ig_buddhaBrot,
      im_hq3x,
+     ig_generalNewtonFractals,
      myStringUtil,
      LazFileUtils;
 
