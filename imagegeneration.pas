@@ -479,6 +479,8 @@ FUNCTION T_generalImageGenrationAlgorithm.toString(nameMode: T_parameterNameMode
       def:P_generalImageGenrationAlgorithm;
       p:array of array[0..1] of T_parameterValue=();
   begin
+    if nameMode=tsm_parameterNameOnly then exit(meta^.getName);
+
     setLength(p,numberOfParameters);
     for i:=0 to numberOfParameters-1 do p[i,1]:=     getParameter(i);
     def:=P_generalImageGenrationAlgorithm(meta^.getDefaultOperation);
@@ -486,7 +488,12 @@ FUNCTION T_generalImageGenrationAlgorithm.toString(nameMode: T_parameterNameMode
     result:='';
     for i:=0 to numberOfParameters-1 do if not(p[i,0].strEq(p[i,1])) then
       result+=getParameter(i).toString(tsm_forSerialization)+';';
-    result:=meta^.getName+'['+copy(result,1,length(result)-1)+']';
+
+    case nameMode of
+      tsm_forSerialization,
+      tsm_withNiceParameterName: result:=meta^.getName+'['+copy(result,1,length(result)-1)+']';
+      else                       result:=                  copy(result,1,length(result)-1);
+    end;
     for i:=0 to numberOfParameters-1 do begin
       p[i,0].destroy;
       p[i,1].destroy;

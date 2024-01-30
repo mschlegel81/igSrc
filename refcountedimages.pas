@@ -21,6 +21,7 @@ T_referenceCountedImage=object
     CONSTRUCTOR createFromFilename(CONST imageFilePath:string);
     FUNCTION previewImage:TImage;
     PROPERTY id:longword read id_;
+    PROCEDURE dropPreview(CONST if_ref_count_below:longint=maxLongint);
 end;
 
 PROCEDURE disposeRCImage(VAR i:P_referenceCountedImage);
@@ -73,6 +74,11 @@ FUNCTION T_referenceCountedImage.previewImage: TImage;
       image.copyToImage(preview);
     end;
     result:=preview;
+  end;
+
+PROCEDURE T_referenceCountedImage.dropPreview(CONST if_ref_count_below:longint=maxLongint);
+  begin
+    if (refCount<if_ref_count_below) and (preview<>nil) then FreeAndNil(preview);
   end;
 
 end.

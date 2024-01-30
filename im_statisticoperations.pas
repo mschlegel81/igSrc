@@ -894,10 +894,11 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
 
   PROCEDURE lineBasedDither;
     VAR x,y,xm,ym:longint;
-        oldPixel,newPixel,error:T_rgbFloatColor;
+        oldPixel, newPixel,error: T_rgbFloatColor;
     begin
       xm:=context^.image.dimensions.width -1;
       ym:=context^.image.dimensions.height-1;
+
       error:=BLACK;
       for y:=0 to ym do case byte(y and 3) of
         1: for x:=0 to xm do begin
@@ -905,25 +906,21 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
              newPixel:=nearestColor(oldPixel);
              error:=(oldPixel-newPixel)*(1/8);
              context^.image[x,y]:=newPixel;
-             if x>0  then context^.image.multIncPixel(x-1,y-1,1,error);
-                          context^.image.multIncPixel(x  ,y-1,1,error*2);
-             if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
-             if y<ym then begin
-               if x>0  then context^.image.multIncPixel(x-1,y+1,1,error);
-                            context^.image.multIncPixel(x  ,y+1,1,error*2);
-               if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
-             end;
+             context^.image.checkedInc(x-1,y-1,error);
+             context^.image.checkedInc(x  ,y-1,error*2);
+             context^.image.checkedInc(x+1,y-1,error);
+             context^.image.checkedInc(x-1,y+1,error);
+             context^.image.checkedInc(x  ,y+1,error*2);
+             context^.image.checkedInc(x+1,y+1,error);
            end;
        2:  for x:=0 to xm do begin
              oldPixel:=context^.image[x,y];
              newPixel:=nearestColor(oldPixel);
              error:=(oldPixel-newPixel)*(1/4*0.9);
              context^.image[x,y]:=newPixel;
-             if y<ym then begin
-               if x>0  then context^.image.multIncPixel(x-1,y+1,1,error);
-                            context^.image.multIncPixel(x  ,y+1,1,error*2);
-               if x<xm then context^.image.multIncPixel(x+1,y+1,1,error);
-             end;
+             context^.image.checkedInc(x-1,y+1,error);
+             context^.image.checkedInc(x  ,y+1,error*2);
+             context^.image.checkedInc(x+1,y+1,error);
            end;
       end;
       for y:=ym downto 0 do case byte(y and 3) of
@@ -932,11 +929,9 @@ PROCEDURE quantizeCustom_impl(CONST parameters:T_parameterValue; CONST context:P
              newPixel:=nearestColor(oldPixel);
              error:=(oldPixel-newPixel)*(1/4*0.9);
              context^.image[x,y]:=newPixel;
-             if y>0 then begin
-               if x>0  then context^.image.multIncPixel(x-1,y-1,1,error);
-                            context^.image.multIncPixel(x  ,y-1,1,error*2);
-               if x<xm then context^.image.multIncPixel(x+1,y-1,1,error);
-             end;
+             context^.image.checkedInc(x-1,y-1,error);
+             context^.image.checkedInc(x  ,y-1,error*2);
+             context^.image.checkedInc(x+1,y-1,error);
            end;
         3: for x:=0 to xm do context^.image[x,y]:=nearestColor(context^.image[x,y]);
       end;

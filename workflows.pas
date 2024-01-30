@@ -65,13 +65,11 @@ TYPE
       FUNCTION getSerialVersion:dword; virtual;
       FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
       PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
+      PROCEDURE memoryCleanup(CONST clear_all_images:boolean);
   end;
 
   { T_editorWorkflowHistory }
   P_workflowState=^T_workflowState;
-
-  { T_workflowState }
-
   T_workflowState=object
     plain:P_editorWorkflow;
     serialized:ansistring;
@@ -87,6 +85,7 @@ TYPE
   T_editorWorkflowHistory=object(T_serializable)
     private
       undoList,redoList:array of P_workflowState;
+      PROCEDURE cleanup(CONST clearRedo:boolean=false);
     public
       CONSTRUCTOR create;
       DESTRUCTOR destroy;
@@ -99,6 +98,7 @@ TYPE
       FUNCTION getSerialVersion:dword; virtual;
       FUNCTION loadFromStream(VAR stream:T_bufferedInputStreamWrapper):boolean; virtual;
       PROCEDURE saveToStream(VAR stream:T_bufferedOutputStreamWrapper); virtual;
+      PROCEDURE memoryCleanup;
   end;
 
   P_generateImageWorkflow=^T_generateImageWorkflow;
@@ -202,7 +202,6 @@ PROCEDURE T_workflowState.serialize;
 PROCEDURE T_workflowState.deserialize;
   VAR streamWrapper:T_bufferedInputStreamWrapper;
       stream:TStringStream;
-      i:longint;
   begin
     if plain<>nil then exit;
     stream:=TStringStream.create(serialized);
@@ -257,10 +256,36 @@ DESTRUCTOR T_editorWorkflowHistory.destroy;
 //    streamWrapper.destroy;
 //  end;
 //
+
+PROCEDURE T_editorWorkflowHistory.cleanup(CONST clearRedo:boolean=false);
+  CONST MAX_UNDOS=100;
+        MAX_LIVE_UNDOS=10;
+  VAR i:longint;
+  begin
+    if length(undoList)>MAX_LIVE_UNDOS then for i:=0 to length(undoList)-1-MAX_LIVE_UNDOS do undoList[i]^.serialize;
+    if length(undoList)>MAX_UNDOS then begin
+      dispose(undoList[0],destroy);
+      for i:=0 to length(undoList)-2 do undoList[i]:=undoList[i+1];
+      setLength(undoList,length(undoList)-1);
+    end;
+    if clearRedo then begin
+      for i:=0 to length(redoList)-1 do dispose(redoList[i],destroy);
+      setLength(redoList,0);
+    end else begin
+      if length(redoList)>MAX_LIVE_UNDOS then for i:=0 to length(redoList)-1-MAX_LIVE_UNDOS do redoList[i]^.serialize;
+      if length(redoList)>MAX_UNDOS then begin
+        dispose(redoList[0],destroy);
+        for i:=0 to length(redoList)-2 do redoList[i]:=redoList[i+1];
+        setLength(redoList,length(redoList)-1);
+      end;
+    end;
+  end;
+
 PROCEDURE T_editorWorkflowHistory.postState(VAR wf: T_editorWorkflow);
   begin
     setLength(undoList,length(undoList)+1);
     new(undoList[length(undoList)-1],create(wf));
+    cleanup(true);
   end;
 
 FUNCTION T_editorWorkflowHistory.canUndo: boolean;
@@ -289,6 +314,7 @@ PROCEDURE T_editorWorkflowHistory.performUndo(VAR wf: T_editorWorkflow);
       wf.config.initialResolution:=initialRes;
       wf.configChanged;
     end;
+    cleanup();
   end;
 
 PROCEDURE T_editorWorkflowHistory.performRedo(VAR wf: T_editorWorkflow);
@@ -307,6 +333,7 @@ PROCEDURE T_editorWorkflowHistory.performRedo(VAR wf: T_editorWorkflow);
       wf.config.initialResolution:=initialRes;
       wf.configChanged;
     end;
+    cleanup();
   end;
 
 FUNCTION T_editorWorkflowHistory.getSerialVersion: dword;
@@ -339,7 +366,7 @@ PROCEDURE T_editorWorkflowHistory.saveToStream(VAR stream: T_bufferedOutputStrea
   VAR i,imax:longint;
   begin
     imax:=length(undoList);
-    if imax>1000 then imax:=1000;
+    if imax>100 then imax:=100;
     stream.writeNaturalNumber(imax);
     for i:=0 to imax-1 do begin
       undoList[i]^.serialize;
@@ -347,12 +374,19 @@ PROCEDURE T_editorWorkflowHistory.saveToStream(VAR stream: T_bufferedOutputStrea
     end;
 
     imax:=length(redoList);
-    if imax>1000 then imax:=1000;
+    if imax>10 then imax:=10;
     stream.writeNaturalNumber(imax);
     for i:=0 to imax-1 do begin
       redoList[i]^.serialize;
       stream.writeAnsiString(redoList[i]^.serialized);
     end;
+  end;
+
+PROCEDURE T_editorWorkflowHistory.memoryCleanup;
+  VAR i:longint;
+  begin
+    for i:=0 to length(undoList)-1 do if undoList[i]^.plain<>nil then undoList[i]^.plain^.memoryCleanup(true);
+    for i:=0 to length(redoList)-1 do if redoList[i]^.plain<>nil then redoList[i]^.plain^.memoryCleanup(true);
   end;
 
 CONSTRUCTOR T_standaloneWorkflow.create;
@@ -524,7 +558,7 @@ PROCEDURE T_simpleWorkflow.afterStep(CONST stepIndex: longint; CONST elapsed: do
 PROCEDURE T_editorWorkflow.afterStep(CONST stepIndex: longint; CONST elapsed: double);
   begin
     if elapsed>reportStepTimeIfLargerThan then messageQueue^.Post('Finished step after '+myTimeToStr(elapsed),false,currentStepIndex,stepCount);
-    if currentExecution.workflowState in [ts_evaluating,ts_ready]
+    if currentExecution.workflowState in [ts_evaluating,ts_ready,ts_softStopRequested]
     then step[stepIndex]^.saveOutputImage(image);
   end;
 
@@ -535,7 +569,7 @@ PROCEDURE T_simpleWorkflow.afterAll;
     try
       stash.clear;
       if currentExecution.workflowState in [ts_pending,ts_evaluating] then currentExecution.workflowState:=ts_ready;
-      if currentExecution.workflowState in [ts_stopRequested        ] then currentExecution.workflowState:=ts_cancelled;
+      if currentExecution.workflowState in [ts_hardStopRequested,ts_softStopRequested] then currentExecution.workflowState:=ts_cancelled;
       case currentExecution.workflowState of
         ts_ready: messageQueue^.Post('Workflow done '+myTimeToStr(now-startedAt),false,-1,0);
         ts_cancelled: messageQueue^.Post('Workflow cancelled '+myTimeToStr(now-startedAt),false,currentExecution.currentStepIndex,stepCount);
@@ -954,6 +988,16 @@ PROCEDURE T_editorWorkflow.saveToStream(VAR stream: T_bufferedOutputStreamWrappe
     config.saveToStream(stream);
     stream.writeNaturalNumber(length(steps));
     for i:=0 to length(steps)-1 do steps[i]^.saveToStream(stream);
+  end;
+
+PROCEDURE T_editorWorkflow.memoryCleanup(CONST clear_all_images: boolean);
+  VAR i:longint;
+  begin
+    if clear_all_images then begin
+      for i:=0 to stepCount-1 do steps[i]^.clearOutputImage;
+    end else begin
+      for i:=0 to stepCount-1 do if steps[i]^.outputImage<>nil then steps[i]^.outputImage^.dropPreview;
+    end;
   end;
 
 FUNCTION T_simpleWorkflow.workflowType: T_workflowType;

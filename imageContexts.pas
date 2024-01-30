@@ -65,7 +65,8 @@ TYPE
                ts_evaluating, //set on dequeue
                ts_ready,      //set after evaluation
                ts_cancelled,
-               ts_stopRequested);
+               ts_hardStopRequested,
+               ts_softStopRequested);
   P_parallelTask=^T_parallelTask;
   T_parallelTask=object
     id:longint;
@@ -346,7 +347,7 @@ PROCEDURE T_abstractWorkflow.executeQueueTasks;
     task:=dequeue;
     while (task<>nil) do begin
       task^.state:=ts_evaluating;
-      if not(currentExecution.workflowState in [ts_cancelled,ts_stopRequested])
+      if not(currentExecution.workflowState in [ts_cancelled,ts_hardStopRequested,ts_softStopRequested])
       then begin
         task^.execute;
         logParallelStepDone;
@@ -480,7 +481,7 @@ PROCEDURE T_abstractWorkflow.ensureStop;
   begin
     enterCriticalSection(contextCS);
     if currentExecution.workflowState=ts_evaluating then begin
-      currentExecution.workflowState:=ts_stopRequested;
+      currentExecution.workflowState:=ts_hardStopRequested;
       messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex,stepCount);
     end;
     while not(currentExecution.workflowState in [ts_cancelled,ts_ready]) do begin
@@ -492,13 +493,17 @@ PROCEDURE T_abstractWorkflow.ensureStop;
   end;
 
 PROCEDURE T_abstractWorkflow.stopBeforeEditing(CONST firstIndex,lastIndex:longint);
+  VAR hard:boolean;
   begin
     enterCriticalSection(contextCS);
+    hard:=(currentExecution.currentStepIndex>=firstIndex) and (currentExecution.currentStepIndex<=lastIndex);
     if currentExecution.workflowState=ts_evaluating then begin
-      currentExecution.workflowState:=ts_stopRequested;
+      if hard
+      then currentExecution.workflowState:=ts_hardStopRequested
+      else currentExecution.workflowState:=ts_softStopRequested;
       messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex,stepCount);
     end;
-    while not(currentExecution.workflowState in [ts_cancelled,ts_ready]) and (currentExecution.currentStepIndex>=firstIndex) and (currentExecution.currentStepIndex<=lastIndex) do begin
+    while not(currentExecution.workflowState in [ts_cancelled,ts_ready]) and hard do begin
       leaveCriticalSection(contextCS);
       sleep(1);
       enterCriticalSection(contextCS);
@@ -510,7 +515,7 @@ PROCEDURE T_abstractWorkflow.postStop;
   begin
     enterCriticalSection(contextCS);
     if currentExecution.workflowState=ts_evaluating then begin
-      currentExecution.workflowState:=ts_stopRequested;
+      currentExecution.workflowState:=ts_softStopRequested;
       messageQueue^.Post('Stopping',false,currentExecution.currentStepIndex,stepCount);
     end;
     leaveCriticalSection(contextCS);
@@ -519,7 +524,7 @@ PROCEDURE T_abstractWorkflow.postStop;
 FUNCTION T_abstractWorkflow.executing: boolean;
   begin
     enterCriticalSection(contextCS);
-    result:=currentExecution.workflowState in [ts_pending,ts_evaluating,ts_stopRequested];
+    result:=currentExecution.workflowState in [ts_pending,ts_evaluating,ts_hardStopRequested,ts_softStopRequested];
     leaveCriticalSection(contextCS);
   end;
 
@@ -533,7 +538,7 @@ FUNCTION T_abstractWorkflow.isDone: boolean;
 FUNCTION T_abstractWorkflow.cancellationRequested: boolean;
   begin
     enterCriticalSection(contextCS);
-    result:=currentExecution.workflowState=ts_stopRequested;
+    result:=currentExecution.workflowState=ts_hardStopRequested;
     leaveCriticalSection(contextCS);
   end;
 
@@ -541,7 +546,7 @@ PROCEDURE T_abstractWorkflow.cancelWithError(CONST errorMessage: string);
   begin
     enterCriticalSection(contextCS);
     if currentExecution.workflowState=ts_evaluating then begin
-      currentExecution.workflowState:=ts_stopRequested;
+      currentExecution.workflowState:=ts_hardStopRequested;
       messageQueue^.Post(errorMessage,true,currentExecution.currentStepIndex,stepCount);
     end;
     leaveCriticalSection(contextCS);
