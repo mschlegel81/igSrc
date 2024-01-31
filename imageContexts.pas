@@ -159,6 +159,7 @@ FUNCTION extractName(CONST s:string):string;
   VAR tmp:T_arrayOfString;
   begin
     tmp:=split(s,splitters);
+    if length(tmp)=0 then exit('');
     result:=trim(tmp[0]);
     setLength(tmp,0);
   end;

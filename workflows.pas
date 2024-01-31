@@ -56,7 +56,7 @@ TYPE
       PROCEDURE configChanged; virtual;
       CONSTRUCTOR createEditorWorkflow(CONST messageQueue_:P_structuredMessageQueue);
       CONSTRUCTOR clone(CONST original:P_editorWorkflow);
-      PROCEDURE copyFrom(CONST original:P_editorWorkflow);
+      PROCEDURE copyFromDestroyingOriginal(CONST original:P_editorWorkflow);
       PROCEDURE stepChanged(CONST index:longint);
       PROCEDURE swapStepDown(CONST firstIndex,lastIndex:longint);
       PROCEDURE removeStep(CONST firstIndex,lastIndex:longint);
@@ -78,8 +78,8 @@ TYPE
     CONSTRUCTOR createFromString(CONST s:ansistring);
     DESTRUCTOR destroy;
     PROCEDURE serialize;
-    PROCEDURE deserialize;
-    PROCEDURE apply(VAR target:T_editorWorkflow);
+    FUNCTION deserialize:boolean;
+    FUNCTION apply(VAR target:T_editorWorkflow):boolean;
   end;
 
   T_editorWorkflowHistory=object(T_serializable)
@@ -199,22 +199,22 @@ PROCEDURE T_workflowState.serialize;
     plain:=nil;
   end;
 
-PROCEDURE T_workflowState.deserialize;
+FUNCTION T_workflowState.deserialize:boolean;
   VAR streamWrapper:T_bufferedInputStreamWrapper;
       stream:TStringStream;
   begin
-    if plain<>nil then exit;
+    if plain<>nil then exit(true);
     stream:=TStringStream.create(serialized);
     streamWrapper.create(stream);
     new(plain,createEditorWorkflow(nil));
-    plain^.loadFromStream(streamWrapper);
+    result:=plain^.loadFromStream(streamWrapper);
     streamWrapper.destroy;
   end;
 
-PROCEDURE T_workflowState.apply(VAR target: T_editorWorkflow);
+FUNCTION T_workflowState.apply(VAR target: T_editorWorkflow):boolean;
   begin
-    deserialize;
-    target.copyFrom(plain);
+    result:=deserialize;
+    if result then target.copyFromDestroyingOriginal(plain);
   end;
 
 { T_editorWorkflowHistory }
@@ -230,32 +230,6 @@ DESTRUCTOR T_editorWorkflowHistory.destroy;
     setLength(undoList,0);
     setLength(redoList,0);
   end;
-
-//FUNCTION readState(VAR wf:T_editorWorkflow):ansistring;
-//  VAR streamWrapper:T_bufferedOutputStreamWrapper;
-//      stream:TStringStream;
-//  begin
-//    stream:=TStringStream.create();
-//    streamWrapper.create(stream);
-//    wf.saveToStream(streamWrapper);
-//    streamWrapper.flush;
-//    result:=stream.DataString;
-//    streamWrapper.destroy;
-//  end;
-//
-//PROCEDURE applyState(VAR wf:T_editorWorkflow; CONST rawData:ansistring);
-//  VAR streamWrapper:T_bufferedInputStreamWrapper;
-//      stream:TStringStream;
-//      i:longint;
-//  begin
-//    stream:=TStringStream.create(rawData);
-//    streamWrapper.create(stream);
-//    for i:=0 to length(wf.steps)-1 do dispose(wf.steps[i],destroy);
-//    setLength(wf.steps,0);
-//    wf.loadFromStream(streamWrapper);
-//    streamWrapper.destroy;
-//  end;
-//
 
 PROCEDURE T_editorWorkflowHistory.cleanup(CONST clearRedo:boolean=false);
   CONST MAX_UNDOS=100;
@@ -300,6 +274,7 @@ FUNCTION T_editorWorkflowHistory.canRedo: boolean;
 
 PROCEDURE T_editorWorkflowHistory.performUndo(VAR wf: T_editorWorkflow);
   VAR initialRes: T_imageDimensions;
+      restored:boolean;
   begin
     if length(undoList)=0 then exit;
     initialRes:=wf.config.initialResolution;
@@ -307,9 +282,13 @@ PROCEDURE T_editorWorkflowHistory.performUndo(VAR wf: T_editorWorkflow);
     setLength(redoList,length(redoList)+1);
     new(redoList[length(redoList)-1],create(wf));
     wf.ensureStop;
-    undoList[length(undoList)-1]^.apply(wf);
-    dispose(undoList[length(undoList)-1],destroy);
-    setLength(undoList,length(undoList)-1);
+    repeat
+      restored:=undoList[length(undoList)-1]^.apply(wf);
+      dispose(undoList[length(undoList)-1],destroy);
+      setLength(undoList,length(undoList)-1);
+    until restored or (length(undoList)=0);
+    if not(restored) then exit;
+
     if wf.config.initialResolution<>initialRes then begin
       wf.config.initialResolution:=initialRes;
       wf.configChanged;
@@ -319,6 +298,7 @@ PROCEDURE T_editorWorkflowHistory.performUndo(VAR wf: T_editorWorkflow);
 
 PROCEDURE T_editorWorkflowHistory.performRedo(VAR wf: T_editorWorkflow);
   VAR initialRes: T_imageDimensions;
+      restored:boolean;
   begin
     if length(redoList)=0 then exit;
     initialRes:=wf.config.initialResolution;
@@ -326,9 +306,13 @@ PROCEDURE T_editorWorkflowHistory.performRedo(VAR wf: T_editorWorkflow);
     setLength(undoList,length(undoList)+1);
     new(undoList[length(undoList)-1],create(wf));
     wf.ensureStop;
-    redoList[length(redoList)-1]^.apply(wf);
-    dispose(redoList[length(redoList)-1],destroy);
-    setLength(redoList,length(redoList)-1);
+    repeat
+      restored:=redoList[length(redoList)-1]^.apply(wf);
+      dispose(redoList[length(redoList)-1],destroy);
+      setLength(redoList,length(redoList)-1);
+    until restored or (length(redoList)=0);
+    if not(restored) then exit;
+
     if wf.config.initialResolution<>initialRes then begin
       wf.config.initialResolution:=initialRes;
       wf.configChanged;
@@ -467,6 +451,10 @@ FUNCTION T_generateImageWorkflow.startEditing(CONST stepIndex: longint): boolean
        (relatedEditor^.step[stepIndex]^.operation^.meta^.category<>imc_generation) then exit(false);
     current:=P_algorithmMeta(relatedEditor^.step[stepIndex]^.operation^.meta);
     if not(current^.prototype^.canParseParametersFromString(relatedEditor^.step[stepIndex]^.specification,true)) then exit(false);
+
+    if current^.hasScaler then with P_scaledImageGenerationAlgorithm(current^.prototype)^ do begin
+      scaler.setZoom(scaler.getZoom); //just a hack to trigger recalculation
+    end;
     addingNewStep:=false;
     editingStep:=stepIndex;
     result:=true;
@@ -832,21 +820,72 @@ FUNCTION T_simpleWorkflow.executeAsTodo: boolean;
   end;
 
 PROCEDURE T_simpleWorkflow.checkStepIO;
-  VAR stashesReady:T_arrayOfString;
-      i:longint;
+  VAR stashesReady:array of record
+        id:string;
+        resolution:T_imageDimensions;
+      end;
+
+  PROCEDURE registerStash(CONST step:P_workflowStep; CONST inputResolution:T_imageDimensions);
+    VAR stashId:string;
+    begin
+      stashId:=step^.operation^.writesStash;
+      if stashId='' then exit;
+      setLength(stashesReady,length(stashesReady)+1);
+      with stashesReady[length(stashesReady)-1] do begin
+        id:=stashId;
+        resolution:=inputResolution;
+      end;
+      step^.expectedResolution:=inputResolution;
+    end;
+
+  PROCEDURE markInvalid(CONST step:P_workflowStep);
+    VAR stashId:string;
+        k:longint;
+    begin
+      step^.clearOutputImage;
+      stashId:=step^.operation^.writesStash;
+      if stashId='' then exit;
+      for k:=0 to length(stashesReady)-1 do with stashesReady[k] do if id=stashId then begin
+        id:='';
+        resolution:=imageDimensions(0,0);
+      end;
+    end;
+
+  FUNCTION stepIsPlausible(CONST step:P_workflowStep; CONST imageBeforeIsPresent:boolean; CONST inputResolution:T_imageDimensions):boolean;
+    VAR stashId:string;
+        k:longint;
+    begin
+      stashId:=step^.operation^.readsStash;
+      if stashId<>'' then begin
+        k:=length(stashesReady)-1;
+        while (k>=0) and (stashesReady[k].id<>stashId) do dec(k);
+        if k<0 then exit(false);
+
+        if step^.operation^.dependsOnImageBefore
+        then result:=imageBeforeIsPresent and (inputResolution=stashesReady[k].resolution)
+        else result:=true;
+      end else begin
+        if step^.operation^.dependsOnImageBefore
+        then result:=imageBeforeIsPresent and (inputResolution=step^.expectedResolution)
+        else result:=                          inputResolution=step^.expectedResolution;
+      end;
+    end;
+
+  VAR i:longint;
   begin
     setLength(stashesReady,0);
-    if (length(steps)>0) and (steps[0]^.operation^.writesStash<>'') and (steps[0]^.outputImage<>nil) then append(stashesReady,steps[0]^.operation^.writesStash);
-     //step[0]^.operation^.meta^.getExpectedOutputResolution(@self,config.initialResolution,step[0]^.operation.);
+    if (length(steps)>0) then registerStash(steps[0],config.trueInitialResolution);
     for i:=1 to length(steps)-1 do begin
-//      steps[i]^.checkOutputResolution(@self,steps[i-1]^.expectedResolution);
-      if (steps[i]^.operation^.dependsOnImageBefore and (steps[i-1]^.outputImage=nil))
-      or ((steps[i]^.operation^.readsStash<>'') and not(arrContains(stashesReady,steps[i]^.operation^.readsStash)))
-      then begin
-        steps[i]^.clearOutputImage;
-        dropValues(stashesReady,steps[i]^.operation^.writesStash);
-      end;
-      if (steps[i]^.outputImage<>nil) and (steps[i]^.operation^.writesStash<>'') then append(stashesReady,steps[i]^.operation^.writesStash);
+      if stepIsPlausible(steps[i],steps[i-1]^.outputImage<>nil,steps[i-1]^.expectedResolution) then begin
+        if steps[i]^.outputImage<>nil then registerStash(steps[i],steps[i]^.expectedResolution);
+      end else markInvalid(steps[i]);
+      //if (steps[i]^.operation^.dependsOnImageBefore and (steps[i-1]^.outputImage=nil))
+      //or ((steps[i]^.operation^.readsStash<>'') and not(arrContains(stashesReady,steps[i]^.operation^.readsStash)))
+      //then begin
+      //  steps[i]^.clearOutputImage;
+      //  dropValues(stashesReady,steps[i]^.operation^.writesStash);
+      //end;
+      //if (steps[i]^.outputImage<>nil) and (steps[i]^.operation^.writesStash<>'') then append(stashesReady,steps[i]^.operation^.writesStash);
     end;
   end;
 
@@ -1130,13 +1169,16 @@ CONSTRUCTOR T_editorWorkflow.clone(CONST original:P_editorWorkflow);
     for i:=0 to length(steps)-1 do new(steps[i],clone(original^.steps[i]));
   end;
 
-PROCEDURE T_editorWorkflow.copyFrom(CONST original:P_editorWorkflow);
+PROCEDURE T_editorWorkflow.copyFromDestroyingOriginal(CONST original:P_editorWorkflow);
   VAR i:longint;
   begin
+    enterCriticalSection(contextCS);
     config.copyFrom(original^.config);
     for i:=0 to length(steps)-1 do dispose(steps[i],destroy);
     setLength(steps,length(original^.steps));
-    for i:=0 to length(steps)-1 do new(steps[i],clone(original^.steps[i]));
+    for i:=0 to length(steps)-1 do steps[i]:=original^.steps[i];
+    setLength(original^.steps,0);
+    leaveCriticalSection(contextCS);
   end;
 
 end.
