@@ -135,55 +135,36 @@ FUNCTION T_generalNewtonFractal.getColorAt(CONST ix, iy: longint; CONST xy: T_Co
   //         (x-r0)*       (x-r2)*... +
   //         (x-r0)*(x-r1)*       ... + ...
   // Newton: x[i+1] = x[i]-F(x[i])/F'(x[i])
-  FUNCTION step(CONST x:T_Complex):T_Complex;
-    VAR tmp:array[0..9] of T_Complex;
-        i,j:longint;
-        F,DF:T_Complex;
-    begin
-      for i:=0 to numberOfRoots-1 do tmp[i]:=x-root[i];
-      DF:=0;
-      F:=1;
-      for i:=0 to numberOfRoots-1 do begin
-        F*=tmp[i];
-        result:=1;
-        for j:=0 to numberOfRoots-1 do if j<>i then result*=tmp[j];
-        DF+=result;
-      end;
-      result:=x-F/DF;
-    end;
-
-  FUNCTION closeToRoot(CONST x:T_Complex):longint;
-    VAR i:longint;
-    begin
-      for i:=0 to numberOfRoots-1 do if sqrabs(x-root[i])<1E-12 then exit(i);
-      result:=-1;
-    end;
-
-  FUNCTION closestRoot(CONST x:T_Complex):longint;
-    VAR i:longint;
-    begin
-      result:=0;
-      for i:=1 to numberOfRoots-1 do if sqrabs(x-root[i])<sqrabs(x-root[result]) then result:=i;
-    end;
-
-  VAR x:T_Complex;
+  VAR tmp,alpha,beta:array[0..9] of T_Complex;
+      i:longint;
+      F,DF:T_Complex;
+      x:T_Complex;
       n,i0,i1,i2:longint;
+      minDistToRoot,distToRoot:double;
   begin
+    i0:=maxlongint; i1:=maxlongint-1; i2:=maxlongint-3;
     x:=xy;
     for n:=0 to 2046 do begin
-      x:=step(x);
-      if (n and 7)=7 then begin
-        i0:=closeToRoot(x);
-        if i0>=0 then begin
-          x:=step(x);
-          i1:=closestRoot(x);
-          x:=step(x);
-          i2:=closestRoot(x);
-          if (i0=i1) and (i0=i2) then exit(rootColor[i0]);
+      for i:=0 to numberOfRoots-1 do tmp[i]:=x-root[i];
+      alpha[0]:=1;              for i:=1 to numberOfRoots-1     do alpha[i]:=alpha[i-1]*tmp[i-1];
+      beta[numberOfRoots-1]:=1; for i:=numberOfRoots-2 downto 0 do beta [i]:=beta [i+1]*tmp[i+1];
+      F:=alpha[1]*beta[0];
+      DF:=0;
+      for i:=0 to numberOfRoots-1 do DF+=alpha[i]*beta[i];
+      x-=F/DF;
+
+      i0:=i1; i1:=i2; minDistToRoot:=1E50;
+      for i:=0 to numberOfRoots-1 do begin
+        distToRoot:=sqrabs(x-root[i]);
+        if distToRoot<minDistToRoot then begin
+          minDistToRoot:=distToRoot;
+          i2:=i;
         end;
       end;
+
+      if (i0=i1) and (i1=i2) and (minDistToRoot<1E-12) then exit(rootColor[i0]);
     end;
-    result:=rootColor[closestRoot(x)];
+    result:=rootColor[i2];
   end;
 
 FUNCTION newGeneralNewton:P_generalImageGenrationAlgorithm;
