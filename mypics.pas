@@ -1174,7 +1174,6 @@ PROCEDURE T_rawImage.sketch(CONST cover,relativeDirMapSigma,density,tolerance:do
       end;
       niceLine(lineX[0],lineY[0],lineX[1],lineY[1],lineColor,(alpha));
     end;
-
     temp.destroy;
     grad.destroy;
   end;

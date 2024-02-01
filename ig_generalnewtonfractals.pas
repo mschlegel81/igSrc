@@ -142,7 +142,7 @@ FUNCTION T_generalNewtonFractal.getColorAt(CONST ix, iy: longint; CONST xy: T_Co
       n,i0,i1,i2:longint;
       minDistToRoot,distToRoot:double;
   begin
-    i0:=maxlongint; i1:=maxlongint-1; i2:=maxlongint-3;
+    i0:=maxLongint; i1:=maxLongint-1; i2:=maxLongint-3;
     x:=xy;
     for n:=0 to 2046 do begin
       for i:=0 to numberOfRoots-1 do tmp[i]:=x-root[i];
@@ -161,7 +161,6 @@ FUNCTION T_generalNewtonFractal.getColorAt(CONST ix, iy: longint; CONST xy: T_Co
           i2:=i;
         end;
       end;
-
       if (i0=i1) and (i1=i2) and (minDistToRoot<1E-12) then exit(rootColor[i0]);
     end;
     result:=rootColor[i2];

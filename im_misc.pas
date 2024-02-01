@@ -5,7 +5,7 @@ USES imageManipulation,imageContexts,myParams,mypics,myColors,math,pixMaps;
 
 PROCEDURE sketch_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
   begin
-    context^.image.sketch(parameters.f0,parameters.f1,parameters.f2,parameters.f3);
+    context^.image.sketch(parameters.f0,parameters.f1,parameters.f2,parameters.f3,@context^.cancellationRequested);
   end;
 
 PROCEDURE drip_impl(CONST parameters:T_parameterValue; CONST context:P_abstractWorkflow);
