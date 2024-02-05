@@ -866,8 +866,8 @@ PROCEDURE T_simpleWorkflow.checkStepIO;
         else result:=true;
       end else begin
         if step^.operation^.dependsOnImageBefore
-        then result:=imageBeforeIsPresent and (inputResolution=step^.expectedResolution)
-        else result:=                          inputResolution=step^.expectedResolution;
+        then result:=imageBeforeIsPresent and (step^.operation^.getExpectedOutputResolution(@self,inputResolution)=step^.expectedResolution)
+        else result:=                          step^.operation^.getExpectedOutputResolution(@self,inputResolution)=step^.expectedResolution;
       end;
     end;
 

@@ -120,7 +120,8 @@ PROCEDURE T_workflowStep.clearOutputImage;
 PROCEDURE T_workflowStep.saveOutputImage(VAR image: T_rawImage);
   begin
     disposeRCImage(outputImage);
-    new(outputImage,create(image))
+    new(outputImage,create(image));
+    expectedResolution:=image.dimensions;
   end;
 
 FUNCTION T_workflowStep.toStringPart(CONST configPart: boolean): string;
