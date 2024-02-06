@@ -18,7 +18,7 @@ T_referenceCountedImage=object
   public
     image:T_rawImage;
     CONSTRUCTOR create(VAR original:T_rawImage);
-    CONSTRUCTOR createFromFilename(CONST imageFilePath:string);
+    CONSTRUCTOR createFromFileName(CONST imageFilePath:string);
     FUNCTION previewImage:TImage;
     PROPERTY id:longword read id_;
     PROCEDURE dropPreview(CONST if_ref_count_below:longint=maxLongint);
@@ -59,7 +59,7 @@ CONSTRUCTOR T_referenceCountedImage.create(VAR original: T_rawImage);
     refCount:=1;
   end;
 
-CONSTRUCTOR T_referenceCountedImage.createFromFilename(CONST imageFilePath: string);
+CONSTRUCTOR T_referenceCountedImage.createFromFileName(CONST imageFilePath: string);
   begin
     image.create(imageFilePath);
     preview:=nil;
