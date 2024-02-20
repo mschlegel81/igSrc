@@ -1622,8 +1622,9 @@ FUNCTION T_rawImage.subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
   VAR pointIndex:longint;
       lastKx0:longint=maxLongint;
       lastKy0:longint=maxLongint;
+      cumulated :T_rgbFloatColor=(0,0,0);
+      lastResult:T_rgbFloatColor=(0,0,0);
   begin
-    result:=BLACK;
     for pointIndex:=0 to points.fill-1 do with points.points[pointIndex] do begin
       kx[0]:=round(x)-1; relX:=x-kx[0];
       ky[0]:=round(y)-1; relY:=y-ky[0];
@@ -1639,9 +1640,12 @@ FUNCTION T_rawImage.subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
       end;
       for i:=0 to 2 do
         col[i]:=between(data[kx[0]+ky[i]*dim.width],data[kx[1]+ky[i]*dim.width],data[kx[2]+ky[i]*dim.width],relX);
-      result  +=between(col[0]                     ,col[1]                     ,col[2]                     ,relY);
+      result:=between(col[0],col[1],col[2],relY);
+      cumulated+=result;
+      result:=cumulated*(1/(pointIndex+1));
+      if (pointIndex>3) and (colDiff(result,lastResult)<4E-3) then exit(result);
+      lastResult:=result;
     end;
-    result*=1/points.fill;
   end;
 
 FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
@@ -1730,10 +1734,6 @@ FUNCTION T_rawImage.simpleSubPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatCol
       for x:=round(x0) to round(x1) do begin
         subX0:=min(min(max(max(x-0.5,x0),-0.5),x1),dim.width-0.5);
         subX1:=min(min(max(max(x+0.5,x0),-0.5),x1),dim.width-0.5);
-        if x1>=74 then begin
-          writeln(x0:0:5,' - ',x1:0:5,' x ',y0:0:5,' - ',y1:0:5,' sub: ',
-                  subx0:0:5,' - ',subx1:0:5,' x ',suby0:0:5,' - ',suby1:0:5,' weight: ',(subX1-subX0)*(subY1-subY0):0:8          );
-        end;
         kx:=x;
         if kx<0 then kx:=0 else if kx>=dim.width then kx:=dim.width-1;
         addToTotal(data[kx+ky*dim.width]*((subX1-subX0)*(subY1-subY0)));
