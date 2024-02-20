@@ -296,7 +296,7 @@ PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(VAR image: T_rawI
       new(cachedInitialImage,createFromFileName(initialImageFilename));
       cachedInitialImageWasScaled:=false;
       if (cachedInitialImage^.image.pixelCount<=1) or not(cachedInitialImage^.image.successfullyLoaded) then begin
-        image.resize(fInitialResolution,res_dataResize);
+        image.resize(fInitialResolution,res_dataResize,not intermediateResultsPreviewQuality);
         image.drawCheckerboard;
         initialImageFilename:='';
         clearImage;
@@ -325,7 +325,7 @@ PROCEDURE T_imageWorkflowConfiguration.prepareImageForWorkflow(VAR image: T_rawI
         image.copyFromPixMap(cachedInitialImage^.image);
       end;
     end else begin
-      image.resize(fInitialResolution,res_dataResize);
+      image.resize(fInitialResolution,res_dataResize,not intermediateResultsPreviewQuality);
       image.drawCheckerboard;
     end;
   end;
@@ -347,7 +347,7 @@ FUNCTION T_imageWorkflowConfiguration.trueInitialResolution:T_imageDimensions;
 FUNCTION T_imageWorkflowConfiguration.limitImageSize(VAR image: T_rawImage): boolean;
   begin
     if image.dimensions.fitsInto(fImageSizeLimit) then exit(false);
-    image.resize(fImageSizeLimit,res_fit);
+    image.resize(fImageSizeLimit,res_fit,not intermediateResultsPreviewQuality);
     result:=true;
   end;
 
@@ -356,7 +356,7 @@ FUNCTION T_imageWorkflowConfiguration.limitImageSize(VAR image:P_referenceCounte
   begin
     if image^.image.dimensions.fitsInto(fImageSizeLimit) then exit(false);
     new(otherImage,create(image^.image));
-    otherImage^.image.resize(fImageSizeLimit,res_fit);
+    otherImage^.image.resize(fImageSizeLimit,res_fit,not intermediateResultsPreviewQuality);
     disposeRCImage(image);
     image:=otherImage;
     result:=true;

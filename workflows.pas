@@ -395,7 +395,7 @@ PROCEDURE T_generateImageWorkflow.beforeAll;
     try
       messageQueue^.postSeparator;
       messageQueue^.Post('Starting preview calculation',false,-1,0);
-      image.resize(relatedEditor^.config.initialResolution,res_dataResize);
+      image.resize(relatedEditor^.config.initialResolution,res_dataResize,false);
       if (editingStep>0) and (editingStep-1<relatedEditor^.stepCount) and (relatedEditor^.step[editingStep-1]^.outputImage<>nil) then begin
         image.copyFromPixMap(relatedEditor^.step[editingStep-1]^.outputImage^.image);
         relatedEditor^.config.limitImageSize(image);

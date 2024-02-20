@@ -1294,7 +1294,7 @@ PROCEDURE T_functionPerPixelViaRawDataAlgorithm.execute(CONST context: P_abstrac
          (temporaryRawMap^.dimensions.width<>image.dimensions.width) or
          (temporaryRawMap^.dimensions.height<>image.dimensions.height) then rawMapIsOutdated:=64;
       if temporaryRawMap=nil then new(temporaryRawMap,create(image.dimensions.width,image.dimensions.height));
-      temporaryRawMap^.resize(image.dimensions, res_dataResize);
+      temporaryRawMap^.resize(image.dimensions, res_dataResize,not context^.previewQuality);
       if rawMapIsOutdated>0 then begin
         scalerChanagedSinceCalculation:=false;
         clearQueue;

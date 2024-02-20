@@ -30,7 +30,7 @@ PROCEDURE hq3x_impl(CONST parameters:T_parameterValue; CONST context:P_abstractW
       halt;
     end;
     temp.create(context^.image);
-    context^.image.resize(newDim,res_dataResize);
+    context^.image.resize(newDim,res_dataResize,false);
 
     for y:=0 to dim.height-1 do begin
       inputCol [-1]:=temp.linePtr(max(0,y-1));

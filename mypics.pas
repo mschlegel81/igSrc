@@ -47,6 +47,15 @@ TYPE
     FUNCTION markAlias(CONST globalTol:single):boolean;
   end;
 
+  { T_pointList }
+
+  T_pointList=object
+    fill:longint;
+    points:array[0..31] of record x,y:double; end;
+    PROCEDURE clear;
+    PROCEDURE add(CONST x,y:double);
+  end;
+
   T_rgbFloatMap=specialize G_pixelMap<T_rgbFloatColor>;
   T_rgbMap=specialize G_pixelMap<T_rgbColor>;
   P_floatColor=^T_rgbFloatColor;
@@ -89,8 +98,8 @@ TYPE
       FUNCTION getJpgFileData(CONST quality:longint=100):ansistring;
       //---------------------------------------------------------:File interface
       //Geometry manipulations:-------------------------------------------------
-      PROCEDURE resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle:T_resizeStyle);
-      PROCEDURE zoom(CONST factor:double);
+      PROCEDURE resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle:T_resizeStyle; CONST highQuality:boolean);
+      PROCEDURE zoom(CONST factor:double; CONST highQuality:boolean);
       //-------------------------------------------------:Geometry manipulations
       //Statistic accessors:----------------------------------------------------
       FUNCTION histogram:T_compoundHistogram;
@@ -113,16 +122,20 @@ TYPE
       PROCEDURE drip(CONST diffusiveness,range:double);
       FUNCTION rgbaSplit(CONST transparentColor:T_rgbFloatColor):T_rawImage;
       PROCEDURE halftone(CONST scale:single; CONST param:longint);
-      PROCEDURE rotate(CONST angleInDegrees:double);
+      PROCEDURE rotate(CONST angleInDegrees:double; CONST highQuality:boolean);
       PROCEDURE copyFromImageWithOffset(VAR image:T_rawImage; CONST xOff,yOff:longint);
+      FUNCTION simpleSubPixel(CONST x,y:double):T_rgbFloatColor;
+      FUNCTION subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
+      FUNCTION subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
   end;
 
 F_displayErrorFunction=PROCEDURE(CONST s:ansistring);
 
 VAR compressionQualityPercentage:longint=100;
-//FUNCTION resize(CONST dim:T_imageDimensions; CONST newWidth,newHeight:longint; CONST resizeStyle:T_resizeStyle):T_imageDimensions;
+CONST EMPTY_POINT_LIST:T_pointList=(fill:0);
 
 IMPLEMENTATION
+USES darts;
 VAR globalFileLock:TRTLCriticalSection;
 CONSTRUCTOR T_colChunk.create;
   begin end;
@@ -210,6 +223,20 @@ FUNCTION T_colChunk.markAlias(CONST globalTol:single):boolean;
     end;
   end;
 
+{ T_pointList }
+
+PROCEDURE T_pointList.clear;
+  begin
+    fill:=0;
+  end;
+
+PROCEDURE T_pointList.add(CONST x, y: double);
+  begin
+    points[fill].x:=x;
+    points[fill].y:=y;
+    inc(fill);
+  end;
+
 CONSTRUCTOR T_rawImage.create(CONST width_, height_: longint);
   begin
     inherited create(width_,height_);
@@ -280,7 +307,7 @@ PROCEDURE T_rawImage.copyFromImage(VAR srcImage: TImage);
 
   begin
     initialize(pc);
-    resize(imageDimensions(srcImage.picture.width,srcImage.picture.height),res_dataResize);
+    resize(imageDimensions(srcImage.picture.width,srcImage.picture.height),res_dataResize,false);
 
     ScanLineImage:=TLazIntfImage.create(dim.width,dim.height);
     ImgFormatDescription.Init_BPP24_B8G8R8_BIO_TTB(dim.width,dim.height);
@@ -323,7 +350,7 @@ FUNCTION T_rawImage.chunksInMap: longint;
 PROCEDURE T_rawImage.markChunksAsPending;
   VAR x,y:longint;
   begin
-    for y:=dim.height-1 downto 0 do for x:=0 to dim.width-1 do
+    for y:=0 to dim.height-1 do for x:=0 to dim.width-1 do
       if ((x and 63) in [0,63]) or ((y and 63) in [0,63]) or (odd(x) xor odd(y)) and (((x and 63) in [21,42]) or ((y and 63) in [21,42]))
       then pixel[x,y]:=WHITE
       else pixel[x,y]:=BLACK;
@@ -348,7 +375,7 @@ FUNCTION T_rawImage.getPendingList(CONST allArePending:boolean): T_arrayOfLongin
         for cy:=0 to length(isPending[cx])-1 do isPending[cx,cy]:=true;
       end;
       //scan:-----------------------------------------------------
-      for y:=dim.height-1 downto 0 do begin
+      for y:=0 to dim.height-1 do begin
         cy:=y div CHUNK_BLOCK_SIZE;
         for x:=0 to dim.width-1 do begin
           cx:=x div CHUNK_BLOCK_SIZE;
@@ -585,7 +612,7 @@ PROCEDURE T_rawImage.saveJpgWithSizeLimit(CONST fileName:ansistring; CONST sizeL
       stream.free;
     end;
 
-PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T_resizeStyle);
+PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T_resizeStyle; CONST highQuality:boolean);
   VAR srcRect,destRect:TRect;
       dx,dy:longint;
       destDim:T_imageDimensions;
@@ -615,6 +642,30 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
       srcImage.free;
       copyFromImage(destImage);
       destImage.free;
+    end;
+
+  PROCEDURE resizeViaRawImage;
+    VAR temp:T_rawImage;
+        x,y:longint;
+        //col: T_rgbFloatColor;
+        //points:T_pointList;
+    begin
+      temp.create(self);
+      destDim:=imageDimensions(destRect.width,destRect.height);
+      inherited resize(destDim);
+      clearWithColor(BLACK);
+      for y:=destRect.top to destRect.Bottom-1 do
+      for x:=destRect.Left to destRect.Right-1 do begin
+//        points.clear;
+//        for k:=0 to 31 do points.add(srcRect.Left+srcRect.width /destRect.width *(x-darts_delta[k,0]),
+//                                     srcRect.top +srcRect.height/destRect.height*(y-darts_delta[k,1]));
+        pixel[x,y]:=temp.subPixelBoxAvg(
+          srcRect.Left+srcRect.width /destRect.width *(x-0.5),
+          srcRect.Left+srcRect.width /destRect.width *(x+0.5),
+          srcRect.top +srcRect.height/destRect.height*(y-0.5),
+          srcRect.top +srcRect.height/destRect.height*(y+0.5));  //temp.subPixelAverage(points);
+      end;
+      temp.destroy;
     end;
 
   begin
@@ -663,7 +714,9 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
     if resizeStyle=res_dataResize then begin
       destDim:=tgtDim;
       inherited resize(destDim);
-    end else resizeViaTImage;
+    end else if highQuality and (resizeStyle in [res_exact,res_cropToFill,res_cropRotate,res_fit,res_fitExpand,res_fitRotate])
+    then resizeViaRawImage
+    else resizeViaTImage;
     if resizeStyle in [res_fitExpand,res_fitExpandPixelate] then begin
       destDim.width :=tgtDim.width -dim.width ; dx:=-(destDim.width  shr 1); inc(destDim.width ,dx+dim.width );
       destDim.height:=tgtDim.height-dim.height; dy:=-(destDim.height shr 1); inc(destDim.height,dy+dim.height);
@@ -671,28 +724,51 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
     end;
   end;
 
-PROCEDURE T_rawImage.zoom(CONST factor:double);
+PROCEDURE T_rawImage.zoom(CONST factor:double; CONST highQuality:boolean);
   VAR oldDim:T_imageDimensions;
       x0,x1,y0,y1:longint;
+      cx,cy:double;
+      temp:T_rawImage;
+      invFactor:double;
+  FUNCTION hqPixel(CONST ix,iy:longint):T_rgbFloatColor;
+    VAR k:longint;
+        points:T_pointList;
+    begin
+      points.clear;
+      for k:=0 to 31 do points.add((ix-cx)*invFactor+cx+darts_delta[k,0],
+                                   (iy-cy)*invFactor+cy+darts_delta[k,1]);
+      result:=temp.subPixelAverage(points);
+    end;
+
+  VAR x,y:longint;
   begin
-    oldDim:=dim;
-    if factor>1 then begin
-      crop(0.5-0.5/factor,0.5+0.5/factor,
-           0.5-0.5/factor,0.5+0.5/factor);
-      resize(oldDim,res_exact);
+    if highQuality then begin
+      invFactor:=1/factor;
+      temp.create(self);
+      cx:=dim.width/2;
+      cy:=dim.height/2;
+      for y:=0 to dim.height-1 do for x:=0 to dim.width-1 do pixel[x,y]:=hqPixel(x,y);
+      temp.destroy;
     end else begin
-      //new size=old size*factor
-      resize(imageDimensions(round(oldDim.width *factor),
-                             round(oldDim.height*factor)),res_exact);
-      //x0=round(rx0                               *dim.width)
-      //  =round((0.5-0.5/ factor                 )*dim.width)
-      //  =round((0.5-0.5/(dim.width/oldDim.width))*dim.width)
-      //  =round(0.5*dim.width-0.5*oldDim.width);
-      x0:=dim.width shr 1-oldDim.width shr 1;
-      x1:= oldDim.width+x0;
-      y0:=dim.height shr 1-oldDim.height shr 1;
-      y1:= oldDim.height+y0;
-      cropAbsolute(x0,x1,y0,y1);
+      oldDim:=dim;
+      if factor>1 then begin
+        crop(0.5-0.5/factor,0.5+0.5/factor,
+             0.5-0.5/factor,0.5+0.5/factor);
+        resize(oldDim,res_exact,highQuality);
+      end else begin
+        //new size=old size*factor
+        resize(imageDimensions(round(oldDim.width *factor),
+                               round(oldDim.height*factor)),res_exact,highQuality);
+        //x0=round(rx0                               *dim.width)
+        //  =round((0.5-0.5/ factor                 )*dim.width)
+        //  =round((0.5-0.5/(dim.width/oldDim.width))*dim.width)
+        //  =round(0.5*dim.width-0.5*oldDim.width);
+        x0:=dim.width shr 1-oldDim.width shr 1;
+        x1:= oldDim.width+x0;
+        y0:=dim.height shr 1-oldDim.height shr 1;
+        y1:= oldDim.height+y0;
+        cropAbsolute(x0,x1,y0,y1);
+      end;
     end;
   end;
 
@@ -1459,29 +1535,24 @@ PROCEDURE T_rawImage.halftone(CONST scale:single; CONST param:longint);
     if param and 1=1 then for x:=0 to xRes*yRes-1 do pt[x]:=WHITE-pt[x];
   end;
 
-PROCEDURE T_rawImage.rotate(CONST angleInDegrees:double);
+PROCEDURE T_rawImage.rotate(CONST angleInDegrees:double; CONST highQuality:boolean);
   VAR A:array[0..1] of double;
       temp:T_rawImage;
       x,y:longint;
       cx,cy:double;
       i,j:double;
 
-  FUNCTION smoothSafePixel(fx,fy:double):T_rgbColor;
-    VAR kx,ky:array[0..1] of longint;
-        w:array[0..1,0..1] of double;
-        i,j:longint;
+  FUNCTION hqPixel(CONST ix,iy:double):T_rgbFloatColor;
+    VAR k:longint;
+        points:T_pointList;
     begin
-      kx[0]:=floor(fx); kx[1]:=kx[0]+1; fx-=kx[0];
-      ky[0]:=floor(fy); ky[1]:=ky[0]+1; fy-=ky[0];
-      w[0,0]:=(1-fx)*(1-fy);
-      w[0,1]:=(1-fx)*   fy ;
-      w[1,0]:=   fx *(1-fy);
-      w[1,1]:=   fx *   fy ;
-      result:=BLACK;
-      for i:=0 to 1 do for j:=0 to 1 do if
-         (kx[i]>=0) and (kx[i]<dim.width) and
-         (ky[j]>=0) and (ky[j]<dim.height) then
-        result+=temp.pixel[kx[i],ky[j]]*w[i,j];
+      if highQuality then begin
+        points.clear;
+        for k:=0 to 31 do points.add(A[0]*(ix+darts_delta[k,0])+A[1]*(iy+darts_delta[k,1])+cx,
+                                     A[0]*(iy+darts_delta[k,1])-A[1]*(ix+darts_delta[k,0])+cy);
+        result:=temp.subPixelAverage(points);
+      end else result:=temp.simpleSubPixel(A[0]*ix+A[1]*iy+cx,
+                                           A[0]*iy-A[1]*ix+cy);
     end;
 
   begin
@@ -1490,13 +1561,11 @@ PROCEDURE T_rawImage.rotate(CONST angleInDegrees:double);
     temp.create(self);
     cx:=(dim.width-1)/2;
     cy:=(dim.height-1)/2;
-    for y:=dim.height-1 downto 0 do
+    for y:=0 to dim.height-1 do
     for x:=0 to dim.width-1 do begin
       i:=x-cx;
       j:=y-cy;
-      pixel[x,y]:=smoothSafePixel(
-        A[0]*i+A[1]*j+cx,
-        A[0]*j-A[1]*i+cy);
+      pixel[x,y]:=hqPixel(i,j);
     end;
     temp.destroy;
   end;
@@ -1512,6 +1581,121 @@ PROCEDURE T_rawImage.copyFromImageWithOffset(VAR image:T_rawImage; CONST xOff,yO
         if (tx>=0) and (tx<dimensions.width) then pixel[tx,ty]:=image[sx,sy];
       end;
     end;
+  end;
+
+FUNCTION T_rawImage.simpleSubPixel(CONST x,y:double):T_rgbFloatColor;
+  VAR kx,ky:longint;
+  begin
+    kx:=round(x); if kx<0 then kx:=0 else if kx>=dim.width then kx:=dim.width-1;
+    ky:=round(y); if ky<0 then ky:=0 else if ky>=dim.height then ky:=dim.height-1;
+    result:=data[kx+ky*dim.width];
+  end;
+
+FUNCTION T_rawImage.subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
+  VAR kx,ky:array[0..2] of longint;
+      i:longint;
+      relX,relY:double;
+      col:array[0..2] of T_rgbFloatColor;
+
+  FUNCTION between(CONST c0,c1,c2:T_rgbFloatColor; CONST tau:double):T_rgbFloatColor; inline;
+    VAR w0,w1,w2:double;
+    begin
+      w0:=-1.6875+tau*( 13.5+tau*(-27+tau*( 20- 5*tau)));
+      w1:= 5.375 +tau*(-28  +tau*( 54+tau*(-40+10*tau)));
+      w2:=-2.6875+tau*( 14.5+tau*(-27+tau*( 20- 5*tau)));
+      result[cc_red]  :=c0[cc_red  ]*w0+c1[cc_red  ]*w1+c2[cc_red  ]*w2;
+      result[cc_green]:=c0[cc_green]*w0+c1[cc_green]*w1+c2[cc_green]*w2;
+      result[cc_blue] :=c0[cc_blue ]*w0+c1[cc_blue ]*w1+c2[cc_blue ]*w2;
+    end;
+
+  VAR pointIndex:longint;
+      lastKx0:longint=maxLongint;
+      lastKy0:longint=maxLongint;
+  begin
+    result:=BLACK;
+    for pointIndex:=0 to points.fill-1 do with points.points[pointIndex] do begin
+      kx[0]:=round(x)-1; relX:=x-kx[0];
+      ky[0]:=round(y)-1; relY:=y-ky[0];
+      if (kx[0]<>lastKx0) or (ky[0]<>lastKy0) then begin
+        lastKx0:=kx[0]; lastKy0:=ky[0];
+        for i:=1 to 2 do kx[i]:=kx[0]+i;
+        for i:=1 to 2 do ky[i]:=ky[0]+i;
+        for i:=0 to 2 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width  then kx[i]:=dim.width -1;
+        for i:=0 to 2 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
+      end else begin
+        if kx[0]<0 then kx[0]:=0 else if kx[0]>=dim.width  then kx[0]:=dim.width -1;
+        if ky[0]<0 then ky[0]:=0 else if ky[0]>=dim.height then ky[0]:=dim.height-1;
+      end;
+      for i:=0 to 2 do
+        col[i]:=between(data[kx[0]+ky[i]*dim.width],data[kx[1]+ky[i]*dim.width],data[kx[2]+ky[i]*dim.width],relX);
+      result  +=between(col[0]                     ,col[1]                     ,col[2]                     ,relY);
+    end;
+    result*=1/points.fill;
+  end;
+
+FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
+  FUNCTION integrate(CONST c0,c1,c2:T_rgbFloatColor; CONST tau,phi:double):T_rgbFloatColor; inline;
+    VAR tau2,tau3,tau4,tau5,
+        dTau,dTau2,dTau3,dTau4,dTau5,
+        w0,w1,w2:double;
+    begin
+      tau2:=sqr(tau); tau3:=tau*tau2; tau4:=tau*tau3; tau5:=tau*tau4;
+      dTau:=phi-tau;
+      dTau2:=sqr(phi); dTau3:=phi*dTau2; dTau4:=phi*dTau3; dTau5:=phi*dTau4-tau5;
+      dTau2-=tau2; dTau3-=tau3; dTau4-=tau4;
+      w0:=-1.6875*dTau + 6.75*dTau2 -  9*dTau3 +  5*dTau4 - 1*dTau5;
+      w1:=  5.375*dTau - 14  *dTau2 + 18*dTau3 - 10*dTau4 + 2*dTau5;
+      w2:=-2.6875*dTau + 7.25*dTau2 -  9*dTau3 +  5*dTau4 - 1*dTau5;
+      result[cc_red]  :=c0[cc_red  ]*w0+c1[cc_red  ]*w1+c2[cc_red  ]*w2;
+      result[cc_green]:=c0[cc_green]*w0+c1[cc_green]*w1+c2[cc_green]*w2;
+      result[cc_blue] :=c0[cc_blue ]*w0+c1[cc_blue ]*w1+c2[cc_blue ]*w2;
+    end;
+
+  VAR total:array[RGB_CHANNELS] of double=(0,0,0);
+  PROCEDURE addToTotal(CONST rgb:T_rgbFloatColor); inline;
+    begin
+      total[cc_red  ]+=rgb[cc_red  ];
+      total[cc_green]+=rgb[cc_green];
+      total[cc_blue ]+=rgb[cc_blue ];
+    end;
+
+  VAR x,y,i:longint;
+      subY0,subY1,subX0,subX1,y_tau,y_phi,x_tau,x_phi:double;
+      fullY,fullX:boolean;
+      kx,ky:array[0..2] of longint;
+      col:array[0..2] of T_rgbFloatColor;
+  begin
+    for y:=round(y0) to round(y1) do begin
+      subY0:=min(min(max(max(y-0.5,y0),-0.5),y1),dimensions.height-0.5);
+      subY1:=min(min(max(max(y+0.5,y0),-0.5),y1),dimensions.height-0.5);
+      ky[0]:=y-1;
+      y_tau:=subY0-ky[0];
+      y_phi:=subY1-ky[0];
+      for i:=1 to 2 do ky[i]:=ky[0]+i;
+      for i:=0 to 2 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
+      fullY:=(abs(y_tau-0.5)<1E-3) and (abs(y_phi-0.5)<1E-3);
+
+      for x:=round(x0) to round(x1) do begin
+        subX0:=min(min(max(max(x-0.5,x0),-0.5),x1),dimensions.width-0.5);
+        subX1:=min(min(max(max(x+0.5,x0),-0.5),x1),dimensions.width-0.5);
+        kx[0]:=x-1;
+        x_tau:=subX0-kx[0];
+        x_phi:=subX1-kx[0];
+        for i:=1 to 2 do kx[i]:=kx[0]+i;
+        for i:=0 to 2 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width then kx[i]:=dim.width -1;
+        fullX:=(abs(x_tau-0.5)<1E-3) and (abs(x_phi-0.5)<1E-3);
+
+        if fullX and fullY then addToTotal(data[kx[1]+ky[1]*dim.width])
+        else begin
+          for i:=0 to 2 do col[i]:=integrate(data[kx[0]+ky[i]*dim.width],data[kx[1]+ky[i]*dim.width],data[kx[2]+ky[i]*dim.width],x_tau,x_phi);
+          addToTotal(integrate(col[0],col[1],col[2],y_tau,y_phi));
+        end;
+      end;
+    end;
+    subY0:=1/(y1-y0)/(x1-x0);
+    result[cc_red  ]:=total[cc_red  ]*subY0;
+    result[cc_green]:=total[cc_green]*subY0;
+    result[cc_blue ]:=total[cc_blue ]*subY0;
   end;
 
 INITIALIZATION
