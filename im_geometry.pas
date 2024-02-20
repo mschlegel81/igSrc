@@ -22,6 +22,13 @@ T_rotateMeta=object(T_simpleImageOperationMeta)
     FUNCTION getExpectedOutputResolution(CONST context:P_abstractWorkflow; CONST inputResolution:T_imageDimensions; CONST parameters:T_parameterValue):T_imageDimensions; virtual;
   end;
 
+P_keystoneMeta=^T_keystoneMeta;
+T_keystoneMeta=object(T_simpleImageOperationMeta)
+  public
+    CONSTRUCTOR create;
+    FUNCTION getExpectedOutputResolution(CONST context:P_abstractWorkflow; CONST inputResolution:T_imageDimensions; CONST parameters:T_parameterValue):T_imageDimensions; virtual;
+  end;
+
 { T_resizeMeta }
 P_resizeMeta=^T_resizeMeta;
 T_resizeMeta=object(T_simpleImageOperationMeta)
@@ -274,18 +281,38 @@ FUNCTION T_rotateMeta.getExpectedOutputResolution(CONST context: P_abstractWorkf
     result:=context^.limitedDimensionsForResizeStep(result);
   end;
 
+{ T_keystoneMeta }
+
+CONSTRUCTOR T_keystoneMeta.create;
+  begin
+    inherited create(imc_geometry,
+                     newParameterDescription('keystone',pt_float)^.setDefaultValue('-0.2'),
+                     @keystone_impl,
+                     sok_inputDependent);
+  end;
+
+FUNCTION T_keystoneMeta.getExpectedOutputResolution(CONST context: P_abstractWorkflow; CONST inputResolution: T_imageDimensions; CONST parameters: T_parameterValue): T_imageDimensions;
+  VAR py, newY1, newX1, newX0: double;
+  begin
+    py:=-abs(parameters.f0)/inputResolution.height;
+    newY1:=(inputResolution.height-1) /(1+py*(inputResolution.height-1));
+    newX1:=(inputResolution.width-1)/2/(1+py*(inputResolution.height-1));
+    newX0:=-newX1;
+    result:=context^.limitedDimensionsForResizeStep(imageDimensions(round(newX1-newX0+1),round(newY1+1)));
+  end;
+
 CONSTRUCTOR T_cropMeta.create;
-begin
-  inherited create(imc_geometry,
-                   newParameterDescription(OP_NAME_CROP, pt_4floats)^
-                     .addChildParameterDescription(spa_f0,'relative x0',pt_float)^
-                     .addChildParameterDescription(spa_f1,'relative x1',pt_float)^
-                     .addChildParameterDescription(spa_f2,'relative y0',pt_float)^
-                     .addChildParameterDescription(spa_f3,'relative y1',pt_float)^
-                     .setDefaultValue('0:1x0:1'),
-                   @crop_impl,
-                   sok_inputDependent)
-end;
+  begin
+    inherited create(imc_geometry,
+                     newParameterDescription(OP_NAME_CROP, pt_4floats)^
+                       .addChildParameterDescription(spa_f0,'relative x0',pt_float)^
+                       .addChildParameterDescription(spa_f1,'relative x1',pt_float)^
+                       .addChildParameterDescription(spa_f2,'relative y0',pt_float)^
+                       .addChildParameterDescription(spa_f3,'relative y1',pt_float)^
+                       .setDefaultValue('0:1x0:1'),
+                     @crop_impl,
+                     sok_inputDependent)
+  end;
 
 FUNCTION T_cropMeta.getOperationToCrop(CONST x0, x1, y0, y1: double
   ): P_simpleImageOperation;
@@ -314,6 +341,14 @@ FUNCTION registerRotateOperation(CONST name:string; CONST op: F_simpleImageOpera
   VAR tmp:P_rotateMeta;
   begin
     new(tmp,create(name,op));
+    registerOperation(tmp);
+    result:=tmp;
+  end;
+
+FUNCTION registerKeystone:P_simpleImageOperationMeta;
+  VAR tmp:P_keystoneMeta;
+  begin
+    new(tmp,create);
     registerOperation(tmp);
     result:=tmp;
   end;
@@ -351,10 +386,7 @@ INITIALIZATION
                           newParameterDescription('rotate',pt_float,-3600,3600)^.setDefaultValue('45'),
                           @rotDegrees_impl,
                           sok_inputDependent);
-  registerSimpleOperation(imc_geometry,
-                          newParameterDescription('keystone',pt_float)^.setDefaultValue('0.2'),
-                          @keystone_impl,
-                          sok_inputDependent);
+  registerKeystone;
   new(cropMeta,create);
   registerOperation(cropMeta);
 end.
