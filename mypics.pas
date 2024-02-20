@@ -656,25 +656,25 @@ PROCEDURE T_rawImage.resize(CONST tgtDim:T_imageDimensions; CONST resizeStyle: T
       clearWithColor(BLACK);
       if resizeStyle in [res_exact,res_cropToFill,res_cropRotate,res_fit,res_fitExpand,res_fitRotate]
       then begin
-        sx:=(srcRect.width )/(destRect.width );
-        sy:=(srcRect.height)/(destRect.height);
+        sx:=(srcRect.width -1)/(destRect.width -1);
+        sy:=(srcRect.height-1)/(destRect.height-1);
         for y:=destRect.top to destRect.Bottom-1 do
         for x:=destRect.Left to destRect.Right-1 do
           pixel[x,y]:=temp.subPixelBoxAvg(
-            srcRect.Left+sx*(x),
-            srcRect.Left+sx*(x+1),
-            srcRect.top +sy*(y),
-            srcRect.top +sy*(y+1));
+            srcRect.Left+sx*(x-0.5),
+            srcRect.Left+sx*(x+0.5),
+            srcRect.top +sy*(y-0.5),
+            srcRect.top +sy*(y+0.5));
       end else begin
         sx:=(srcRect.width -1)/(destRect.width -1);
         sy:=(srcRect.height-1)/(destRect.height-1);
         for y:=destRect.top to destRect.Bottom-1 do
         for x:=destRect.Left to destRect.Right-1 do
           pixel[x,y]:=temp.simpleSubPixelBoxAvg(
-            srcRect.Left+sx*(x),
-            srcRect.Left+sx*(x+1),
-            srcRect.top +sy*(y),
-            srcRect.top +sy*(y+1));
+            srcRect.Left+sx*(x-0.5),
+            srcRect.Left+sx*(x+0.5),
+            srcRect.top +sy*(y-0.5),
+            srcRect.top +sy*(y+0.5));
       end;
       temp.destroy;
     end;
@@ -1681,8 +1681,8 @@ FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
       col:array[0..2] of T_rgbFloatColor;
   begin
     for y:=round(y0) to round(y1) do begin
-      subY0:=min(min(max(max(y-0.5,y0),-0.5),y1),dim.height-0.5);
-      subY1:=min(min(max(max(y+0.5,y0),-0.5),y1),dim.height-0.5);
+      subY0:=min(max(y-0.5,y0),y1);
+      subY1:=min(max(y+0.5,y0),y1);
       ky[0]:=y-1;
       y_tau:=subY0-ky[0];
       y_phi:=subY1-ky[0];
@@ -1691,8 +1691,8 @@ FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
       fullY:=(abs(y_tau-0.5)<1E-3) and (abs(y_phi-1.5)<1E-3);
 
       for x:=round(x0) to round(x1) do begin
-        subX0:=min(min(max(max(x-0.5,x0),-0.5),x1),dim.width-0.5);
-        subX1:=min(min(max(max(x+0.5,x0),-0.5),x1),dim.width-0.5);
+        subX0:=min(max(x-0.5,x0),x1);
+        subX1:=min(max(x+0.5,x0),x1);
         kx[0]:=x-1;
         x_tau:=subX0-kx[0];
         x_phi:=subX1-kx[0];
@@ -1702,8 +1702,11 @@ FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
 
         if fullX and fullY then addToTotal(data[kx[1]+ky[1]*dim.width])
         else begin
-          for i:=0 to 2 do col[i]:=integrate(data[kx[0]+ky[i]*dim.width],data[kx[1]+ky[i]*dim.width],data[kx[2]+ky[i]*dim.width],x_tau,x_phi);
-          addToTotal(integrate(col[0],col[1],col[2],y_tau,y_phi));
+          for i:=0 to 2 do col[i]:=integrate(data[kx[0]+ky[i]*dim.width],
+                                             data[kx[1]+ky[i]*dim.width],
+                                             data[kx[2]+ky[i]*dim.width],x_tau,x_phi);
+          result:=integrate(col[0],col[1],col[2],y_tau,y_phi);
+          addToTotal(result);
         end;
       end;
     end;
@@ -1727,13 +1730,13 @@ FUNCTION T_rawImage.simpleSubPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatCol
       kx,ky:longint;
   begin
     for y:=round(y0) to round(y1) do begin
-      subY0:=min(min(max(max(y-0.5,y0),-0.5),y1),dim.height-0.5);
-      subY1:=min(min(max(max(y+0.5,y0),-0.5),y1),dim.height-0.5);
+      subY0:=min(max(y-0.5,y0),y1);
+      subY1:=min(max(y+0.5,y0),y1);
       ky:=y;
       if ky<0 then ky:=0 else if ky>=dim.height then ky:=dim.height-1;
       for x:=round(x0) to round(x1) do begin
-        subX0:=min(min(max(max(x-0.5,x0),-0.5),x1),dim.width-0.5);
-        subX1:=min(min(max(max(x+0.5,x0),-0.5),x1),dim.width-0.5);
+        subX0:=min(max(x-0.5,x0),x1);
+        subX1:=min(max(x+0.5,x0),x1);
         kx:=x;
         if kx<0 then kx:=0 else if kx>=dim.width then kx:=dim.width-1;
         addToTotal(data[kx+ky*dim.width]*((subX1-subX0)*(subY1-subY0)));
