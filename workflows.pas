@@ -161,6 +161,7 @@ USES imageManipulation,
      ig_buddhaBrot,
      im_hq3x,
      ig_generalNewtonFractals,
+     im_deconvolution,
      myStringUtil,
      LazFileUtils;
 
