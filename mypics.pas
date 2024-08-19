@@ -1602,18 +1602,142 @@ FUNCTION T_rawImage.simpleSubPixel(CONST x,y:double):T_rgbFloatColor;
     result:=data[kx+ky*dim.width];
   end;
 
+//FUNCTION T_rawImage.subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
+//  VAR kx,ky:array[-2..2] of longint;
+//      i:longint;
+//      relX,relY:double;
+//      col:array[-2..2] of T_rgbFloatColor;
+//
+//  FUNCTION between(CONST c0,c1,c2,c3,c4:T_rgbFloatColor; CONST tau:double):T_rgbFloatColor; inline;
+//    VAR w0,w1,w2,w3,w4:double;
+//    begin
+//      w0:= 0.0046875           +tau*(+0.10416666666666667+tau*(-0.0625+tau*(-0.083333333333333329+tau* 0.041666666666666664)));
+//      w1:=-0.060416666666666667+tau*(-0.70833333333333337+tau*(+0.75  +tau*(+0.16666666666666666 +tau*-0.16666666666666666 )));
+//      w2:= 1.1114583333333334  +tau*                      tau*(-1.375 +tau*                       tau* 0.25                );
+//      w3:=-0.060416666666666667+tau*(+0.70833333333333337+tau*(+0.75  +tau*(-0.16666666666666666 +tau*-0.16666666666666666 )));
+//      w4:= 0.0046875           +tau*(-0.10416666666666667+tau*(-0.0625+tau*(+0.083333333333333329+tau* 0.041666666666666664)));
+//      result[cc_red]  :=c0[cc_red  ]*w0+c1[cc_red  ]*w1+c2[cc_red  ]*w2+c3[cc_red  ]*w3+c4[cc_red  ]*w4;
+//      result[cc_green]:=c0[cc_green]*w0+c1[cc_green]*w1+c2[cc_green]*w2+c3[cc_green]*w3+c4[cc_green]*w4;
+//      result[cc_blue] :=c0[cc_blue ]*w0+c1[cc_blue ]*w1+c2[cc_blue ]*w2+c3[cc_blue ]*w3+c4[cc_blue ]*w4;
+//    end;
+//
+//  VAR pointIndex:longint;
+//      lastKx0:longint=maxLongint;
+//      lastKy0:longint=maxLongint;
+//      cumulated :T_rgbFloatColor=(0,0,0);
+//      lastResult:T_rgbFloatColor=(0,0,0);
+//  begin
+//    for pointIndex:=0 to points.fill-1 do with points.points[pointIndex] do begin
+//      kx[0]:=round(x); relX:=x-kx[0];
+//      ky[0]:=round(y); relY:=y-ky[0];
+//      if (kx[0]<>lastKx0) or (ky[0]<>lastKy0) then begin
+//        lastKx0:=kx[0]; lastKy0:=ky[0];
+//        for i:=-2 to 2 do kx[i]:=kx[0]+i;
+//        for i:=-2 to 2 do ky[i]:=ky[0]+i;
+//        for i:=-2 to 2 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width  then kx[i]:=dim.width -1;
+//        for i:=-2 to 2 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
+//      end else begin
+//        if kx[0]<0 then kx[0]:=0 else if kx[0]>=dim.width  then kx[0]:=dim.width -1;
+//        if ky[0]<0 then ky[0]:=0 else if ky[0]>=dim.height then ky[0]:=dim.height-1;
+//      end;
+//      for i:=-2 to 2 do
+//        col[i]:=between(data[kx[-2]+ky[i]*dim.width],
+//                        data[kx[-1]+ky[i]*dim.width],
+//                        data[kx[ 0]+ky[i]*dim.width],
+//                        data[kx[ 1]+ky[i]*dim.width],
+//                        data[kx[ 2]+ky[i]*dim.width],relX);
+//      result:=between(col[-2],col[-1],col[0],col[1],col[2],relY);
+//      cumulated+=result;
+//      result:=cumulated*(1/(pointIndex+1));
+//      if (pointIndex>3) and (colDiff(result,lastResult)<4E-3) then exit(result);
+//      lastResult:=result;
+//    end;
+//  end;
+//
+//FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
+//  FUNCTION integrate(CONST c0,c1,c2,c3,c4:T_rgbFloatColor; CONST tau,phi:double):T_rgbFloatColor; inline;
+//    VAR tau2,tau3,tau4,tau5,
+//        dTau,dTau2,dTau3,dTau4,dTau5,
+//        w0,w1,w2,w3,w4:double;
+//    begin
+//      tau2:=sqr(tau); tau3:=tau*tau2; tau4:=tau*tau3; tau5:=tau*tau4;
+//      dTau:=phi-tau;
+//      dTau2:=sqr(phi); dTau3:=phi*dTau2; dTau4:=phi*dTau3; dTau5:=phi*dTau4-tau5;
+//      dTau2-=tau2; dTau3-=tau3; dTau4-=tau4;
+//      w0:=  0.0046875           *dTau + 0.052083333333333336*dTau2 - 0.020833333333333332*dTau3 - 0.020833333333333332*dTau4 + 0.008333333333333333*dTau5;
+//      w1:=- 0.060416666666666667*dTau - 0.35416666666666669 *dTau2 + 0.25                *dTau3 + 0.041666666666666664*dTau4 - 0.03333333333333333 *dTau5;
+//      w2:=  1.1114583333333334  *dTau                              - 0.4583333333333333  *dTau3                              + 0.05                *dTau5;
+//      w3:=- 0.060416666666666667*dTau + 0.35416666666666669 *dTau2 + 0.25                *dTau3 - 0.041666666666666664*dTau4 - 0.03333333333333333 *dTau5;
+//      w4:=  0.0046875           *dTau - 0.052083333333333336*dTau2 - 0.020833333333333332*dTau3 + 0.020833333333333332*dTau4 + 0.008333333333333333*dTau5;
+//      result[cc_red]  :=c0[cc_red  ]*w0+c1[cc_red  ]*w1+c2[cc_red  ]*w2+c3[cc_red  ]*w3+c4[cc_red  ]*w4;
+//      result[cc_green]:=c0[cc_green]*w0+c1[cc_green]*w1+c2[cc_green]*w2+c3[cc_green]*w3+c4[cc_green]*w4;
+//      result[cc_blue] :=c0[cc_blue ]*w0+c1[cc_blue ]*w1+c2[cc_blue ]*w2+c3[cc_blue ]*w3+c4[cc_blue ]*w4;
+//    end;
+//
+//  VAR total:array[RGB_CHANNELS] of double=(0,0,0);
+//  PROCEDURE addToTotal(CONST rgb:T_rgbFloatColor); inline;
+//    begin
+//      total[cc_red  ]+=rgb[cc_red  ];
+//      total[cc_green]+=rgb[cc_green];
+//      total[cc_blue ]+=rgb[cc_blue ];
+//    end;
+//
+//  VAR x,y,i:longint;
+//      subY0,subY1,subX0,subX1,y_tau,y_phi,x_tau,x_phi:double;
+//      fullY,fullX:boolean;
+//      kx,ky:array[-2..2] of longint;
+//      col:array  [-2..2] of T_rgbFloatColor;
+//  begin
+//    for y:=round(y0) to round(y1) do begin
+//      subY0:=min(max(y-0.5,y0),y1);
+//      subY1:=min(max(y+0.5,y0),y1);
+//      ky[0]:=y;
+//      y_tau:=subY0-ky[0];
+//      y_phi:=subY1-ky[0];
+//      for i:=-2 to 2 do ky[i]:=ky[0]+i;
+//      for i:=-2 to 2 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
+//      fullY:=(abs(y_tau+0.5)<1E-3) and (abs(y_phi-0.5)<1E-3);
+//
+//      for x:=round(x0) to round(x1) do begin
+//        subX0:=min(max(x-0.5,x0),x1);
+//        subX1:=min(max(x+0.5,x0),x1);
+//        kx[0]:=x;
+//        x_tau:=subX0-kx[0];
+//        x_phi:=subX1-kx[0];
+//        for i:=-2 to 2 do kx[i]:=kx[0]+i;
+//        for i:=-2 to 2 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width then kx[i]:=dim.width -1;
+//        fullX:=(abs(x_tau+0.5)<1E-3) and (abs(x_phi-0.5)<1E-3);
+//
+//        if fullX and fullY then addToTotal(data[kx[0]+ky[0]*dim.width])
+//        else begin
+//          for i:=-2 to 2 do col[i]:=integrate(data[kx[-2]+ky[i]*dim.width],
+//                                              data[kx[-1]+ky[i]*dim.width],
+//                                              data[kx[ 0]+ky[i]*dim.width],
+//                                              data[kx[ 1]+ky[i]*dim.width],
+//                                              data[kx[ 2]+ky[i]*dim.width],x_tau,x_phi);
+//          result:=integrate(col[-2],col[-1],col[0],col[1],col[2],y_tau,y_phi);
+//          addToTotal(result);
+//        end;
+//      end;
+//    end;
+//    subY0:=1/(y1-y0)/(x1-x0);
+//    result[cc_red  ]:=total[cc_red  ]*subY0;
+//    result[cc_green]:=total[cc_green]*subY0;
+//    result[cc_blue ]:=total[cc_blue ]*subY0;
+//  end;
+
 FUNCTION T_rawImage.subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
-  VAR kx,ky:array[0..2] of longint;
+  VAR kx,ky:array[-1..1] of longint;
       i:longint;
       relX,relY:double;
-      col:array[0..2] of T_rgbFloatColor;
+      col:array[-1..1] of T_rgbFloatColor;
 
   FUNCTION between(CONST c0,c1,c2:T_rgbFloatColor; CONST tau:double):T_rgbFloatColor; inline;
     VAR w0,w1,w2:double;
     begin
-      w0:=-1.6875+tau*( 13.5+tau*(-27+tau*( 20- 5*tau)));
-      w1:= 5.375 +tau*(-28  +tau*( 54+tau*(-40+10*tau)));
-      w2:=-2.6875+tau*( 14.5+tau*(-27+tau*( 20- 5*tau)));
+      w0:=-0.13541666666666666+tau*(-0.5+tau*( 1.75-tau*tau*0.83333333333333337));
+      w1:= 1.2708333333333333 +tau*      tau*(-3.5 +tau*tau*1.6666666666666667 ) ;
+      w2:=-0.13541666666666666+tau*(+0.5+tau*( 1.75-tau*tau*0.83333333333333337));
       result[cc_red]  :=c0[cc_red  ]*w0+c1[cc_red  ]*w1+c2[cc_red  ]*w2;
       result[cc_green]:=c0[cc_green]*w0+c1[cc_green]*w1+c2[cc_green]*w2;
       result[cc_blue] :=c0[cc_blue ]*w0+c1[cc_blue ]*w1+c2[cc_blue ]*w2;
@@ -1626,21 +1750,23 @@ FUNCTION T_rawImage.subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
       lastResult:T_rgbFloatColor=(0,0,0);
   begin
     for pointIndex:=0 to points.fill-1 do with points.points[pointIndex] do begin
-      kx[0]:=round(x)-1; relX:=x-kx[0];
-      ky[0]:=round(y)-1; relY:=y-ky[0];
+      kx[0]:=round(x); relX:=x-kx[0];
+      ky[0]:=round(y); relY:=y-ky[0];
       if (kx[0]<>lastKx0) or (ky[0]<>lastKy0) then begin
         lastKx0:=kx[0]; lastKy0:=ky[0];
-        for i:=1 to 2 do kx[i]:=kx[0]+i;
-        for i:=1 to 2 do ky[i]:=ky[0]+i;
-        for i:=0 to 2 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width  then kx[i]:=dim.width -1;
-        for i:=0 to 2 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
+        for i:=-1 to 1 do kx[i]:=kx[0]+i;
+        for i:=-1 to 1 do ky[i]:=ky[0]+i;
+        for i:=-1 to 1 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width  then kx[i]:=dim.width -1;
+        for i:=-1 to 1 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
       end else begin
         if kx[0]<0 then kx[0]:=0 else if kx[0]>=dim.width  then kx[0]:=dim.width -1;
         if ky[0]<0 then ky[0]:=0 else if ky[0]>=dim.height then ky[0]:=dim.height-1;
       end;
-      for i:=0 to 2 do
-        col[i]:=between(data[kx[0]+ky[i]*dim.width],data[kx[1]+ky[i]*dim.width],data[kx[2]+ky[i]*dim.width],relX);
-      result:=between(col[0],col[1],col[2],relY);
+      for i:=-1 to 1 do
+        col[i]:=between(data[kx[-1]+ky[i]*dim.width],
+                        data[kx[ 0]+ky[i]*dim.width],
+                        data[kx[ 1]+ky[i]*dim.width],relX);
+      result:=between(col[-1],col[0],col[1],relY);
       cumulated+=result;
       result:=cumulated*(1/(pointIndex+1));
       if (pointIndex>3) and (colDiff(result,lastResult)<4E-3) then exit(result);
@@ -1650,17 +1776,17 @@ FUNCTION T_rawImage.subPixelAverage(CONST points:T_pointList):T_rgbFloatColor;
 
 FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
   FUNCTION integrate(CONST c0,c1,c2:T_rgbFloatColor; CONST tau,phi:double):T_rgbFloatColor; inline;
-    VAR tau2,tau3,tau4,tau5,
-        dTau,dTau2,dTau3,dTau4,dTau5,
+    VAR tau2,tau3,tau5,
+        dTau,dTau2,dTau3,dTau5,
         w0,w1,w2:double;
     begin
-      tau2:=sqr(tau); tau3:=tau*tau2; tau4:=tau*tau3; tau5:=tau*tau4;
+      tau2:=sqr(tau); tau3:=tau*tau2; tau5:=tau3*tau2;
       dTau:=phi-tau;
-      dTau2:=sqr(phi); dTau3:=phi*dTau2; dTau4:=phi*dTau3; dTau5:=phi*dTau4-tau5;
-      dTau2-=tau2; dTau3-=tau3; dTau4-=tau4;
-      w0:=-1.6875*dTau + 6.75*dTau2 -  9*dTau3 +  5*dTau4 - 1*dTau5;
-      w1:=  5.375*dTau - 14  *dTau2 + 18*dTau3 - 10*dTau4 + 2*dTau5;
-      w2:=-2.6875*dTau + 7.25*dTau2 -  9*dTau3 +  5*dTau4 - 1*dTau5;
+      dTau2:=sqr(phi); dTau3:=phi*dTau2; dTau5:=dTau3*dTau2-tau5;
+      dTau2-=tau2; dTau3-=tau3;
+      w0:=-0.13541666666666666*dTau - 0.25*dTau2 +0.58333333333333337*dTau3 - 0.16666666666666666*dTau5;
+      w1:=+1.2708333333333333 *dTau              -1.1666666666666667 *dTau3 + 0.3333333333333333 *dTau5;
+      w2:=-0.13541666666666666*dTau + 0.25*dTau2 +0.58333333333333337*dTau3 - 0.16666666666666666*dTau5;
       result[cc_red]  :=c0[cc_red  ]*w0+c1[cc_red  ]*w1+c2[cc_red  ]*w2;
       result[cc_green]:=c0[cc_green]*w0+c1[cc_green]*w1+c2[cc_green]*w2;
       result[cc_blue] :=c0[cc_blue ]*w0+c1[cc_blue ]*w1+c2[cc_blue ]*w2;
@@ -1677,35 +1803,35 @@ FUNCTION T_rawImage.subPixelBoxAvg(CONST x0,x1,y0,y1:double):T_rgbFloatColor;
   VAR x,y,i:longint;
       subY0,subY1,subX0,subX1,y_tau,y_phi,x_tau,x_phi:double;
       fullY,fullX:boolean;
-      kx,ky:array[0..2] of longint;
-      col:array[0..2] of T_rgbFloatColor;
+      kx,ky:array[-1..1] of longint;
+      col:array  [-1..1] of T_rgbFloatColor;
   begin
     for y:=round(y0) to round(y1) do begin
       subY0:=min(max(y-0.5,y0),y1);
       subY1:=min(max(y+0.5,y0),y1);
-      ky[0]:=y-1;
+      ky[0]:=y;
       y_tau:=subY0-ky[0];
       y_phi:=subY1-ky[0];
-      for i:=1 to 2 do ky[i]:=ky[0]+i;
-      for i:=0 to 2 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
-      fullY:=(abs(y_tau-0.5)<1E-3) and (abs(y_phi-1.5)<1E-3);
+      for i:=-1 to 1 do ky[i]:=ky[0]+i;
+      for i:=-1 to 1 do if ky[i]<0 then ky[i]:=0 else if ky[i]>=dim.height then ky[i]:=dim.height-1;
+      fullY:=(abs(y_tau+0.5)<1E-3) and (abs(y_phi-0.5)<1E-3);
 
       for x:=round(x0) to round(x1) do begin
         subX0:=min(max(x-0.5,x0),x1);
         subX1:=min(max(x+0.5,x0),x1);
-        kx[0]:=x-1;
+        kx[0]:=x;
         x_tau:=subX0-kx[0];
         x_phi:=subX1-kx[0];
-        for i:=1 to 2 do kx[i]:=kx[0]+i;
-        for i:=0 to 2 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width then kx[i]:=dim.width -1;
-        fullX:=(abs(x_tau-0.5)<1E-3) and (abs(x_phi-1.5)<1E-3);
+        for i:=-1 to 1 do kx[i]:=kx[0]+i;
+        for i:=-1 to 1 do if kx[i]<0 then kx[i]:=0 else if kx[i]>=dim.width then kx[i]:=dim.width -1;
+        fullX:=(abs(x_tau+0.5)<1E-3) and (abs(x_phi-0.5)<1E-3);
 
-        if fullX and fullY then addToTotal(data[kx[1]+ky[1]*dim.width])
+        if fullX and fullY then addToTotal(data[kx[0]+ky[0]*dim.width])
         else begin
-          for i:=0 to 2 do col[i]:=integrate(data[kx[0]+ky[i]*dim.width],
-                                             data[kx[1]+ky[i]*dim.width],
-                                             data[kx[2]+ky[i]*dim.width],x_tau,x_phi);
-          result:=integrate(col[0],col[1],col[2],y_tau,y_phi);
+          for i:=-1 to 1 do col[i]:=integrate(data[kx[-1]+ky[i]*dim.width],
+                                              data[kx[ 0]+ky[i]*dim.width],
+                                              data[kx[ 1]+ky[i]*dim.width],x_tau,x_phi);
+          result:=integrate(col[-1],col[0],col[1],y_tau,y_phi);
           addToTotal(result);
         end;
       end;
