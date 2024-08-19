@@ -3,7 +3,7 @@ printPattern(i:Int)->
   (i|vectorIfThenElse((2^[0..7] and i)>0,'#',' '));
 
 decodePattern(i:Int)->begin
-  local P:=(2^[0..7] and i)>0;
+  P:=(2^[0..7] and i)>0;
   P.head(4)|true|P.tail(4);
 end;
 
@@ -21,8 +21,8 @@ ROT_270:=ROT_180[ROT_90];
 ALL_SYMMETRIES:=[ROT_90,ROT_180,ROT_270,MIRROR,ROT_90[MIRROR],ROT_180[MIRROR],ROT_270[MIRROR]];
 
 sym_of(i:Int)->begin
-  local pat:=i.decodePattern;
-  local seen:=[i].toSet;
+  pat:=i.decodePattern;
+  seen:=[i].toSet;
   ALL_SYMMETRIES
     .map((sym)->encodePattern(pat[sym])=>sym)
     .each(r,r[0] in seen ? void : begin
@@ -32,8 +32,8 @@ sym_of(i:Int)->begin
 end;
 
 SYMMETRIC_PATTERN:=begin
-  local M:=[].toMap;
-  local seen:=[].toSet;
+  M:=[].toMap;
+  seen:=[].toSet;
   [0..255].each(i,i in seen ? void : begin
     seen|=i;
     sym_of(i).each(r,begin
@@ -368,23 +368,23 @@ PATTERN_EXTENSIONS:=[
 setEl(L:List,idx,value)->L.each(x,index=idx ? value : x);
 
 generateCode(pattern_index:Int)->begin
-  local stencil:=decodePattern(pattern_index);
-  local symmetry:=SYMMETRIC_PATTERN[pattern_index] orElse [pattern_index,[0..8]];
-  local output:=PATTERN_EXTENSIONS[symmetry[0]][symmetry[1]];
+  stencil:=decodePattern(pattern_index);
+  symmetry:=SYMMETRIC_PATTERN[pattern_index] orElse [pattern_index,[0..8]];
+  output:=PATTERN_EXTENSIONS[symmetry[0]][symmetry[1]];
 
-  local mixSimilar  :=output.map((k)->k in ['#','+','?']);
-  local mixDifferent:=output.map((k)->k in [' ','+','?']);
+  mixSimilar  :=output.map((k)->k in ['#','+','?']);
+  mixDifferent:=output.map((k)->k in [' ','+','?']);
 
-  local useStencil:=(recX,recY,stX,stY,weight)->begin
-    local rec:=(recX+1)*3+recY+1;
-    local st :=(stX +1)*3+stY +1;
+  useStencil:=(recX,recY,stX,stY,weight)->begin
+    rec:=(recX+1)*3+recY+1;
+    st :=(stX +1)*3+stY +1;
     stencil[st] and mixSimilar[rec] or !stencil[st] and mixDifferent[rec]
     ? [format('stencil[%s,%s]*',stX,stY),weight]
     : void;
   end;
 
-  local mix:=(recX,recY)->begin
-    local Q:=
+  mix:=(recX,recY)->begin
+    Q:=
     (recX=0
      ? recY=0
        ? [[0,0,8]]
@@ -393,7 +393,7 @@ generateCode(pattern_index:Int)->begin
        ? [[0,0,2],[recX,0,1]]
        : [[0,0,4],[recX,0,2],[0,recY,2],[recX,recY,1]])
     .each(m,useStencil(recX,recY,m[0],m[1],m[2]));
-    local totalWeight:=Q.getInner(1).agg(+);
+    totalWeight:=Q.getInner(1).agg(+);
     Q.size <= 1
     ? format('  outputCol[%2s,3*x+%s]:=%s;',recY,recX+1,Q[0,0].replace('*',''))
     : format('  outputCol[%2s,3*x+%s]:=%s;',recY,recX+1,Q.each(entry,entry[0]&(entry[1]/totalWeight)).join('+'));
@@ -410,23 +410,23 @@ generateCode->begin
 end;
 
 reconstruction_mask(pattern_index:Int)->begin
-  local stencil:=decodePattern(pattern_index);
-  local symmetry:=SYMMETRIC_PATTERN[pattern_index] orElse [pattern_index,[0..8]];
-  local output:=PATTERN_EXTENSIONS[symmetry[0]][symmetry[1]];
+  stencil:=decodePattern(pattern_index);
+  symmetry:=SYMMETRIC_PATTERN[pattern_index] orElse [pattern_index,[0..8]];
+  output:=PATTERN_EXTENSIONS[symmetry[0]][symmetry[1]];
 
-  local mixSimilar  :=output.map((k)->k in ['#','+','?']);
-  local mixDifferent:=output.map((k)->k in [' ','+','?']);
+  mixSimilar  :=output.map((k)->k in ['#','+','?']);
+  mixDifferent:=output.map((k)->k in [' ','+','?']);
 
-  local useStencil:=(recX,recY,stX,stY,weight)->begin
-    local rec:=(recX+1)*3+recY+1;
-    local st :=(stX +1)*3+stY +1;
+  useStencil:=(recX,recY,stX,stY,weight)->begin
+    rec:=(recX+1)*3+recY+1;
+    st :=(stX +1)*3+stY +1;
      stencil[st] and mixSimilar  [rec] or
     !stencil[st] and mixDifferent[rec]
     ? [st,weight]
     : void;
   end;
-  local mix:=(recX,recY)->begin
-    local Q:=
+  mix:=(recX,recY)->begin
+    Q:=
     (recX=0
      ? recY=0
        ? [[0,0,8]]
@@ -435,18 +435,18 @@ reconstruction_mask(pattern_index:Int)->begin
        ? [[0,0,2],[recX,0,1]]
        : [[0,0,4],[recX,0,2],[0,recY,2],[recX,recY,1]])
     .each(m,useStencil(recX,recY,m[0],m[1],m[2]));
-    local totalWeight:=Q.getInner(1).agg(+);
+    totalWeight:=Q.getInner(1).agg(+);
     Q.getInner(1).groupToList(Q.getInner(0),0,::orElse,9)/totalWeight;
   end;
   [-1..1].each(recY,[-1..1].each(recX,mix(recY,recX)),|);
 end;
 
 reconstruct(stencil_:BooleanList(9))->begin
-  local inverted:=!stencil_[4];
-  local pattern_index:=encodePattern(inverted ? !stencil_ : stencil_);
-  local symmetry:=SYMMETRIC_PATTERN[pattern_index] orElse [pattern_index,[0..8]];
-  local numStencil:=ord(stencil_);
-  local r:=reconstruction_mask(pattern_index)
+  inverted:=!stencil_[4];
+  pattern_index:=encodePattern(inverted ? !stencil_ : stencil_);
+  symmetry:=SYMMETRIC_PATTERN[pattern_index] orElse [pattern_index,[0..8]];
+  numStencil:=ord(stencil_);
+  r:=reconstruction_mask(pattern_index)
   .map((w)->(w*numStencil).agg(+));
   [r,
    inverted ? 'i' : ' ',
@@ -457,7 +457,7 @@ end;
 ANY:='?';
 
 reconstruct(stencil_:List(9))->begin
-  local stencils:=[stencil_];
+  stencils:=[stencil_];
   indexOf(stencil_.map((s)->s==ANY))
   .map((i)->((S,value)->S.each(s,index==i ? value : s)))
   .each(f,stencils:=stencils.each(stencil,f(stencil,true),f(stencil,false)));
@@ -465,11 +465,11 @@ reconstruct(stencil_:List(9))->begin
 end;
 
 scaleUp(s:String,yOffset)->begin
-  local env:=s.chars[[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30]]='#';
+  env:=s.chars[[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30]]='#';
   assert(env.isBooleanList(16));
 
 
-  local reconstruction:=
+  reconstruction:=
   [[ANY,ANY   ,ANY,
     ANY,env[0],env[1],
     ANY,env[4],env[5]],
@@ -535,7 +535,7 @@ scaleUp(s:String,yOffset)->begin
          reconstruction[10,2],
          reconstruction[10,3],
          reconstruction[10,1]);
-  local R:=1-reconstruction.getInner(0);
+  R:=1-reconstruction.getInner(0);
 
 
   setOptions(["x0"=>-1,"x1"=>1,"y0"=>-1,"y1"=>1,"fontsize"=>10,"preserveAspect"=>true,"autoscaleX"=>true,"autoscaleY"=>true,"logscaleX"=>false,"logscaleY"=>false,"autoscaleFactor"=>1,"axisStyleX"=>0,"axisStyleY"=>0].toMap);
@@ -564,10 +564,10 @@ BIT_FLIPS:=[0..3,5..8].each(i,[0..8]=i);
 checkSimilarPatterns->begin
   PATTERN_EXTENSIONS.filter((e)->'?' in e[1]).getInner(0).sort
   .pEach(pat,begin
-     local Q0:=decodePattern(pat);
-     local R0:=reconstruct(Q0);
+     Q0:=decodePattern(pat);
+     R0:=reconstruct(Q0);
      BIT_FLIPS.map((flip)->flip xor Q0).each(Q1,begin
-       local R1:=reconstruct(Q1);
+       R1:=reconstruct(Q1);
        [euklideanNorm(R0[0]-R1[0]),
         [Q0,R0],
         [Q1,R1]];
