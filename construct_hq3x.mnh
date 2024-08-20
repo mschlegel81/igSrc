@@ -1,3 +1,4 @@
+@SuppressUnusedWarning
 printPattern(i:Int)->
   "%3d: %s %s %s\n     %s # %s\n     %s %s %s".printf@
   (i|vectorIfThenElse((2^[0..7] and i)>0,'#',' '));
@@ -365,6 +366,7 @@ PATTERN_EXTENSIONS:=[
      .map((e)->e[0]=>e[1].chars[[0,2,4,6,8,10,12,14,16]]).toMap;
 
 
+@SuppressUnusedWarning
 setEl(L:List,idx,value)->L.each(x,index=idx ? value : x);
 
 generateCode(pattern_index:Int)->begin
@@ -464,6 +466,7 @@ reconstruct(stencil_:List(9))->begin
   [stencils.pMap(::reconstruct).getInner(0).agg(+)/stencils.size,'?','?','?'];
 end;
 
+@SuppressUnusedWarning
 scaleUp(s:String,yOffset)->begin
   env:=s.chars[[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30]]='#';
   assert(env.isBooleanList(16));
@@ -561,6 +564,7 @@ end;
 
 BIT_FLIPS:=[0..3,5..8].each(i,[0..8]=i);
 
+@SuppressUnusedWarning
 checkSimilarPatterns->begin
   PATTERN_EXTENSIONS.filter((e)->'?' in e[1]).getInner(0).sort
   .pEach(pat,begin
