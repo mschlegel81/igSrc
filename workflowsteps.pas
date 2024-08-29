@@ -42,7 +42,6 @@ end;
 
 IMPLEMENTATION
 USES sysutils;
-VAR next_hash:longword=0;
 PROCEDURE T_workflowStep.setSpecification(CONST spec: string);
   begin
     if specString=spec then exit;
